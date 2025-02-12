@@ -1,0 +1,39 @@
+Hand-writing a parser:
+
+
+
+# Use enum for Rust
+class Token:
+    pass
+
+class OpenParen(Token):
+    pass
+
+
+
+
+
+class Scanner:
+    rest: str
+    def __init__(self, input: str)
+        self.rest = input
+
+    def is_end_of_file(self) -> bool:
+        return len(self.rest) == 0
+
+
+    def peek(self) -> str | None:
+        if not self.is_end_of_file():
+            return self.rest[0]
+
+    def gobble(self, ntoken: int) ->str | None:
+        if not self.is_end_of_file():
+            self.rest = self.rest[n:]
+
+
+
+
+
+
+
+

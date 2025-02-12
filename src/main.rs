@@ -1,6 +1,8 @@
-// Example usage: cargo run tests/hello.decaf --target=scan
+// Example usage: cargo run tests/inputs/hello.dcf -t <scan, parse,>
 mod add;
 mod utils;
+mod scan;
+mod parse;
 // Additional packages: anyhow (error types), nom (parsing), clap (cli args)
 
 // Heap allocated structures:
@@ -30,18 +32,18 @@ fn main() {
         );
     }
 
+
     // Perform a compiler action based on the specified target
     match args.target {
         utils::cli::CompilerAction::Default => {
             panic!("Invalid target");
         }
         utils::cli::CompilerAction::Scan => {
-            // todo!("scan");
-            println!("arguments are: {}", input);
-            scan(&input);
+            scan::scan(&input);
         }
         utils::cli::CompilerAction::Parse => {
             todo!("parse");
+            // parse::parse(&input);
         }
         utils::cli::CompilerAction::Inter => {
             todo!("inter");
@@ -50,31 +52,4 @@ fn main() {
             todo!("assembly");
         }
     }
-}
-
-
-/*
- Input: a Decaf source file String as input. 
-
- Effects: Outputs a sequence of tokens. 
-*/
-fn scan(_file: &String) -> Vec<u8>{
-    // careful about comments!
-    let output = Vec::new();
-    println!("SCANNING");
-    output
-}
-
-
-/* 
- Input: a sequence of tokens produced by the scanner.
-
- Effects:
- - Verifies that tokens conform to valid Decaf via the language specification
- - Outputs a syntax tree representation of the Decaf program
-*/
-fn _parse() {
-    // use nom for parser
-    // enum for AST
-    println!("PARSING");
 }
