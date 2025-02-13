@@ -16,7 +16,6 @@ fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     }
 }
 
-
 fn main() {
     let args = utils::cli::parse();
     let input = std::fs::read_to_string(&args.input).expect("Filename is incorrect.");
