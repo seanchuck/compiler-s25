@@ -21,7 +21,8 @@ fn main() {
     let input = std::fs::read_to_string(&args.input).expect("Filename is incorrect.");
 
     // Use writeln!(writer, "template string") to write to stdout ot file.
-    let _writer = get_writer(&args.output);
+    let mut writer = get_writer(&args.output);
+    let filename = args.input.to_string_lossy().to_string();
 
     // Print debugging information
     if args.debug {
@@ -31,13 +32,14 @@ fn main() {
         );
     }
 
+
     // Perform a compiler action based on the specified target
     match args.target {
         utils::cli::CompilerAction::Default => {
             panic!("Invalid target");
         }
         utils::cli::CompilerAction::Scan => {
-            scan::scan(&input);
+            scan::scan(&input, &filename, &mut writer);
         }
         utils::cli::CompilerAction::Parse => {
             todo!("parse");
