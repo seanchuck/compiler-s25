@@ -1,4 +1,4 @@
-/* 
+/*
  Input: a sequence of tokens produced by the scanner.
 
  Effects:

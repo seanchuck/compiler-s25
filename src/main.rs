@@ -1,8 +1,8 @@
 // Example usage: cargo run tests/inputs/hello.dcf -t <scan, parse,>
 mod add;
-mod utils;
-mod scan;
 mod parse;
+mod scan;
+mod utils;
 // Additional packages: anyhow (error types), nom (parsing), clap (cli args)
 
 // Heap allocated structures:
@@ -12,7 +12,7 @@ mod parse;
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
         Some(path) => Box::new(std::fs::File::create(path.as_path()).unwrap()),
-        None => Box::new(std::io::stdout())
+        None => Box::new(std::io::stdout()),
     }
 }
 
@@ -30,7 +30,6 @@ fn main() {
             args.input, args.debug, args.opt, args.output, args.target
         );
     }
-
 
     // Perform a compiler action based on the specified target
     match args.target {
