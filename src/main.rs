@@ -1,4 +1,4 @@
-// Example usage: cargo run tests/inputs/hello.dcf -t <scan, parse,>
+// Example usage: cargo run tests/hello.dcf -t <scan, parse,>
 mod add;
 mod parse;
 mod scan;

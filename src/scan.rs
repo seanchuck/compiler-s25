@@ -267,7 +267,7 @@ fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_
                                 consume(program, current_col, 1);
                                 return Ok( TokenInfo { token : Token::Literal(Literal::Long(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
                             }
-                            ';' | ',' | ')' | ']' => {
+                            ';' | ',' | ')' | ']' | ' ' => {
                                 return Ok( TokenInfo { token : Token::Literal(Literal::Int(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
                             }
                             _ => {
@@ -292,7 +292,7 @@ fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_
                     consume(program, current_col, 1);
                     return Ok( TokenInfo { token : Token::Literal(Literal::Long(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
                 }
-                ';' | ',' | ')' | ']' => {
+                ';' | ',' | ')' | ']' | ' ' => {
                     return Ok( TokenInfo { token : Token::Literal(Literal::Int(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
                 }
                 _ => {
@@ -316,7 +316,7 @@ fn lex_keyword_or_identifier(program: &mut Vec<char>, current_line: &mut i32, cu
         // Bail out if we see whitespace or opening parens, signaling end of token
 
         match character {
-            ' ' | '(' => {
+            ';' | ',' | ')' | ']' | ' ' | '(' => {
                 break;
             }
             _ => {
