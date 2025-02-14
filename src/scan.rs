@@ -2,7 +2,7 @@
 Scanner.
 */
 
-use std::fmt::Write;
+use std::{fmt::Write, process};
 
 use anyhow::{anyhow, Result};
 /*
@@ -527,6 +527,7 @@ The main scan function for this file.
 pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) -> Vec<Token> {
     let mut program: Vec<char> = file.chars().collect();
     let mut tokens: Vec<Token> = vec![];
+    let mut found_err = false;
 
     // Keep track of line and column for error-handling purposes
     let (mut current_line, mut current_col) = (1, 1);
@@ -588,11 +589,16 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
                 tokens.push(token_info.token);
             }
             Err(token_value) => {
+                found_err = true;
                 let template_string = format!("Error in \"{}\" (line {}, column {})\t→\t{}\n",
                     filename, current_line, current_col, token_value);
                     writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
             }
         }
+    }
+
+    if found_err {
+        process::exit(1);
     }
 
     // println!("Tokens are:\n {:?}", tokens);
