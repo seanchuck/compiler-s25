@@ -2,9 +2,8 @@
 Scanner.
 */
 
-use std::{fmt::Write, process};
-
 use anyhow::{anyhow, Result};
+use std::process;
 /*
 Tokens: Identifier, Keyword, string literal, numeric literal (decimal, hex), Operator
 Keywords: if, bool, break, import, continue, else, false, for, while, int, long, return, len, true, void
@@ -76,14 +75,15 @@ Ensure: consumption is done correctly
 */
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct TokenInfo {
     pub token: Token,
     pub display: String,
     pub line: i32,
-    pub col: i32
-
+    pub col: i32,
 }
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum Token {
     Keyword(Keyword), // Keyword variant has type Keyword
     Identifier(String),
@@ -99,18 +99,20 @@ pub enum Keyword {
     Import,
     Continue,
     Else,
-    False,
     For,
     While,
     Int,
     Long,
     Return,
     Len,
-    True,
     Void,
+    // never constructed since captured in boolean literals
+    // True,
+    // False,
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum Symbol {
     Operator(Operator),
     Punctuation(Punctuation),
@@ -247,12 +249,15 @@ fn gobble_comment(
     }
 }
 
-
-/* 
-Typically for literals, we continue matching until a termination character: 
+/*
+Typically for literals, we continue matching until a termination character:
 (';' | ',' | ')' | ']' | ' ' | '(' | '\n')
 */
-fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) -> Result<TokenInfo> {
+fn lex_numeric_literal(
+    program: &mut Vec<char>,
+    current_line: &mut i32,
+    current_col: &mut i32,
+) -> Result<TokenInfo> {
     // Allow: Hex (0x), normal long
     // Termination at: (;), (,), (L), ()), (])
     let mut nliteral = String::new();
@@ -272,15 +277,24 @@ fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_
                             }
                             'L' => {
                                 consume(program, current_col, 1);
-                                return Ok( TokenInfo { token : Token::Literal(Literal::HexLong(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
+                                return Ok(TokenInfo {
+                                    token: Token::Literal(Literal::HexLong(nliteral.clone())),
+                                    display: nliteral,
+                                    line: *current_line,
+                                    col: *current_col,
+                                });
                             }
                             // ';' | ',' | ')' | ']' | ' ' | '\n' => {
                             _ => {
-                                return Ok( TokenInfo { token : Token::Literal(Literal::HexInt(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
-                            }
-                            // _ => {
-                            //     return Err(anyhow!("Illegal char in hex literal!"));
-                            // }
+                                return Ok(TokenInfo {
+                                    token: Token::Literal(Literal::HexInt(nliteral.clone())),
+                                    display: nliteral,
+                                    line: *current_line,
+                                    col: *current_col,
+                                });
+                            } // _ => {
+                              //     return Err(anyhow!("Illegal char in hex literal!"));
+                              // }
                         }
                     }
                     return Err(anyhow!("Unexpected end of hex literal"));
@@ -298,7 +312,12 @@ fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_
                 }
                 'L' => {
                     consume(program, current_col, 1);
-                    return Ok( TokenInfo { token : Token::Literal(Literal::Long(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
+                    return Ok(TokenInfo {
+                        token: Token::Literal(Literal::Long(nliteral.clone())),
+                        display: nliteral,
+                        line: *current_line,
+                        col: *current_col,
+                    });
                 }
 
                 // Can be terminated by punctuation or by an identifier (e.g., 24value1)
@@ -306,11 +325,15 @@ fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_
 
                 // No special termination characters: just end as soon as we stop matching
                 _ => {
-                    return Ok( TokenInfo { token : Token::Literal(Literal::Int(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
-                }
-                // _ => {
-                //     return Err(anyhow!("Illegal char in decimal literal!"));
-                // }
+                    return Ok(TokenInfo {
+                        token: Token::Literal(Literal::Int(nliteral.clone())),
+                        display: nliteral,
+                        line: *current_line,
+                        col: *current_col,
+                    });
+                } // _ => {
+                  //     return Err(anyhow!("Illegal char in decimal literal!"));
+                  // }
             }
         }
     }
@@ -321,7 +344,11 @@ fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_
 /*
 Lex a Keyword or Identifier.
 */
-fn lex_keyword_or_identifier(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) -> Result<TokenInfo> {
+fn lex_keyword_or_identifier(
+    program: &mut Vec<char>,
+    current_line: &mut i32,
+    current_col: &mut i32,
+) -> Result<TokenInfo> {
     let mut keyword_or_identifier = String::new();
 
     // Build the keyword or identifier as the longest string of alphanumerics or underscores
@@ -329,13 +356,12 @@ fn lex_keyword_or_identifier(program: &mut Vec<char>, current_line: &mut i32, cu
         if character.is_alphanumeric() || character == '_' {
             keyword_or_identifier.push(character);
             consume(program, current_col, 1);
-
         } else {
             break;
         }
         // match character {
         //     ';' | ',' | ')' | '[' | ']' | ' ' | '(' | '\n'  => {
-                
+
         //         break;
         //     }
         //     _ => {
@@ -346,36 +372,118 @@ fn lex_keyword_or_identifier(program: &mut Vec<char>, current_line: &mut i32, cu
     }
 
     match keyword_or_identifier.as_str() {
-        "if" => Ok(TokenInfo { token: Token::Keyword(Keyword::If), display: "if".to_string(), line: *current_line, col: *current_col }),
-        "bool" => Ok(TokenInfo { token: Token::Keyword(Keyword::Bool), display: "bool".to_string(), line: *current_line, col: *current_col }),
-        "break" => Ok(TokenInfo { token: Token::Keyword(Keyword::Break), display: "break".to_string(), line: *current_line, col: *current_col }),
-        "import" => Ok(TokenInfo { token: Token::Keyword(Keyword::Import), display: "import".to_string(), line: *current_line, col: *current_col }),
-        "continue" => Ok(TokenInfo { token: Token::Keyword(Keyword::Continue), display: "continue".to_string(), line: *current_line, col: *current_col }),
-        "else" => Ok(TokenInfo { token: Token::Keyword(Keyword::Else), display: "else".to_string(), line: *current_line, col: *current_col }),
-        "for" => Ok(TokenInfo { token: Token::Keyword(Keyword::For), display: "for".to_string(), line: *current_line, col: *current_col }),
-        "while" => Ok(TokenInfo { token: Token::Keyword(Keyword::While), display: "while".to_string(), line: *current_line, col: *current_col }),
-        "int" => Ok(TokenInfo { token: Token::Keyword(Keyword::Int), display: "int".to_string(), line: *current_line, col: *current_col }),
-        "long" => Ok(TokenInfo { token: Token::Keyword(Keyword::Long), display: "long".to_string(), line: *current_line, col: *current_col }),
-        "return" => Ok(TokenInfo { token: Token::Keyword(Keyword::Return), display: "return".to_string(), line: *current_line, col: *current_col }),
-        "len" => Ok(TokenInfo { token: Token::Keyword(Keyword::Len), display: "len".to_string(), line: *current_line, col: *current_col }),
-        "void" => Ok(TokenInfo { token: Token::Keyword(Keyword::Void), display: "void".to_string(), line: *current_line, col: *current_col }),
-        
+        "if" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::If),
+            display: "if".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "bool" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::Bool),
+            display: "bool".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "break" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::Break),
+            display: "break".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "import" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::Import),
+            display: "import".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "continue" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::Continue),
+            display: "continue".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "else" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::Else),
+            display: "else".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "for" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::For),
+            display: "for".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "while" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::While),
+            display: "while".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "int" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::Int),
+            display: "int".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "long" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::Long),
+            display: "long".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "return" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::Return),
+            display: "return".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "len" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::Len),
+            display: "len".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "void" => Ok(TokenInfo {
+            token: Token::Keyword(Keyword::Void),
+            display: "void".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+
         // "false" and "true" are keywords, but lexed as boolean literals
-        "false" => Ok(TokenInfo { token: Token::Literal(Literal::Bool(false)), display: "false".to_string()  ,line: *current_line, col: *current_col }),
-        "true" => Ok(TokenInfo { token: Token::Literal(Literal::Bool(true)), display: "true".to_string()  ,line: *current_line, col: *current_col }),
+        "false" => Ok(TokenInfo {
+            token: Token::Literal(Literal::Bool(false)),
+            display: "false".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
+        "true" => Ok(TokenInfo {
+            token: Token::Literal(Literal::Bool(true)),
+            display: "true".to_string(),
+            line: *current_line,
+            col: *current_col,
+        }),
 
         // If the token doesn't match any keywords, return it as an identifier
-        _ => Ok(TokenInfo { token: Token::Identifier(keyword_or_identifier.clone()), display: keyword_or_identifier, line: *current_line, col: *current_col }),
+        _ => Ok(TokenInfo {
+            token: Token::Identifier(keyword_or_identifier.clone()),
+            display: keyword_or_identifier,
+            line: *current_line,
+            col: *current_col,
+        }),
     }
 }
-    
-
 
 /*
 Lex a string literal, identified by a leading quotation mark.
 Returns errors for incomplete strings and illegal characters.
 */
-fn lex_string_literal(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) -> Result<TokenInfo> {
+fn lex_string_literal(
+    program: &mut Vec<char>,
+    current_line: &mut i32,
+    current_col: &mut i32,
+) -> Result<TokenInfo> {
     let mut sliteral = String::new();
     consume(program, current_col, 1);
 
@@ -388,7 +496,14 @@ fn lex_string_literal(program: &mut Vec<char>, current_line: &mut i32, current_c
         consume(program, current_col, 1);
 
         match char1 {
-            '"' => return Ok( TokenInfo { token : Token::Literal(Literal::String(sliteral.clone())), display: sliteral, line: *current_line, col: *current_col }),
+            '"' => {
+                return Ok(TokenInfo {
+                    token: Token::Literal(Literal::String(sliteral.clone())),
+                    display: sliteral,
+                    line: *current_line,
+                    col: *current_col,
+                })
+            }
             '\'' => return Err(anyhow!("Illegal single quote in string literal")),
             '\\' => match program.get(0) {
                 Some(&char2 @ ('"' | '\'' | '\\' | 't' | 'n' | 'r' | 'f')) => {
@@ -419,7 +534,11 @@ fn lex_string_literal(program: &mut Vec<char>, current_line: &mut i32, current_c
 Lex a character literal, identified by a leading single quote.
 Returns errors for incomplete or illegal characters.
 */
-fn lex_char_literal(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) -> Result<TokenInfo> {
+fn lex_char_literal(
+    program: &mut Vec<char>,
+    current_line: &mut i32,
+    current_col: &mut i32,
+) -> Result<TokenInfo> {
     consume(program, current_col, 1); // Consume opening quote (')
 
     let char1 = match program.get(0) {
@@ -438,18 +557,18 @@ fn lex_char_literal(program: &mut Vec<char>, current_line: &mut i32, current_col
                 consume(program, current_col, 1);
                 match escaped_char {
                     '\'' => '\'',
-                    '"'  => '"',
+                    '"' => '"',
                     '\\' => '\\',
-                    't'  => '\t',
-                    'n'  => '\n',
-                    'r'  => '\r',
-                    'f'  => '\x0C',  // Form feed
-                    '0'  => '\0',    // Null character
-                    _    => {
+                    't' => '\t',
+                    'n' => '\n',
+                    'r' => '\r',
+                    'f' => '\x0C', // Form feed
+                    '0' => '\0',   // Null character
+                    _ => {
                         return Err(anyhow!("Invalid escape sequence \\{}", escaped_char));
-                    }, // Return as is for unrecognized escapes
+                    } // Return as is for unrecognized escapes
                 }
-            },
+            }
             None => '\\', // If there's no character after '\', just return it
         }
     } else {
@@ -467,32 +586,105 @@ fn lex_char_literal(program: &mut Vec<char>, current_line: &mut i32, current_col
     match program.get(0) {
         Some('\'') => {
             consume(program, current_col, 1); // Consume closing quote
-            Ok( TokenInfo { token : Token::Literal(Literal::Char(char_value)), display: char_value.to_string(), line: *current_line, col: *current_col })
-
+            Ok(TokenInfo {
+                token: Token::Literal(Literal::Char(char_value)),
+                display: char_value.to_string(),
+                line: *current_line,
+                col: *current_col,
+            })
         }
         _ => Err(anyhow!("Character literal missing closing quote")),
     }
 }
 
 // does the matching and shii
-fn get_next_token(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) -> Result<TokenInfo> {
+fn get_next_token(
+    program: &mut Vec<char>,
+    current_line: &mut i32,
+    current_col: &mut i32,
+) -> Result<TokenInfo> {
     if let Some(&char1) = program.get(0) {
         // Attempt to match length-2 symbols first
         if let Some(&char2) = program.get(1) {
             let token = match (char1, char2) {
-                ('=', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Equal)), display: "==".to_string(), line: *current_line, col: *current_col }),
-                ('+', '+') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Increment)), display: "++".to_string(), line: *current_line, col: *current_col }),
-                ('-', '-') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Decrement)), display: "--".to_string(), line: *current_line, col: *current_col }),
-                ('!', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::NotEqual)), display: "!=".to_string(), line: *current_line, col: *current_col }),
-                ('<', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::LessEqual)), display: "<=".to_string(), line: *current_line, col: *current_col }),
-                ('>', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::GreaterEqual)), display: ">=".to_string(), line: *current_line, col: *current_col }),
-                ('&', '&') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::LogicalAnd)), display: "&&".to_string(), line: *current_line, col: *current_col }),
-                ('|', '|') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::LogicalOr)), display: "||".to_string(), line: *current_line, col: *current_col }),
-                ('+', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::PlusAssign)), display: "+=".to_string(), line: *current_line, col: *current_col }),
-                ('-', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::MinusAssign)), display: "-=".to_string(), line: *current_line, col: *current_col }),
-                ('*', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::MultiplyAssign)), display: "*=".to_string(), line: *current_line, col: *current_col }),
-                ('/', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::DivideAssign)), display: "/=".to_string(), line: *current_line, col: *current_col }),
-                ('%', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::ModuloAssign)), display: "%=".to_string(), line: *current_line, col: *current_col }),
+                ('=', '=') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::Equal)),
+                    display: "==".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('+', '+') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::Increment)),
+                    display: "++".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('-', '-') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::Decrement)),
+                    display: "--".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('!', '=') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::NotEqual)),
+                    display: "!=".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('<', '=') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::LessEqual)),
+                    display: "<=".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('>', '=') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::GreaterEqual)),
+                    display: ">=".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('&', '&') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::LogicalAnd)),
+                    display: "&&".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('|', '|') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::LogicalOr)),
+                    display: "||".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('+', '=') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::PlusAssign)),
+                    display: "+=".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('-', '=') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::MinusAssign)),
+                    display: "-=".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('*', '=') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::MultiplyAssign)),
+                    display: "*=".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('/', '=') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::DivideAssign)),
+                    display: "/=".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
+                ('%', '=') => Some(TokenInfo {
+                    token: Token::Symbol(Symbol::Operator(Operator::ModuloAssign)),
+                    display: "%=".to_string(),
+                    line: *current_line,
+                    col: *current_col,
+                }),
                 _ => None,
             };
             if token.is_some() {
@@ -504,25 +696,109 @@ fn get_next_token(program: &mut Vec<char>, current_line: &mut i32, current_col: 
         // println!("current program: {:?}", program);
         // Match single-character Symbols directly
         let token = match char1 {
-            '(' => Some(TokenInfo { token: Token::Symbol(Symbol::Punctuation(Punctuation::LeftParen)), display: '('.to_string(), line: *current_line, col: *current_col }),
-            ')' => Some(TokenInfo { token: Token::Symbol(Symbol::Punctuation(Punctuation::RightParen)), display: ')'.to_string(), line: *current_line, col: *current_col }),
-            '{' => Some(TokenInfo { token: Token::Symbol(Symbol::Punctuation(Punctuation::LeftBrace)), display: '{'.to_string(), line: *current_line, col: *current_col }),
-            '}' => Some(TokenInfo { token: Token::Symbol(Symbol::Punctuation(Punctuation::RightBrace)), display: '}'.to_string(), line: *current_line, col: *current_col }),
-            '[' => Some(TokenInfo { token: Token::Symbol(Symbol::Punctuation(Punctuation::LeftBracket)), display: '['.to_string(), line: *current_line, col: *current_col }),
-            ']' => Some(TokenInfo { token: Token::Symbol(Symbol::Punctuation(Punctuation::RightBracket)), display: ']'.to_string(), line: *current_line, col: *current_col }),
-            ';' => Some(TokenInfo { token: Token::Symbol(Symbol::Punctuation(Punctuation::Semicolon)), display: ';'.to_string(), line: *current_line, col: *current_col }),
-            ',' => Some(TokenInfo { token: Token::Symbol(Symbol::Punctuation(Punctuation::Comma)), display: ','.to_string(), line: *current_line, col: *current_col }),
-    
-            '=' => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Assign)), display: '='.to_string(), line: *current_line, col: *current_col }),
-            '+' => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Plus)), display: '+'.to_string(), line: *current_line, col: *current_col }),
-            '-' => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Minus)), display: '-'.to_string(), line: *current_line, col: *current_col }),
-            '*' => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Multiply)), display: '*'.to_string(), line: *current_line, col: *current_col }),
-            '/' => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Divide)), display: '/'.to_string(), line: *current_line, col: *current_col }),
-            '%' => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Modulo)), display: '%'.to_string(), line: *current_line, col: *current_col }),
-            '<' => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Less)), display: '<'.to_string(), line: *current_line, col: *current_col }),
-            '>' => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Greater)), display: '>'.to_string(), line: *current_line, col: *current_col }),
-            '!' => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::LogicalNot)), display: '!'.to_string(), line: *current_line, col: *current_col }),
-        
+            '(' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Punctuation(Punctuation::LeftParen)),
+                display: '('.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            ')' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Punctuation(Punctuation::RightParen)),
+                display: ')'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            '{' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Punctuation(Punctuation::LeftBrace)),
+                display: '{'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            '}' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Punctuation(Punctuation::RightBrace)),
+                display: '}'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            '[' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Punctuation(Punctuation::LeftBracket)),
+                display: '['.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            ']' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Punctuation(Punctuation::RightBracket)),
+                display: ']'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            ';' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Punctuation(Punctuation::Semicolon)),
+                display: ';'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            ',' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Punctuation(Punctuation::Comma)),
+                display: ','.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+
+            '=' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Operator(Operator::Assign)),
+                display: '='.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            '+' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Operator(Operator::Plus)),
+                display: '+'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            '-' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Operator(Operator::Minus)),
+                display: '-'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            '*' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Operator(Operator::Multiply)),
+                display: '*'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            '/' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Operator(Operator::Divide)),
+                display: '/'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            '%' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Operator(Operator::Modulo)),
+                display: '%'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            '<' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Operator(Operator::Less)),
+                display: '<'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            '>' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Operator(Operator::Greater)),
+                display: '>'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
+            '!' => Some(TokenInfo {
+                token: Token::Symbol(Symbol::Operator(Operator::LogicalNot)),
+                display: '!'.to_string(),
+                line: *current_line,
+                col: *current_col,
+            }),
 
             // These fn handle their own consumption and return immediately
             '\'' => return lex_char_literal(program, current_line, current_col),
@@ -535,6 +811,8 @@ fn get_next_token(program: &mut Vec<char>, current_line: &mut i32, current_col: 
                 } else if char1.is_numeric() {
                     return lex_numeric_literal(program, current_line, current_col);
                 } else {
+                    // Consume a character to prevent infinite loops!
+                    consume(program, current_col, 1);
                     return Err(anyhow!("Character not recognized!"));
                 }
             }
@@ -604,7 +882,7 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
                             '\'' => "\\'".to_string(),
                             '"' => "\\\"".to_string(),
                             '\\' => "\\\\".to_string(),
-                            _ => format!("{}", text)
+                            _ => format!("{}", text),
                         };
                         format!("{} CHARLITERAL \'{}\'", token_info.line, display_char)
                     }
@@ -636,9 +914,11 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
             }
             Err(token_value) => {
                 found_err = true;
-                let template_string = format!("Error in \"{}\" (line {}, column {})\t→\t{}",
-                    filename, current_line, current_col, token_value);
-                    writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
+                let template_string = format!(
+                    "Error in \"{}\" (line {}, column {})\t→\t{}",
+                    filename, current_line, current_col, token_value
+                );
+                writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
             }
         }
     }

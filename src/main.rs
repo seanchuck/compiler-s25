@@ -32,7 +32,6 @@ fn main() {
         );
     }
 
-
     // Perform a compiler action based on the specified target
     match args.target {
         utils::cli::CompilerAction::Default => {
