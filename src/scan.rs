@@ -274,12 +274,13 @@ fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_
                                 consume(program, current_col, 1);
                                 return Ok( TokenInfo { token : Token::Literal(Literal::HexLong(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
                             }
-                            ';' | ',' | ')' | ']' | ' ' | '\n' => {
+                            // ';' | ',' | ')' | ']' | ' ' | '\n' => {
+                            _ => {
                                 return Ok( TokenInfo { token : Token::Literal(Literal::HexInt(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
                             }
-                            _ => {
-                                return Err(anyhow!("Illegal char in hex literal!"));
-                            }
+                            // _ => {
+                            //     return Err(anyhow!("Illegal char in hex literal!"));
+                            // }
                         }
                     }
                     return Err(anyhow!("Unexpected end of hex literal"));
@@ -301,12 +302,15 @@ fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_
                 }
 
                 // Can be terminated by punctuation or by an identifier (e.g., 24value1)
-                ';' | ',' | ')' | ']' | ' ' | '}'| '\n' | 'a'..='z' | 'A'..='K' | 'M'..='Z' => {
+                // ';' | ',' | ')' | ']' | ' ' | '}'| '\n' | 'a'..='z' | 'A'..='K' | 'M'..='Z' => {
+
+                // No special termination characters: just end as soon as we stop matching
+                _ => {
                     return Ok( TokenInfo { token : Token::Literal(Literal::Int(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
                 }
-                _ => {
-                    return Err(anyhow!("Illegal char in decimal literal!"));
-                }
+                // _ => {
+                //     return Err(anyhow!("Illegal char in decimal literal!"));
+                // }
             }
         }
     }
@@ -358,7 +362,7 @@ fn lex_keyword_or_identifier(program: &mut Vec<char>, current_line: &mut i32, cu
         
         // "false" and "true" are keywords, but lexed as boolean literals
         "false" => Ok(TokenInfo { token: Token::Literal(Literal::Bool(false)), display: "false".to_string()  ,line: *current_line, col: *current_col }),
-        "true" => Ok(TokenInfo { token: Token::Literal(Literal::Bool(false)), display: "true".to_string()  ,line: *current_line, col: *current_col }),
+        "true" => Ok(TokenInfo { token: Token::Literal(Literal::Bool(true)), display: "true".to_string()  ,line: *current_line, col: *current_col }),
 
         // If the token doesn't match any keywords, return it as an identifier
         _ => Ok(TokenInfo { token: Token::Identifier(keyword_or_identifier.clone()), display: keyword_or_identifier, line: *current_line, col: *current_col }),
@@ -387,9 +391,11 @@ fn lex_string_literal(program: &mut Vec<char>, current_line: &mut i32, current_c
             '"' => return Ok( TokenInfo { token : Token::Literal(Literal::String(sliteral.clone())), display: sliteral, line: *current_line, col: *current_col }),
             '\'' => return Err(anyhow!("Illegal single quote in string literal")),
             '\\' => match program.get(0) {
-                Some(&char2 @ ('"' | '\\' | 't' | 'n' | 'r' | 'f')) => {
+                Some(&char2 @ ('"' | '\'' | '\\' | 't' | 'n' | 'r' | 'f')) => {
                     sliteral.push_str(match char2 {
-                        '"' => "\"",
+                        // must also pushing leading backslash
+                        '"' => "\\\"",
+                        '\'' => "\\'",
                         '\\' => "\\\\",
                         't' => "\\t",
                         'n' => "\\n",
