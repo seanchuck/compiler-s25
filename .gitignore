@@ -17,4 +17,7 @@ Cargo.lock
 .vscode/
 
 # Public public-tests
-public-tests/*
+public-tests/
+
+# File for debugging outputs
+out.out

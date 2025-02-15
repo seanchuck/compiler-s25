@@ -158,6 +158,8 @@ pub enum Literal {
     Char(char),
     Int(String),
     Long(String),
+    HexInt(String),
+    HexLong(String),
     String(String),
     Bool(bool),
 }
@@ -245,6 +247,11 @@ fn gobble_comment(
     }
 }
 
+
+/* 
+Typically for literals, we continue matching until a termination character: 
+(';' | ',' | ')' | ']' | ' ' | '(' | '\n')
+*/
 fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) -> Result<TokenInfo> {
     // Allow: Hex (0x), normal long
     // Termination at: (;), (,), (L), ()), (])
@@ -265,10 +272,10 @@ fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_
                             }
                             'L' => {
                                 consume(program, current_col, 1);
-                                return Ok( TokenInfo { token : Token::Literal(Literal::Long(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
+                                return Ok( TokenInfo { token : Token::Literal(Literal::HexLong(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
                             }
-                            ';' | ',' | ')' | ']' | ' ' => {
-                                return Ok( TokenInfo { token : Token::Literal(Literal::Int(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
+                            ';' | ',' | ')' | ']' | ' ' | '\n' => {
+                                return Ok( TokenInfo { token : Token::Literal(Literal::HexInt(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
                             }
                             _ => {
                                 return Err(anyhow!("Illegal char in hex literal!"));
@@ -292,7 +299,9 @@ fn lex_numeric_literal(program: &mut Vec<char>, current_line: &mut i32, current_
                     consume(program, current_col, 1);
                     return Ok( TokenInfo { token : Token::Literal(Literal::Long(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
                 }
-                ';' | ',' | ')' | ']' | ' ' => {
+
+                // Can be terminated by punctuation or by an identifier (e.g., 24value1)
+                ';' | ',' | ')' | ']' | ' ' | '}'| '\n' | 'a'..='z' | 'A'..='K' | 'M'..='Z' => {
                     return Ok( TokenInfo { token : Token::Literal(Literal::Int(nliteral.clone())), display: nliteral, line: *current_line, col: *current_col });
                 }
                 _ => {
@@ -311,19 +320,25 @@ Lex a Keyword or Identifier.
 fn lex_keyword_or_identifier(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) -> Result<TokenInfo> {
     let mut keyword_or_identifier = String::new();
 
-    // Build the keyword or identifier
+    // Build the keyword or identifier as the longest string of alphanumerics or underscores
     while let Some(&character) = program.get(0) {
-        // Bail out if we see whitespace or opening parens, signaling end of token
+        if character.is_alphanumeric() || character == '_' {
+            keyword_or_identifier.push(character);
+            consume(program, current_col, 1);
 
-        match character {
-            ';' | ',' | ')' | ']' | ' ' | '(' => {
-                break;
-            }
-            _ => {
-                keyword_or_identifier.push(character);
-                consume(program, current_col, 1); // Consume each character inside the string
-            }
+        } else {
+            break;
         }
+        // match character {
+        //     ';' | ',' | ')' | '[' | ']' | ' ' | '(' | '\n'  => {
+                
+        //         break;
+        //     }
+        //     _ => {
+        //         keyword_or_identifier.push(character);
+        //         consume(program, current_col, 1); // Consume each character inside the string
+        //     }
+        // }
     }
 
     match keyword_or_identifier.as_str() {
@@ -361,7 +376,7 @@ fn lex_string_literal(program: &mut Vec<char>, current_line: &mut i32, current_c
     consume(program, current_col, 1);
 
     while let Some(&char1) = program.get(0) {
-        // If we encounter an actual newline (0xA), reject immediately: '\n' vs. "\n" (first is not allowable)
+        // If we encounter an actual newline (0xA == '\n'), reject immediately (newline char "\n" is ok)
         if char1 == '\n' {
             return Err(anyhow!("Newline (0xA) not allowed in string literals"));
         }
@@ -373,18 +388,18 @@ fn lex_string_literal(program: &mut Vec<char>, current_line: &mut i32, current_c
             '\'' => return Err(anyhow!("Illegal single quote in string literal")),
             '\\' => match program.get(0) {
                 Some(&char2 @ ('"' | '\\' | 't' | 'n' | 'r' | 'f')) => {
-                    sliteral.push(match char2 {
-                        '"' => '"',
-                        '\\' => '\\',
-                        't' => '\t',
-                        'n' => '\n',
-                        'r' => '\r',
-                        'f' => '\x0C',
+                    sliteral.push_str(match char2 {
+                        '"' => "\"",
+                        '\\' => "\\\\",
+                        't' => "\\t",
+                        'n' => "\\n",
+                        'r' => "\\r",
+                        'f' => "\\f",
                         _ => unreachable!(),
                     });
                     consume(program, current_col, 1);
                 }
-                Some(&invalid) => return Err(anyhow!("Invalid escape sequence \\{}", invalid)), // Reject invalid backslashes
+                Some(&invalid) => return Err(anyhow!("Invalid escape sequence \'\\{}\'", invalid)), // Reject invalid backslashes
                 None => return Err(anyhow!("Incomplete escape sequence in string literal")),
             },
             _ => sliteral.push(char1),
@@ -413,14 +428,23 @@ fn lex_char_literal(program: &mut Vec<char>, current_line: &mut i32, current_col
     // Match length-2 escaped sequences
     let char_value = if char1 == '\\' {
         match program.get(0) {
-            Some(&escaped_char @ ('\'' | '"' | '\\' | 't' | 'n' | 'r' | 'f')) => {
+            Some(&escaped_char) => {
                 consume(program, current_col, 1);
-                escaped_char
-            }
-            Some(&invalid_char) => {
-                return Err(anyhow!("Invalid escape sequence \\{}", invalid_char));
-            }
-            None => return Err(anyhow!("Incomplete escape sequence")),
+                match escaped_char {
+                    '\'' => '\'',
+                    '"'  => '"',
+                    '\\' => '\\',
+                    't'  => '\t',
+                    'n'  => '\n',
+                    'r'  => '\r',
+                    'f'  => '\x0C',  // Form feed
+                    '0'  => '\0',    // Null character
+                    _    => {
+                        return Err(anyhow!("Invalid escape sequence \\{}", escaped_char));
+                    }, // Return as is for unrecognized escapes
+                }
+            },
+            None => '\\', // If there's no character after '\', just return it
         }
     } else {
         // Reject illegal single characters: `'`, `"`, `\`
@@ -451,13 +475,13 @@ fn get_next_token(program: &mut Vec<char>, current_line: &mut i32, current_col: 
         if let Some(&char2) = program.get(1) {
             let token = match (char1, char2) {
                 ('=', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Equal)), display: "==".to_string(), line: *current_line, col: *current_col }),
+                ('+', '+') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Increment)), display: "++".to_string(), line: *current_line, col: *current_col }),
+                ('-', '-') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Decrement)), display: "--".to_string(), line: *current_line, col: *current_col }),
                 ('!', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::NotEqual)), display: "!=".to_string(), line: *current_line, col: *current_col }),
                 ('<', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::LessEqual)), display: "<=".to_string(), line: *current_line, col: *current_col }),
                 ('>', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::GreaterEqual)), display: ">=".to_string(), line: *current_line, col: *current_col }),
                 ('&', '&') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::LogicalAnd)), display: "&&".to_string(), line: *current_line, col: *current_col }),
                 ('|', '|') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::LogicalOr)), display: "||".to_string(), line: *current_line, col: *current_col }),
-                ('+', '+') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Increment)), display: "++".to_string(), line: *current_line, col: *current_col }),
-                ('-', '-') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::Decrement)), display: "--".to_string(), line: *current_line, col: *current_col }),
                 ('+', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::PlusAssign)), display: "+=".to_string(), line: *current_line, col: *current_col }),
                 ('-', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::MinusAssign)), display: "-=".to_string(), line: *current_line, col: *current_col }),
                 ('*', '=') => Some(TokenInfo { token: Token::Symbol(Symbol::Operator(Operator::MultiplyAssign)), display: "*=".to_string(), line: *current_line, col: *current_col }),
@@ -566,16 +590,32 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
                         format!("{} IDENTIFIER {}", token_info.line, text)
                     }
                     Token::Literal(Literal::Char(text)) => {
-                        format!("{} CHARLITERAL {}", token_info.line, text)
+                        let display_char: String = match text {
+                            '\n' => "\\n".to_string(),
+                            '\t' => "\\t".to_string(),
+                            '\r' => "\\r".to_string(),
+                            '\x0C' => "\\f".to_string(),
+                            '\'' => "\\'".to_string(),
+                            '"' => "\\\"".to_string(),
+                            '\\' => "\\\\".to_string(),
+                            _ => format!("{}", text)
+                        };
+                        format!("{} CHARLITERAL \'{}\'", token_info.line, display_char)
                     }
                     Token::Literal(Literal::String(text)) => {
-                        format!("{} STRINGLITERAL {}", token_info.line, text)
+                        format!("{} STRINGLITERAL \"{}\"", token_info.line, text)
                     }
                     Token::Literal(Literal::Int(value)) => {
                         format!("{} INTLITERAL {}", token_info.line, value)
                     }
                     Token::Literal(Literal::Long(value)) => {
-                        format!("{} LONGLITERAL {}", token_info.line, value)
+                        format!("{} LONGLITERAL {}L", token_info.line, value)
+                    }
+                    Token::Literal(Literal::HexInt(value)) => {
+                        format!("{} INTLITERAL 0x{}", token_info.line, value)
+                    }
+                    Token::Literal(Literal::HexLong(value)) => {
+                        format!("{} LONGLITERAL 0x{}L", token_info.line, value)
                     }
                     Token::Literal(Literal::Bool(value)) => {
                         format!("{} BOOLEANLITERAL {}", token_info.line, value)
@@ -590,7 +630,7 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
             }
             Err(token_value) => {
                 found_err = true;
-                let template_string = format!("Error in \"{}\" (line {}, column {})\t→\t{}\n",
+                let template_string = format!("Error in \"{}\" (line {}, column {})\t→\t{}",
                     filename, current_line, current_col, token_value);
                     writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
             }
