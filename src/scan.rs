@@ -4,78 +4,26 @@ Scanner.
 
 use anyhow::{anyhow, Result};
 use std::process;
-/*
-Tokens: Identifier, Keyword, string literal, numeric literal (decimal, hex), Operator
-Keywords: if, bool, break, import, continue, else, false, for, while, int, long, return, len, true, void
-Operators: -, !, int(), long(), *, /, %, +, -, <, <=, ==, >=, >, !=, &&, ||
-
-Long: 100L
-Whitespace: space, newline, comments (// and /**/), carriage return
-*/
 
 /*
-Stages:
-1. Rigorously check the grammar for what else needs to be parsed (100L, int(), long(), etc.)
-2. Handle illegal inputs
-3. Format output as desired
-4. Keep track of line numbers, etc.
-*/
-
-/*
-Rigorous lexer spec:
-Keywords:
-Identifiers:
-Symbols:
-Literals:
-Errors:
-
-
-Casts:
-int() as int, (, )
-long() as long, (, )
-
-
-Print the following as specialized token types:
-- CHARLITERAL, INTLITERAL, LONGLITERAL, BOOLEANLITERAL, STRINGLITERAL and IDENTIFIER
-- Everything else: just the token
-
-Must keep track of current line until \n!
-
-
-Whitespace: newline (\n), tab (\t),
-
-Legal ASCII char: TODO
-- NO: quote ("), single quote ('), backslash (\)
-- Allows: ASCII in [32, 126], \\, \t, \n, \r, \f
-
-
-Errors:
-- unclosed ""
-- unclosed ''
-- illegal chars: outside ASCII
-- invalid escapes: not in (\"  \'  \\  \t  \n  \r  \f)
-- illegal identifier: must start with alphabetical or _
-- unclsoed comments /* */
+Tasks:
+    1. Gobble whitespace and comments.
+    2. Lex: Keyword, Identifier, Punctuation, Operators, Literals (char, string, bool, numeric (hex, decimal, int, long))
+    3. Throw errors for illegal inputs (illegal chars, unmatched punctuation, etc.)
+    4. Keep track of line numbers, etc.
+    5. Format output
 
 
 All tokens:
-import, void, int, long, bool, if, else, for, while, return, break,
-continue, ;, =, +=, -=, *=, /=, %=, ++, --, int(), long(), len(),
--, !, (), +, -, *, /, %, <, >, <=, >=, ==, !=, &&, ||, a-z,
-A-Z, _, 0-9, hex: 0x[0-9][a-f][A-F],
-    long: dec or hex literal + L, true, false,
+    Whitespace: space, newline, comments (// and /**/), carriage return
+    Tokens: Identifier, Keyword, string literal, numeric literal (decimal, hex), Operator
+    Keywords: if, bool, break, import, continue, else, false, for, while, int, long, return, len, true, void
+    Operators: ;, =, +=, -=, *=, /=, %=, ++, --, int(), long(), len(),
+    -, !, (), +, -, *, /, %, <, >, <=, >=, ==, !=, &&, ||, a-z,
+    A-Z, _, 0-9, hex: 0x[0-9][a-f][A-F],
+        long: dec or hex literal + L, true, false,
 
-TODO: hex, +L, comments, errors
-    - NO: quote ("), single quote ('), backslash (\), Allows: ASCII in [32, 126], \\, \t, \n, \r, \f
-
-
-Ensure: consumption is done correctly
-
-Note:
-    - We allow newline and tab characters directly written like "\n" or "\t" (2 chars each), but not the actual
-    whitespace which parses as a single character ('\n' or '\t')
-
-
+    Whitespace: space, newline, comments (// and /**/), carriage return
 */
 
 #[derive(Debug)]
@@ -159,6 +107,7 @@ pub enum Punctuation {
     Semicolon,
     Comma,
 }
+
 #[derive(Debug)]
 pub enum Literal {
     Char(char),
@@ -171,6 +120,12 @@ pub enum Literal {
 }
 
 // ---------------------------------------------------------------------------------------
+
+/*
+The scanner keeps track of line and column numbers.
+
+*/
+
 /*
 Consume up to nchar characters from the program vector.
 */
@@ -184,13 +139,9 @@ fn consume(program: &mut Vec<char>, current_col: &mut i32, nchar: i32) {
 /*
 Consume all whitespace characters before the next
 token or EOF.
-
-Handles line numbers since is the only fn handling newlines.
 */
 fn gobble_whitespace(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) {
-    // program is a mutable reference
     while !program.is_empty() {
-        // Only satified if we get Some and not None type
         if let Some(&character) = program.first() {
             if character.is_whitespace() {
                 if character == '\n' {
@@ -218,8 +169,8 @@ fn gobble_comment(
         consume(program, current_col, 2);
 
         match (char1, char2) {
+            // Line comment
             ('/', '/') => {
-                // Line comment
                 while let Some(&c) = program.first() {
                     consume(program, current_col, 1);
                     if c == '\n' {
@@ -228,16 +179,16 @@ fn gobble_comment(
                         break;
                     }
                 }
-                Ok("Gobbled comment".to_string())
-            }
+                Ok("Gobbled line comment".to_string())
+            },
+            // Block comment
             ('/', '*') => {
-                // Block comment
                 while let Some(&c) = program.first() {
                     consume(program, current_col, 1);
                     // pattern matching with &'\\'!!!
                     if c == '*' && program.first() == Some(&'/') {
                         consume(program, current_col, 1);
-                        return Ok("Gobbled comment".to_string());
+                        return Ok("Gobbled block comment".to_string());
                     }
                     if c == '\n' {
                         *current_line += 1;
@@ -254,114 +205,87 @@ fn gobble_comment(
 }
 
 /*
-Typically for literals, we continue matching until a termination character:
-(';' | ',' | ')' | ']' | ' ' | '(' | '\n')
+Lex based on decimal or hex type.
+*/
+fn lex_numeric_helper(
+    program: &mut Vec<char>,
+    current_col: &mut i32,
+    current_line: &i32,
+    is_hex: bool,
+) -> Result<TokenInfo, anyhow::Error> {
+    let mut nliteral = String::new();
+
+    while let Some(&c) = program.get(0) {
+        match c {
+            '0'..='9' => {
+                nliteral.push(c);
+                consume(program, current_col, 1);
+            }
+            // hex allows a-f and A-F
+            'a'..='f' | 'A'..='F' if is_hex => {
+                nliteral.push(c);
+                consume(program, current_col, 1);
+            }
+            'L' => {
+                consume(program, current_col, 1);
+                return Ok(TokenInfo {
+                    token: if is_hex {
+                        Token::Literal(Literal::HexLong(nliteral.clone()))
+                    } else {
+                        Token::Literal(Literal::Long(nliteral.clone()))
+                    },
+                    display: nliteral,
+                    line: *current_line,
+                    col: *current_col,
+                });
+            }
+            _ => break, // Stop parsing on any other character
+        }
+    }
+
+    // If we hit EOF or break, return
+    Ok(TokenInfo {
+        token: if is_hex {
+            Token::Literal(Literal::HexInt(nliteral.clone()))
+        } else {
+            Token::Literal(Literal::Int(nliteral.clone()))
+        },
+        display: nliteral,
+        line: *current_line,
+        col: *current_col,
+    })
+}
+
+/*
+Lex a decimal or hex numeric literal of int or long type.
 */
 fn lex_numeric_literal(
     program: &mut Vec<char>,
     current_line: &mut i32,
     current_col: &mut i32,
 ) -> Result<TokenInfo> {
-    // Allow: Hex (0x), normal long
-    // Termination at: (;), (,), (L), ()), (])
-    let mut nliteral = String::new();
-
     if let Some(&char1) = program.get(0) {
         if let Some(&char2) = program.get(1) {
             match (char1, char2) {
-                // Hex evaluation
                 ('0', 'x') => {
-                    consume(program, current_col, 2); // Consume "0x"
-
-                    while let Some(&c) = program.get(0) {
-                        match c {
-                            '0'..='9' | 'a'..='f' | 'A'..='F' => {
-                                nliteral.push(c);
-                                consume(program, current_col, 1);
-                            }
-                            'L' => {
-                                consume(program, current_col, 1);
-                                return Ok(TokenInfo {
-                                    token: Token::Literal(Literal::HexLong(nliteral.clone())),
-                                    display: nliteral,
-                                    line: *current_line,
-                                    col: *current_col,
-                                });
-                            }
-                            // ';' | ',' | ')' | ']' | ' ' | '\n' => {
-                            _ => {
-                                return Ok(TokenInfo {
-                                    token: Token::Literal(Literal::HexInt(nliteral.clone())),
-                                    display: nliteral,
-                                    line: *current_line,
-                                    col: *current_col,
-                                });
-                            }
-                        }
-                    }
-                    // If we hit EOF, return
-                    if program.is_empty() {
-                        return Ok(TokenInfo {
-                            token: Token::Literal(Literal::HexInt(nliteral.clone())),
-                            display: nliteral,
-                            line: *current_line,
-                            col: *current_col,
-                        });
-                    }
-                    return Err(anyhow!("Unexpected end of hex literal"));
+                    consume(program, current_col, 2);
+                    return lex_numeric_helper(program, current_col, current_line, true);
                 }
-                _ => {}
-            }
-        }
-
-        // Decimal evaluation
-        while let Some(&c) = program.get(0) {
-            match c {
-                '0'..='9' => {
-                    nliteral.push(c);
-                    consume(program, current_col, 1);
-                }
-                'L' => {
-                    consume(program, current_col, 1);
-                    return Ok(TokenInfo {
-                        token: Token::Literal(Literal::Long(nliteral.clone())),
-                        display: nliteral,
-                        line: *current_line,
-                        col: *current_col,
-                    });
-                }
-
-                // Can be terminated by punctuation or by an identifier (e.g., 24value1)
-                // ';' | ',' | ')' | ']' | ' ' | '}'| '\n' | 'a'..='z' | 'A'..='K' | 'M'..='Z' => {
-
-                // No special termination characters: just end as soon as we stop matching
                 _ => {
-                    return Ok(TokenInfo {
-                        token: Token::Literal(Literal::Int(nliteral.clone())),
-                        display: nliteral,
-                        line: *current_line,
-                        col: *current_col,
-                    });
+                    return lex_numeric_helper(program, current_col, current_line, false);
                 }
             }
-        }
+        }   
+        return lex_numeric_helper(program, current_col, current_line, false);
     }
-
-    // If we hit EOF, return
-    if program.is_empty() {
-        return Ok(TokenInfo {
-            token: Token::Literal(Literal::Int(nliteral.clone())),
-            display: nliteral,
-            line: *current_line,
-            col: *current_col,
-        });
-    }
-
-    Err(anyhow!("Unexpected end of numeric literal"))
+    // Potentially while loop if we don't do anything (i.e., consume), 
+    // but we never actually hit this case
+    Err(anyhow!("Numeric literal lexing ending unexpectedly"))
 }
 
 /*
 Lex a Keyword or Identifier.
+Attempt to match a Keyword first.
 */
 fn lex_keyword_or_identifier(
     program: &mut Vec<char>,
@@ -378,16 +302,6 @@ fn lex_keyword_or_identifier(
         } else {
             break;
         }
-        // match character {
-        //     ';' | ',' | ')' | '[' | ']' | ' ' | '(' | '\n'  => {
-
-        //         break;
-        //     }
-        //     _ => {
-        //         keyword_or_identifier.push(character);
-        //         consume(program, current_col, 1); // Consume each character inside the string
-        //     }
-        // }
     }
 
     match keyword_or_identifier.as_str() {
@@ -470,7 +384,8 @@ fn lex_keyword_or_identifier(
             col: *current_col,
         }),
 
-        // "false" and "true" are keywords, but lexed as boolean literals
+        // "false" and "true" are keywords, but lexed as boolean literals,
+        // so these cases are probably never reached
         "false" => Ok(TokenInfo {
             token: Token::Literal(Literal::Bool(false)),
             display: "false".to_string(),
@@ -507,15 +422,15 @@ fn lex_string_literal(
     consume(program, current_col, 1);
 
     while let Some(&char1) = program.get(0) {
-        // Actual return, newline, tabs are not allowable -- only corresponding escaped char sequences
+        consume(program, current_col, 1);
+        // Actual return, newline, tabs are not allowable
+        // only corresponding escaped char sequences
         match char1 {
             '\n' | '\t' | '\r' => {
-                return Err(anyhow!("Only newline/tab/return characters allowed in string literal"));
+                return Err(anyhow!("Unexpected newline,tab, or return in string literal"));
             }
             _=>{}
         }
-
-        consume(program, current_col, 1);
 
         match char1 {
             '"' => {
@@ -530,7 +445,6 @@ fn lex_string_literal(
             '\\' => match program.get(0) {
                 Some(&char2 @ ('"' | '\'' | '\\' | 't' | 'n' | 'r' | 'f')) => {
                     sliteral.push_str(match char2 {
-                        // must also pushing leading backslash
                         '"' => "\\\"",
                         '\'' => "\\'",
                         '\\' => "\\\\",
@@ -542,7 +456,7 @@ fn lex_string_literal(
                     });
                     consume(program, current_col, 1);
                 }
-                Some(&invalid) => return Err(anyhow!("Invalid escape sequence \'\\{}\'", invalid)), // Reject invalid backslashes
+                Some(&invalid) => return Err(anyhow!("Invalid escape sequence \'\\{}\'", invalid)),
                 None => return Err(anyhow!("Incomplete escape sequence in string literal")),
             },
             _ => sliteral.push(char1),
@@ -557,7 +471,7 @@ Lex a character literal, identified by a leading single quote.
 Returns errors for incomplete or illegal characters.
 */
 fn lex_char_literal( program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32,) -> Result<TokenInfo> {
-    consume(program, current_col, 1); // Consume opening quote (')
+    consume(program, current_col, 1);
 
     let char1 = match program.get(0) {
         Some(&c) => c,
@@ -566,17 +480,16 @@ fn lex_char_literal( program: &mut Vec<char>, current_line: &mut i32, current_co
         }
     };
 
-    // Actual return, newline, tabs are not allowable -- only corresponding escaped char sequences
     match char1 {
         '\n' | '\t' | '\r' => {
-            return Err(anyhow!("Only newline/tab/return characters allowed in string literal"));
+            return Err(anyhow!("Unexpected newline,tab, or return in char literal"));
         }
         _=>{}
     }
 
     consume(program, current_col, 1); // Move to next character
 
-    // Match length-2 escaped sequences
+    // Match escaped sequences first
     let char_value = if char1 == '\\' {
         match program.get(0) {
             Some(&escaped_char) => {
@@ -588,11 +501,10 @@ fn lex_char_literal( program: &mut Vec<char>, current_line: &mut i32, current_co
                     't' => '\t',
                     'n' => '\n',
                     'r' => '\r',
-                    'f' => '\x0C', // Form feed
-                    '0' => '\0',   // Null character
+                    'f' => '\x0C',
                     _ => {
                         return Err(anyhow!("Invalid escape sequence \\{}", escaped_char));
-                    } // Return as is for unrecognized escapes
+                    }
                 }
             }
             None => '\\', // If there's no character after '\', just return it
@@ -623,7 +535,13 @@ fn lex_char_literal( program: &mut Vec<char>, current_line: &mut i32, current_co
     }
 }
 
-// does the matching and shii
+
+/*
+Main function to get the next token from the program.
+
+Assumes immediate whitespace and tokens have been gobbled, 
+so can immediately begin matching.
+*/
 fn get_next_token(
     program: &mut Vec<char>,
     current_line: &mut i32,
@@ -719,7 +637,6 @@ fn get_next_token(
             }
         };
 
-        // println!("current program: {:?}", program);
         // Match single-character Symbols directly
         let token = match char1 {
             '(' => Some(TokenInfo {
@@ -826,11 +743,11 @@ fn get_next_token(
                 col: *current_col,
             }),
 
-            // These fn handle their own consumption and return immediately
+            // These fn handle their own consumption
             '\'' => return lex_char_literal(program, current_line, current_col),
             '"' => return lex_string_literal(program, current_line, current_col),
 
-            // Fallback: check for Keyword, Identifier, Literal
+            // If no direct match: lex as Keyword, Identifier, and Literal
             _ => {
                 if char1.is_alphabetic() || char1 == '_' {
                     return lex_keyword_or_identifier(program, current_line, current_col);
@@ -868,16 +785,15 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
 
     // Clear whitespace and comments; gobble tokens until hit EOF
     while let Some(&char1) = program.get(0) {
-        // Clear any whitespace
         if char1.is_whitespace() {
             gobble_whitespace(&mut program, &mut current_line, &mut current_col);
             continue;
         }
 
-        // Gobble any comment
         if char1 == '/' {
             if let Some(&char2) = program.get(1) {
                 match (char1, char2) {
+                    // match line and block comments
                     ('/', '/') | ('/', '*') => {
                         if gobble_comment(&mut program, &mut current_col, &mut current_line)
                             .is_err()
@@ -891,7 +807,7 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
             }
         }
 
-        // Get and display the next token
+        // Generate and display the next token to standard out
         let token = get_next_token(&mut program, &mut current_line, &mut current_col);
         match token {
             Ok(token_info) => {
@@ -900,7 +816,7 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
                         format!("{} IDENTIFIER {}", token_info.line, text)
                     }
                     Token::Literal(Literal::Char(text)) => {
-                        let display_char: String = match text {
+                        let display_char = match text {
                             '\n' => "\\n".to_string(),
                             '\t' => "\\t".to_string(),
                             '\r' => "\\r".to_string(),
@@ -908,7 +824,7 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
                             '\'' => "\\'".to_string(),
                             '"' => "\\\"".to_string(),
                             '\\' => "\\\\".to_string(),
-                            _ => format!("{}", text),
+                            _ => text.to_string(),
                         };
                         format!("{} CHARLITERAL \'{}\'", token_info.line, display_char)
                     }
@@ -938,10 +854,11 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
                 writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
                 tokens.push(token_info.token);
             }
+
             Err(token_value) => {
                 found_err = true;
                 let template_string = format!(
-                    "Error in \"{}\" (line {}, column {})\t→\t{}",
+                    "Error in \"{}\" (line {}, column {})→\t{}",
                     filename, current_line, current_col, token_value
                 );
                 writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
