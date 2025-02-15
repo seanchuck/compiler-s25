@@ -71,6 +71,10 @@ TODO: hex, +L, comments, errors
 
 Ensure: consumption is done correctly
 
+Note:
+    - We allow newline and tab characters directly written like "\n" or "\t" (2 chars each), but not the actual
+    whitespace which parses as a single character ('\n' or '\t')
+
 
 */
 
@@ -292,10 +296,17 @@ fn lex_numeric_literal(
                                     line: *current_line,
                                     col: *current_col,
                                 });
-                            } // _ => {
-                              //     return Err(anyhow!("Illegal char in hex literal!"));
-                              // }
+                            }
                         }
+                    }
+                    // If we hit EOF, return
+                    if program.is_empty() {
+                        return Ok(TokenInfo {
+                            token: Token::Literal(Literal::HexInt(nliteral.clone())),
+                            display: nliteral,
+                            line: *current_line,
+                            col: *current_col,
+                        });
                     }
                     return Err(anyhow!("Unexpected end of hex literal"));
                 }
@@ -331,11 +342,19 @@ fn lex_numeric_literal(
                         line: *current_line,
                         col: *current_col,
                     });
-                } // _ => {
-                  //     return Err(anyhow!("Illegal char in decimal literal!"));
-                  // }
+                }
             }
         }
+    }
+
+    // If we hit EOF, return
+    if program.is_empty() {
+        return Ok(TokenInfo {
+            token: Token::Literal(Literal::Int(nliteral.clone())),
+            display: nliteral,
+            line: *current_line,
+            col: *current_col,
+        });
     }
 
     Err(anyhow!("Unexpected end of numeric literal"))
@@ -489,8 +508,11 @@ fn lex_string_literal(
 
     while let Some(&char1) = program.get(0) {
         // If we encounter an actual newline (0xA == '\n'), reject immediately (newline char "\n" is ok)
-        if char1 == '\n' {
-            return Err(anyhow!("Newline (0xA) not allowed in string literals"));
+        match char1 {
+            '\n' | '\t' | '\r' => {
+                return Err(anyhow!("Only newline/tab/return characters allowed in string literal"));
+            }
+            _=>{}
         }
 
         consume(program, current_col, 1);
@@ -534,11 +556,7 @@ fn lex_string_literal(
 Lex a character literal, identified by a leading single quote.
 Returns errors for incomplete or illegal characters.
 */
-fn lex_char_literal(
-    program: &mut Vec<char>,
-    current_line: &mut i32,
-    current_col: &mut i32,
-) -> Result<TokenInfo> {
+fn lex_char_literal( program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32,) -> Result<TokenInfo> {
     consume(program, current_col, 1); // Consume opening quote (')
 
     let char1 = match program.get(0) {
@@ -547,6 +565,10 @@ fn lex_char_literal(
             return Err(anyhow!("Unexpected end of input in character literal"));
         }
     };
+
+    if char1 == '\n' {
+        return Err(anyhow!("Unexpected newline (0xa) in character literal"));
+    }
 
     consume(program, current_col, 1); // Move to next character
 
