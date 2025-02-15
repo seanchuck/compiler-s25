@@ -1,13 +1,9 @@
 // Example usage: cargo run tests/hello.dcf -t <scan, parse,>
+// Additional packages: anyhow (error types), nom (parsing), clap (cli args)
 mod add;
 mod parse;
 mod scan;
 mod utils;
-// Additional packages: anyhow (error types), nom (parsing), clap (cli args)
-
-// Heap allocated structures:
-// - Box: unique pointer (heap)
-// - rc: shared pointer
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
@@ -24,7 +20,6 @@ fn main() {
     let mut writer = get_writer(&args.output);
     let filename = args.input.to_string_lossy().to_string();
 
-    // Print debugging information
     if args.debug {
         eprintln!(
             "Filename: {:?}\nDebug: {:?}\nOptimizations: {:?}\nOutput File: {:?}\nTarget: {:?}",

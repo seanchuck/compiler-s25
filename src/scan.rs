@@ -507,7 +507,7 @@ fn lex_string_literal(
     consume(program, current_col, 1);
 
     while let Some(&char1) = program.get(0) {
-        // If we encounter an actual newline (0xA == '\n'), reject immediately (newline char "\n" is ok)
+        // Actual return, newline, tabs are not allowable -- only corresponding escaped char sequences
         match char1 {
             '\n' | '\t' | '\r' => {
                 return Err(anyhow!("Only newline/tab/return characters allowed in string literal"));
@@ -566,8 +566,12 @@ fn lex_char_literal( program: &mut Vec<char>, current_line: &mut i32, current_co
         }
     };
 
-    if char1 == '\n' {
-        return Err(anyhow!("Unexpected newline (0xa) in character literal"));
+    // Actual return, newline, tabs are not allowable -- only corresponding escaped char sequences
+    match char1 {
+        '\n' | '\t' | '\r' => {
+            return Err(anyhow!("Only newline/tab/return characters allowed in string literal"));
+        }
+        _=>{}
     }
 
     consume(program, current_col, 1); // Move to next character
