@@ -3,8 +3,8 @@
 mod add;
 mod utils;
 
-mod token;
 mod ast;
+mod token;
 
 mod parse;
 mod scan;

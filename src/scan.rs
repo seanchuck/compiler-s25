@@ -27,9 +27,7 @@ All tokens:
     Whitespace: space, newline, comments (// and /**/), carriage return
 */
 
-/*
-Consume up to nchar characters from the program vector.
-*/
+/// Consume up to nchar characters from the program vector.
 fn consume(program: &mut Vec<char>, current_col: &mut i32, nchar: i32) {
     let nchar = nchar.max(0) as usize;
     let nchar = nchar.min(program.len());
@@ -37,10 +35,9 @@ fn consume(program: &mut Vec<char>, current_col: &mut i32, nchar: i32) {
     *current_col += nchar as i32;
 }
 
-/*
-Consume all whitespace characters before the next
-token or EOF.
-*/
+
+/// Consume all whitespace characters before the next
+/// token or EOF.
 fn gobble_whitespace(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) {
     while !program.is_empty() {
         if let Some(&character) = program.first() {
@@ -57,10 +54,9 @@ fn gobble_whitespace(program: &mut Vec<char>, current_line: &mut i32, current_co
     }
 }
 
-/*
-Attempts to gobble a comment.
-Throws an error if a block comment is not closed.
-*/
+
+/// Attempts to gobble a comment.
+/// Throws an error if a block comment is not closed.
 fn gobble_comment(
     program: &mut Vec<char>,
     current_col: &mut i32,
@@ -105,9 +101,8 @@ fn gobble_comment(
     }
 }
 
-/*
-Lex based on decimal or hex type.
-*/
+
+/// Helper to lex integer based on decimal or hex type.
 fn lex_numeric_helper(
     program: &mut Vec<char>,
     current_col: &mut i32,
@@ -157,9 +152,7 @@ fn lex_numeric_helper(
     })
 }
 
-/*
-Lex a decimal or hex numeric literal of int or long type.
-*/
+/// Lex a decimal or hex numeric literal of int or long type.
 fn lex_numeric_literal(
     program: &mut Vec<char>,
     current_line: &mut i32,
@@ -184,10 +177,9 @@ fn lex_numeric_literal(
     Err(anyhow!("Numeric literal lexing ending unexpectedly"))
 }
 
-/*
-Lex a Keyword or Identifier.
-Attempt to match a Keyword first.
-*/
+
+/// Lex a Keyword or Identifier.
+/// Attempt to match a Keyword first.
 fn lex_keyword_or_identifier(
     program: &mut Vec<char>,
     current_line: &mut i32,
@@ -310,10 +302,9 @@ fn lex_keyword_or_identifier(
     }
 }
 
-/*
-Lex a string literal, identified by a leading quotation mark.
-Returns errors for incomplete strings and illegal characters.
-*/
+
+/// Lex a string literal, identified by a leading quotation mark.
+/// Returns errors for incomplete strings and illegal characters.
 fn lex_string_literal(
     program: &mut Vec<char>,
     current_line: &mut i32,
@@ -369,10 +360,9 @@ fn lex_string_literal(
     Err(anyhow!("String literal missing closing quote"))
 }
 
-/*
-Lex a character literal, identified by a leading single quote.
-Returns errors for incomplete or illegal characters.
-*/
+
+/// Lex a character literal, identified by a leading single quote.
+/// Returns errors for incomplete or illegal characters.
 fn lex_char_literal(
     program: &mut Vec<char>,
     current_line: &mut i32,
@@ -676,11 +666,10 @@ fn get_next_token(
     Err(anyhow!("Failed to generate next token"))
 }
 
-/*
-The main scan function for this file.
-    Input: a Decaf source file String as input.
-    Effects: Outputs a sequence of Tokens.
-*/
+
+/// The main scan function for this file.
+///     Input: a Decaf source file String as input.
+///     Effects: Outputs a sequence of Tokens.
 pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) -> Vec<Token> {
     let mut program: Vec<char> = file.chars().collect();
     let mut tokens: Vec<Token> = vec![];

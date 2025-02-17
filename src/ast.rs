@@ -1,7 +1,13 @@
 /*
-Abstract syntax tree structures for parser
+Abstract syntax tree structures for parser, which 
+mimic tree-like structure of the Decaf grammar.
+
+Some are reused from token.rs.
 */
 
+use crate::token::{Literal, Punctuation};
+
+#[derive(Debug)]
 pub enum AST {
     Program {
         imports: Vec<Box<AST>>,
@@ -9,14 +15,14 @@ pub enum AST {
         methods: Vec<Box<AST>>,
     },
     ImportDecl {
-        identifier: String,
+        id: String,
     },
     FieldDecl {
         typ: Type,
         decls: Vec<Box<AST>>,
     },
     ArrayFieldDecl {
-        identifier: String,
+        id: String,
         size: i32,
     },
     MethodDecl {
@@ -35,13 +41,8 @@ pub enum AST {
     Type(Type),
 }
 
-pub enum Type {
-    Int,
-    Long,
-    Bool,
-    Void,
-}
 
+#[derive(Debug)]
 pub enum Statement {
     Assignment {
         location: Box<AST>,
@@ -75,19 +76,12 @@ pub enum Statement {
     Continue,
 }
 
-pub enum AssignOp {
-    Assign,
-    PlusAssign,
-    MinusAssign,
-    MultiplyAssign,
-    DivideAssign,
-    ModuloAssign,
-}
 
+#[derive(Debug)]
 pub enum Expr {
     // Location(Box<AST>),
     ArrAccess {
-        identifier: String,
+        id: String,
         index: Box<AST>,
     },
     MethodCall {
@@ -99,34 +93,23 @@ pub enum Expr {
         target_type: Type,
         expr: Box<AST>,
     },
-    UnaryOp {
-        op: UnaryOp,
+    UnOp {
+        op: UnaryExpr,
         expr: Box<AST>,
     },
-    BinaryOp {
+    BinaryExpr {
         left: Box<AST>,
-        op: BinaryOp,
+        op: BinOp,
         right: Box<AST>,
     },
     Len {
-        identifier: String,
+        id: String,
     },
 }
 
-pub enum Literal {
-    Int(i32),
-    Long(i64),
-    Bool(bool),
-    Char(char),
-    String(String),
-}
 
-pub enum UnaryOp {
-    Neg,
-    Not,
-}
-
-pub enum BinaryOp {
+#[derive(Debug)]
+pub enum BinOp {
     Add,
     Subtract,
     Multiply,
@@ -141,3 +124,34 @@ pub enum BinaryOp {
     And,
     Or,
 }
+
+#[derive(Debug)]
+pub enum UnaryExpr {
+    Neg,
+    Not,
+}
+#[derive(Debug)]
+pub enum AssignOp {
+    Assign,
+    PlusAssign,
+    MinusAssign,
+    MultiplyAssign,
+    DivideAssign,
+    ModuloAssign,
+}
+
+#[derive(Debug)]
+pub enum Type {
+    Int,
+    Long,
+    Bool,
+    Void,
+}
+// #[derive(Debug)]
+// pub enum ASTLiteral {
+    //     Int(i32),
+    //     Long(i64),
+    //     Bool(bool),
+    //     Char(char),
+    //     String(String),
+// }

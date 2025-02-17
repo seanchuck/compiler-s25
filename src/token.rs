@@ -20,7 +20,7 @@ pub enum Token {
     Literal(Literal),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Keyword {
     If,
     Bool,
@@ -47,7 +47,7 @@ pub enum Symbol {
     Punctuation(Punctuation),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Operator {
     Plus,
     Minus,
@@ -73,7 +73,7 @@ pub enum Operator {
     LogicalNot,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Punctuation {
     LeftParen,
     RightParen,
@@ -88,10 +88,10 @@ pub enum Punctuation {
 #[derive(Debug)]
 pub enum Literal {
     Char(char),
+    String(String),
     Int(String),
     Long(String),
     HexInt(String),
     HexLong(String),
-    String(String),
     Bool(bool),
 }
