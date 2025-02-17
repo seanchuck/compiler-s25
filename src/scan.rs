@@ -2,6 +2,7 @@
 Scanner.
 */
 
+use super::token::*;
 use anyhow::{anyhow, Result};
 use std::process;
 
@@ -24,106 +25,6 @@ All tokens:
         long: dec or hex literal + L, true, false,
 
     Whitespace: space, newline, comments (// and /**/), carriage return
-*/
-
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct TokenInfo {
-    pub token: Token,
-    pub display: String,
-    pub line: i32,
-    pub col: i32,
-}
-#[derive(Debug)]
-#[allow(dead_code)]
-pub enum Token {
-    Keyword(Keyword), // Keyword variant has type Keyword
-    Identifier(String),
-    Symbol(Symbol),
-    Literal(Literal),
-}
-
-#[derive(Debug)]
-pub enum Keyword {
-    If,
-    Bool,
-    Break,
-    Import,
-    Continue,
-    Else,
-    For,
-    While,
-    Int,
-    Long,
-    Return,
-    Len,
-    Void,
-    // never constructed since captured in boolean literals
-    // True,
-    // False,
-}
-
-#[derive(Debug)]
-#[allow(dead_code)]
-pub enum Symbol {
-    Operator(Operator),
-    Punctuation(Punctuation),
-}
-
-#[derive(Debug)]
-pub enum Operator {
-    Plus,
-    Minus,
-    Multiply,
-    Divide,
-    Modulo,
-    Assign,
-    PlusAssign,
-    MinusAssign,
-    MultiplyAssign,
-    DivideAssign,
-    ModuloAssign,
-    Increment,
-    Decrement,
-    Equal,
-    NotEqual,
-    Less,
-    Greater,
-    LessEqual,
-    GreaterEqual,
-    LogicalAnd,
-    LogicalOr,
-    LogicalNot,
-}
-
-#[derive(Debug)]
-pub enum Punctuation {
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    LeftBracket,
-    RightBracket,
-    Semicolon,
-    Comma,
-}
-
-#[derive(Debug)]
-pub enum Literal {
-    Char(char),
-    Int(String),
-    Long(String),
-    HexInt(String),
-    HexLong(String),
-    String(String),
-    Bool(bool),
-}
-
-// ---------------------------------------------------------------------------------------
-
-/*
-The scanner keeps track of line and column numbers.
-
 */
 
 /*
@@ -180,7 +81,7 @@ fn gobble_comment(
                     }
                 }
                 Ok("Gobbled line comment".to_string())
-            },
+            }
             // Block comment
             ('/', '*') => {
                 while let Some(&c) = program.first() {
@@ -275,10 +176,10 @@ fn lex_numeric_literal(
                     return lex_numeric_helper(program, current_col, current_line, false);
                 }
             }
-        }   
+        }
         return lex_numeric_helper(program, current_col, current_line, false);
     }
-    // Potentially while loop if we don't do anything (i.e., consume), 
+    // Potentially while loop if we don't do anything (i.e., consume),
     // but we never actually hit this case
     Err(anyhow!("Numeric literal lexing ending unexpectedly"))
 }
@@ -427,9 +328,11 @@ fn lex_string_literal(
         // only corresponding escaped char sequences
         match char1 {
             '\n' | '\t' | '\r' => {
-                return Err(anyhow!("Unexpected newline,tab, or return in string literal"));
+                return Err(anyhow!(
+                    "Unexpected newline,tab, or return in string literal"
+                ));
             }
-            _=>{}
+            _ => {}
         }
 
         match char1 {
@@ -470,7 +373,11 @@ fn lex_string_literal(
 Lex a character literal, identified by a leading single quote.
 Returns errors for incomplete or illegal characters.
 */
-fn lex_char_literal( program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32,) -> Result<TokenInfo> {
+fn lex_char_literal(
+    program: &mut Vec<char>,
+    current_line: &mut i32,
+    current_col: &mut i32,
+) -> Result<TokenInfo> {
     consume(program, current_col, 1);
 
     let char1 = match program.get(0) {
@@ -484,7 +391,7 @@ fn lex_char_literal( program: &mut Vec<char>, current_line: &mut i32, current_co
         '\n' | '\t' | '\r' => {
             return Err(anyhow!("Unexpected newline,tab, or return in char literal"));
         }
-        _=>{}
+        _ => {}
     }
 
     consume(program, current_col, 1); // Move to next character
@@ -535,11 +442,10 @@ fn lex_char_literal( program: &mut Vec<char>, current_line: &mut i32, current_co
     }
 }
 
-
 /*
 Main function to get the next token from the program.
 
-Assumes immediate whitespace and tokens have been gobbled, 
+Assumes immediate whitespace and tokens have been gobbled,
 so can immediately begin matching.
 */
 fn get_next_token(
@@ -870,6 +776,5 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
         process::exit(1);
     }
 
-    // println!("Tokens are:\n {:?}", tokens);
     tokens
 }

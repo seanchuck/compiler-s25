@@ -1,9 +1,13 @@
 // Example usage: cargo run tests/hello.dcf -t <scan, parse,>
 // Additional packages: anyhow (error types), nom (parsing), clap (cli args)
 mod add;
+mod utils;
+
+mod token;
+mod ast;
+
 mod parse;
 mod scan;
-mod utils;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
@@ -36,8 +40,7 @@ fn main() {
             scan::scan(&input, &filename, &mut writer);
         }
         utils::cli::CompilerAction::Parse => {
-            todo!("parse");
-            // parse::parse(&input);
+            parse::parse(&input, &filename, &mut writer);
         }
         utils::cli::CompilerAction::Inter => {
             todo!("inter");
