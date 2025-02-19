@@ -1,6 +1,7 @@
 /*
 Token data structures for scanner.
 */
+// use nom::{InputTake};
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -95,3 +96,25 @@ pub enum Literal {
     HexLong(String),
     Bool(bool),
 }
+
+
+// use nom::Input;
+// use std::ops::RangeFrom;
+
+
+// impl Input for &[Token] {
+//     type Token = Token;
+
+//     fn input_len(&self) -> usize {
+//         self.len()
+//     }
+
+//     fn take(&self, count: usize) -> Self {
+//         &self[..count]
+//     }
+
+//     fn take_split(&self, count: usize) -> (Self, Self) {
+//         self.split_at(count)
+//     }
+
+// }

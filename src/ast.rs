@@ -65,6 +65,10 @@ pub enum Statement {
         update: Box<AST>,
         block: Box<AST>,
     },
+    Update {
+        location: Box<AST>,
+
+    },
     While {
         condition: Box<AST>,
         block: Box<AST>,
@@ -147,3 +151,4 @@ pub enum Type {
     Bool,
     Void,
 }
+

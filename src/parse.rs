@@ -144,8 +144,7 @@ fn parse_string_literal(input: &[Token]) -> IResult<&[Token], AST> {
     }
 }
 
-
-/// Parses all literals of type char, string, and numeric (int, long, decimal, hex)
+/// Parses all literals but type string
 /// For now, "-" parsed separately
 fn parse_literal(input: &[Token]) -> IResult<&[Token], AST> {
     alt((
@@ -154,6 +153,25 @@ fn parse_literal(input: &[Token]) -> IResult<&[Token], AST> {
         parse_char_bool_literal,
     )).parse(input)
 }
+
+fn parse_type(input: &[Token]) -> IResult<&[Token], AST> {
+    match input.first() {
+        Some(Token::Literal(Literal::String(id))) => {
+            let ast_type = match id.as_str() {
+                "int" => AST::Type(Type::Int),
+                "long" => AST::Type(Type::Long),
+                "bool" => AST::Type(Type::Bool),
+                _ => return Err(nom::Err::Error(Error::new(input, nom::error::ErrorKind::Tag))),
+            };
+            Ok((&input[1..], ast_type))
+        }
+        _ => Err(nom::Err::Error(Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        ))),
+    }
+}
+
 
 /// Parses a single binary operator token
 fn parse_BinaryOp_token(input: &[Token]) -> IResult<&[Token], BinaryOp> {
@@ -183,7 +201,6 @@ fn parse_UnaryOp_token(input: &[Token]) -> IResult<&[Token], UnaryOp> {
         map(tag_operator_gen(Operator::Minus), |_| UnaryOp::Neg),
         map(tag_operator_gen(Operator::LogicalNot), |_| UnaryOp::Not),
     )).parse(input)
-    
 }
 
 /// Parses a binary expression
@@ -201,7 +218,6 @@ fn parse_binexpr(input: &[Token]) -> IResult<&[Token], AST> {
     ).parse(input)
 }
 
-
 /// Parses a unary expression
 /// unary expressions take the form: unaryOp
 fn parse_unexpr(input: &[Token]) -> IResult<&[Token], AST> {
@@ -216,7 +232,6 @@ fn parse_unexpr(input: &[Token]) -> IResult<&[Token], AST> {
         },
     ).parse(input)
 }
-
 
 fn parse_len(input: &[Token]) -> IResult<&[Token], AST> {
     let parse_result = ((
@@ -286,7 +301,6 @@ fn parse_parens(input: &[Token]) -> IResult<&[Token], AST> {
     }
 }
 
-
 fn parse_location(input: &[Token]) -> IResult<&[Token], AST> {
     let parse_result = ((
         parse_identifier, // Variable name
@@ -325,7 +339,7 @@ fn parse_location(input: &[Token]) -> IResult<&[Token], AST> {
 fn parse_expr(input: &[Token]) -> IResult<&[Token], AST> {
     alt((
         parse_location,
-        // parse_method_call
+        parse_method_call,
         parse_literal, // don't need args for funcs that just take [Token]
         parse_cast, 
         parse_len,
@@ -335,7 +349,7 @@ fn parse_expr(input: &[Token]) -> IResult<&[Token], AST> {
     )).parse(input)
 }
 
-fn parse_if_statement(input: &[Token]) -> IResult<&[Token], AST> {
+fn parse_if(input: &[Token]) -> IResult<&[Token], AST> {
     // compose the parser
     let parse_result = ((
         tag_keyword_gen(Keyword::If),
@@ -415,26 +429,6 @@ fn parse_while_loop(input: &[Token]) -> IResult<&[Token], AST> {
 }
 
 
-fn parse_import_decl(input: &[Token]) -> IResult<&[Token], AST> {
-    let parse_result = ((
-        tag_keyword_gen(Keyword::Import),
-        parse_identifier,
-        tag_punctuation_gen(Punctuation::Semicolon),
-    ))
-    .parse(input);
-
-    match parse_result {
-        Ok((input, (_, id, _))) => {
-            let id = match id {
-                AST::Identifier(name) => name,
-                _ => return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))),
-            };
-            Ok((input, AST::ImportDecl { id }))
-        }
-        Err(e) => Err(e),
-    }
-}
-
 
 fn parse_break_continue(input: &[Token]) -> IResult<&[Token], AST> {
     let parse_result = ((
@@ -473,22 +467,11 @@ fn parse_return(input: &[Token]) -> IResult<&[Token], AST> {
 }
 
 
-fn parse_statement(input: &[Token]) -> IResult<&[Token], AST> {
-    alt((
-        // parse_assign
-        // parse_method_call
-        parse_if_statement,
-        parse_for_loop,
-        parse_while_loop,
-        parse_break_continue,
-        parse_return,
-    )).parse(input)
-}
-
-
-fn parse_increment(input: &[Token]) -> IResult<&[Token], AST> {
+/// Parse increment "++" which we convert into "+=1" in the AST
+/// Follows the structure: location increment
+fn parse_increment_decrement(input: &[Token]) -> IResult<&[Token], AST> {
     let parse_result = ((
-        parse_identifier, // Variable being incremented/decremented
+        parse_identifier,
         alt((
             map(tag_operator_gen(Operator::Increment), |_| AssignOp::PlusAssign),
             map(tag_operator_gen(Operator::Decrement), |_| AssignOp::MinusAssign),
@@ -528,7 +511,7 @@ fn parse_AssignOp_token(input: &[Token]) -> IResult<&[Token], AssignOp> {
 
 fn parse_assignexpr(input: &[Token]) -> IResult<&[Token], AST> {
     alt((
-        parse_increment,
+        parse_increment_decrement,
         map(
             (
                 parse_AssignOp_token,
@@ -546,12 +529,16 @@ fn parse_assignexpr(input: &[Token]) -> IResult<&[Token], AST> {
     .parse(input)
 }
 
-
 fn parse_assign_to_location(input: &[Token]) -> IResult<&[Token], AST> {
-    let parse_result = ((parse_location, parse_assignexpr)).parse(input);
+    let parse_result = ((
+        parse_location,
+        parse_assignexpr,
+        tag_punctuation_gen(Punctuation::Semicolon),
+    ))
+    .parse(input);
 
     match parse_result {
-        Ok((input, (loc, assign))) => {
+        Ok((input, (loc, assign, _))) => {
             let location = match loc {
                 AST::Identifier(name) => AST::Identifier(name),
                 AST::Expr(Expr::ArrAccess { id, index }) => AST::Expr(Expr::ArrAccess { id, index }),
@@ -577,10 +564,55 @@ fn parse_assign_to_location(input: &[Token]) -> IResult<&[Token], AST> {
     }
 }
 
+fn parse_for_update(input: &[Token]) -> IResult<&[Token], AST> {
+    alt((
+        parse_assign_to_location,
+        parse_increment_decrement,
+    )).parse(input)
+}
+
+fn parse_statement(input: &[Token]) -> IResult<&[Token], AST> {
+    alt((
+        // assigment sequence of two parsers; must manually map output here
+        map(
+            (parse_for_update, tag_punctuation_gen(Punctuation::Semicolon)),
+            |(assign, _)| {
+                match assign {
+                    AST::Statement(Statement::Assignment { location, expr, op}) => {
+                        AST::Statement(Statement::Assignment { location, expr, op })
+                    },
+                    _ => assign,
+                }
+            }
+        ),
+        parse_method_call,
+        parse_if,
+        parse_for_loop,
+        parse_while_loop,
+        parse_return,
+        parse_break_continue,
+    )).parse(input)
+}
 
 
-fn parse_for_update(input: &[Token]) -> IResult<&[Token], (AST, AST)> {
-    (parse_location, parse_assignexpr).parse(input)
+fn parse_import_decl(input: &[Token]) -> IResult<&[Token], AST> {
+    let parse_result = ((
+        tag_keyword_gen(Keyword::Import),
+        parse_identifier,
+        tag_punctuation_gen(Punctuation::Semicolon),
+    ))
+    .parse(input);
+
+    match parse_result {
+        Ok((input, (_, id, _))) => {
+            let id = match id {
+                AST::Identifier(name) => name,
+                _ => return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))),
+            };
+            Ok((input, AST::ImportDecl { id }))
+        }
+        Err(e) => Err(e),
+    }
 }
 
 fn parse_array_field_decl(input: &[Token]) -> IResult<&[Token], AST> {
@@ -610,7 +642,10 @@ fn parse_array_field_decl(input: &[Token]) -> IResult<&[Token], AST> {
 }
 
 
-
+// These all require parsing multiple appearances
+fn parse_method_call(input: &[Token]) -> IResult<&[Token], AST> {
+    todo!()
+}
 
 fn parse_method_decl(input: &[Token]) -> IResult<&[Token], AST> {
     todo!()
@@ -620,7 +655,7 @@ fn parse_field_decl(input: &[Token]) -> IResult<&[Token], AST> {
     todo!()
 }
 
-fn param_list(input: &[Token]) -> IResult<&[Token], AST> {
+fn parse_param_list(input: &[Token]) -> IResult<&[Token], AST> {
     todo!()
 }
 
@@ -628,9 +663,8 @@ fn parse_block(input: &[Token]) -> IResult<&[Token], AST> {
     todo!()
 }
 
-//
 fn parse_program(input: &[Token]) -> IResult<&[Token], AST> {
-    Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
+    todo!()
 }
 
 /// Input: a sequence of tokens produced by the scanner.
