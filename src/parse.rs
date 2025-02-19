@@ -642,6 +642,38 @@ fn parse_array_field_decl(input: &[Token]) -> IResult<&[Token], AST> {
 }
 
 
+/// Manual implementation to match 0+ instances of a production.
+/// Given a parser F and input vector of tokens, 
+/// repeatedly apply the parser until it fails.
+fn parse_all<'a, F, O>(mut parser: F, mut input: &'a [Token]) -> IResult<&'a [Token], Vec<O>>
+where F: FnMut(&'a [Token]) -> IResult<&'a [Token], O>,
+{
+    let mut results = Vec::new();
+
+    while let Ok((new_input, parsed_item)) = parser(input) {
+        results.push(parsed_item);
+        input = new_input;
+    }
+
+    Ok((input, results))
+}
+
+fn parse_block(input: &[Token]) -> IResult<&[Token], AST> {
+    let (input, _) = tag_punctuation_gen(Punctuation::LeftBrace)(input)?;
+    let (input, field_decls) = parse_all(parse_field_decl, input)?;
+    let (input, statements) = parse_all(parse_statement, input)?;
+    let (input, _) = tag_punctuation_gen(Punctuation::RightBrace)(input)?;
+
+    Ok((
+        input,
+        AST::Block {
+            // Convert Vec<AST> to Vec<Box<AST>>
+            field_decls: field_decls.into_iter().map(Box::new).collect(),
+            statements: statements.into_iter().map(Box::new).collect(),
+        },
+    ))
+}
+
 // These all require parsing multiple appearances
 fn parse_method_call(input: &[Token]) -> IResult<&[Token], AST> {
     todo!()
@@ -659,9 +691,9 @@ fn parse_param_list(input: &[Token]) -> IResult<&[Token], AST> {
     todo!()
 }
 
-fn parse_block(input: &[Token]) -> IResult<&[Token], AST> {
-    todo!()
-}
+// fn parse_block(input: &[Token]) -> IResult<&[Token], AST> {
+//     todo!()
+// }
 
 fn parse_program(input: &[Token]) -> IResult<&[Token], AST> {
     todo!()
