@@ -37,7 +37,7 @@ fn main() {
             panic!("Invalid target");
         }
         utils::cli::CompilerAction::Scan => {
-            scan::scan(&input, &filename, &mut writer);
+            scan::scan(&input, &filename, &mut writer, true);
         }
         utils::cli::CompilerAction::Parse => {
             parse::parse(&input, &filename, &mut writer);

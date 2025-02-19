@@ -23,7 +23,7 @@ pub enum AST {
     },
     ArrayFieldDecl {
         id: String,
-        size: i32,
+        size: String,
     },
     MethodDecl {
         return_type: Option<Type>,
@@ -93,13 +93,13 @@ pub enum Expr {
         target_type: Type,
         expr: Box<AST>,
     },
-    UnOp {
-        op: UnaryExpr,
+    UnaryExpr {
+        op: UnaryOp,
         expr: Box<AST>,
     },
     BinaryExpr {
         left: Box<AST>,
-        op: BinOp,
+        op: BinaryOp,
         right: Box<AST>,
     },
     Len {
@@ -109,7 +109,7 @@ pub enum Expr {
 
 
 #[derive(Debug)]
-pub enum BinOp {
+pub enum BinaryOp {
     Add,
     Subtract,
     Multiply,
@@ -126,7 +126,7 @@ pub enum BinOp {
 }
 
 #[derive(Debug)]
-pub enum UnaryExpr {
+pub enum UnaryOp {
     Neg,
     Not,
 }
@@ -147,11 +147,3 @@ pub enum Type {
     Bool,
     Void,
 }
-// #[derive(Debug)]
-// pub enum ASTLiteral {
-    //     Int(i32),
-    //     Long(i64),
-    //     Bool(bool),
-    //     Char(char),
-    //     String(String),
-// }

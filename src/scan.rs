@@ -668,9 +668,12 @@ fn get_next_token(
 
 
 /// The main scan function for this file.
-///     Input: a Decaf source file String as input.
-///     Effects: Outputs a sequence of Tokens.
-pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) -> Vec<Token> {
+///  - Input: a Decaf source file String as input.
+///  - Effects: Outputs a sequence of Tokens.
+///     If verbose is specified, will print the sequence of tokens
+///     using the provided writer
+///     
+pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>, verbose: bool) -> Vec<Token> {
     let mut program: Vec<char> = file.chars().collect();
     let mut tokens: Vec<Token> = vec![];
     let mut found_err = false;
@@ -746,7 +749,9 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
                     }
                 };
 
-                writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
+                if verbose {
+                    writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
+                }
                 tokens.push(token_info.token);
             }
 
@@ -756,7 +761,9 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>) ->
                     "Error in \"{}\" (line {}, column {})→\t{}",
                     filename, current_line, current_col, token_value
                 );
-                writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
+                if verbose {
+                    writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
+                }
             }
         }
     }
