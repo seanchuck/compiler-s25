@@ -74,7 +74,7 @@ pub enum Operator {
     LogicalNot,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Punctuation {
     LeftParen,
     RightParen,
@@ -96,25 +96,3 @@ pub enum Literal {
     HexLong(String),
     Bool(bool),
 }
-
-
-// use nom::Input;
-// use std::ops::RangeFrom;
-
-
-// impl Input for &[Token] {
-//     type Token = Token;
-
-//     fn input_len(&self) -> usize {
-//         self.len()
-//     }
-
-//     fn take(&self, count: usize) -> Self {
-//         &self[..count]
-//     }
-
-//     fn take_split(&self, count: usize) -> (Self, Self) {
-//         self.split_at(count)
-//     }
-
-// }

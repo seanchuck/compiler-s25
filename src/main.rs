@@ -40,7 +40,7 @@ fn main() {
             scan::scan(&input, &filename, &mut writer, true);
         }
         utils::cli::CompilerAction::Parse => {
-            parse::parse(&input, &filename, &mut writer);
+            parse::parse(&input, &filename, &mut writer, true);
         }
         utils::cli::CompilerAction::Inter => {
             todo!("inter");
