@@ -11,7 +11,7 @@ OUTPUT_FILE="out.out"
 
 # Loop through all files in 'illegal' and 'legal' directories
 # for dir in "illegal" "legal"; do
-for dir in "legal"; do
+for dir in "illegal" "legal"; do
     for file in "$BASE_DIR/$dir"/*; do
         if [[ -f "$file" ]]; then
             echo "Running: ./run.sh $file -t parse" | tee -a "$OUTPUT_FILE"

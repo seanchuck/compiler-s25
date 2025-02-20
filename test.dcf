@@ -1,3 +1,4 @@
-void main ( ) {
-  a = -3 * 4 / 6 + ( F[b+2] - foo ( ) );
+void bar ( ) {
+  for ( i = 9; i >= 0; i++ ) {
+  }
 }
