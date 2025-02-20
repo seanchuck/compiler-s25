@@ -5,7 +5,7 @@ mimic tree-like structure of the Decaf grammar.
 Some are reused from token.rs.
 */
 
-use crate::token::{Literal, Punctuation};
+use crate::token::{Literal};
 
 #[derive(Debug)]
 pub enum AST {

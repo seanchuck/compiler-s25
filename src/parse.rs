@@ -174,7 +174,7 @@ fn parse_type(input: &[Token]) -> IResult<&[Token], Type> {
 
 
 /// Parses a single binary operator token
-fn parse_BinaryOp_token(input: &[Token]) -> IResult<&[Token], BinaryOp> {
+fn parse_binaryop_token(input: &[Token]) -> IResult<&[Token], BinaryOp> {
     alt((
         // Matching order enforces `order of operations`
         map(tag_operator_gen(Operator::Multiply), |_| BinaryOp::Add),
@@ -207,7 +207,7 @@ fn parse_unaryop_token(input: &[Token]) -> IResult<&[Token], UnaryOp> {
 /// binary expressions take the form: left_expression binop right_expression
 fn parse_binexpr(input: &[Token]) -> IResult<&[Token], AST> {
     map(
-        (parse_expr, parse_BinaryOp_token, parse_expr),
+        (parse_expr, parse_binaryop_token, parse_expr),
         |(lexpr, op, rexpr)| {
             AST::Expr(Expr::BinaryExpr {
                 left: Box::new(lexpr),
@@ -643,71 +643,10 @@ fn parse_array_field_decl(input: &[Token]) -> IResult<&[Token], AST> {
 }
 
 
-/// Manual implementation to match 0+ instances of a production.
-/// Given a parser F and input vector of tokens, 
-/// repeatedly apply the parser until it fails.
-fn parse_all_instances<'a, F, O>(mut parser: F, mut input: &'a [Token]) -> IResult<&'a [Token], Vec<O>>
-where F: FnMut(&'a [Token]) -> IResult<&'a [Token], O>,
-{
-    let mut results = Vec::new();
-
-    while let Ok((new_input, parsed_item)) = parser(input) {
-        results.push(parsed_item);
-        input = new_input;
-    }
-
-    Ok((input, results))
-}
-
-/// Parses **at least one** instance of a production, separated by a given token.
-/// This ensures the sequence matches **1+ instances (`+`)**, enforcing a **non-empty list**.
-fn parse_nonempty_list<'a, F, O>(
-    mut parser: F, 
-    separator: Punctuation
-) -> impl FnMut(&'a [Token]) -> IResult<&'a [Token], Vec<O>> 
-where 
-    F: FnMut(&'a [Token]) -> IResult<&'a [Token], O>,
-{
-    move |mut input: &[Token]| {
-        let mut results = Vec::new();
-
-        // Parse at least one instance
-        let (new_input, first_item) = parser(input)?;
-        results.push(first_item);
-        input = new_input;
-
-        // Parse additional instances separated by `separator`
-        while let Ok((new_input, _)) = tag_punctuation_gen(separator)(input) {
-            let (new_input, next_item) = parser(new_input)?;
-            results.push(next_item);
-            input = new_input;
-        }
-
-        Ok((input, results))
-    }
-}
-
-fn parse_block(input: &[Token]) -> IResult<&[Token], AST> {
-    let (input, _) = tag_punctuation_gen(Punctuation::LeftBrace)(input)?;
-    let (input, field_decls) = parse_all_instances(parse_field_decl, input)?;
-    let (input, statements) = parse_all_instances(parse_statement, input)?;
-    let (input, _) = tag_punctuation_gen(Punctuation::RightBrace)(input)?;
-
-    Ok((
-        input,
-        AST::Block {
-            // Convert Vec<AST> to Vec<Box<AST>>
-            field_decls: field_decls.into_iter().map(Box::new).collect(),
-            statements: statements.into_iter().map(Box::new).collect(),
-        },
-    ))
-}
-
-// These all require parsing multiple appearances
 fn parse_method_call(input: &[Token]) -> IResult<&[Token], AST> {
     let (input, method_name) = parse_identifier(input)?;
     let (input, _) = tag_punctuation_gen(Punctuation::LeftParen)(input)?;
-    let (input, args) = parse_nonempty_list(parse_expr, Punctuation::Comma)(input)?;
+    let (input, args) = separated_list1(tag_punctuation_gen(Punctuation::Comma), parse_expr)(input)?;
     let (input, _) = tag_punctuation_gen(Punctuation::RightParen)(input)?;
 
     Ok((
@@ -722,70 +661,19 @@ fn parse_method_call(input: &[Token]) -> IResult<&[Token], AST> {
     ))
 }
 
+
+fn parse_block(input: &[Token]) -> IResult<&[Token], AST> {
+    todo!()
+}
+
+
 fn parse_method_decl(input: &[Token]) -> IResult<&[Token], AST> {
-    // Parse return type: either a valid `Type` or `void`
-    let (input, return_type) = alt((
-        map(tag_keyword_gen(Keyword::Void), |_| None), // Void return type
-        map(parse_type, |typ| Some(typ)), // Normal return type
-    )).parse(input)?;
-
-    // Parse method name (identifier)
-    let (input, method_name) = parse_identifier(input)?;
-
-    // Ensure method name is correctly extracted
-    let method_name = match method_name {
-        AST::Identifier(name) => name,
-        _ => return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))),
-    };
-
-    let (input, _) = tag_punctuation_gen(Punctuation::LeftParen)(input)?;
-    // Parse method parameters: enforce at least one (type, id) pair separated by `,`
-    let (input, params) = parse_nonempty_list(
-        |input| {
-            let (input, typ) = parse_type(input)?;
-            let (input, id) = parse_identifier(input)?;
-
-            let id = match id {
-                AST::Identifier(name) => name,
-                _ => return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))),
-            };
-
-            Ok((input, (typ, id)))
-        },
-        Punctuation::Comma,
-    )(input)?;
-
-    // Parse `)`
-    let (input, _) = tag_punctuation_gen(Punctuation::RightParen)(input)?;
-
-    // Parse block (function body)
-    let (input, block) = parse_block(input)?;
-
-    // Construct AST
-    Ok((
-        input,
-        AST::MethodDecl {
-            return_type,
-            name: method_name,
-            params,
-            block: Box::new(block),
-        },
-    ))
+    todo!()
 }
 
 
 fn parse_field_decl(input: &[Token]) -> IResult<&[Token], AST> {
-    let (input, parsed_type) = parse_type(input)?;
-    let (input, params_list) = parse_all_instances(parse_id_or_array_field_decl, input)?;
-    let (input, _) = tag_punctuation_gen(Punctuation::Semicolon)(input)?;
-
-    Ok((
-        input,
-        AST::FieldDecl { 
-            typ: parsed_type, 
-            decls: params_list.into_iter().map(Box::new).collect()
-        }
-    ))
+    todo!()
 }
 
 fn parse_id_or_array_field_decl(input: &[Token]) -> IResult<&[Token], AST> {
@@ -796,17 +684,10 @@ fn parse_id_or_array_field_decl(input: &[Token]) -> IResult<&[Token], AST> {
 }
 
 fn parse_program(input: &[Token]) -> IResult<&[Token], AST> {
-    let (input, imports) = parse_all_instances(parse_import_decl, input)?;
-    let (input, field_decls) = parse_all_instances(parse_field_decl, input)?;
-    let (input, method_decls) = parse_all_instances(parse_method_decl, input)?;
-
-    Ok((input,
-    AST::Program {
-         imports: imports.into_iter().map(Box::new).collect(), 
-         fields: field_decls.into_iter().map(Box::new).collect(), 
-         methods: method_decls.into_iter().map(Box::new).collect(), 
-        }))
+    todo!()
 }
+
+
 
 /// Input: a sequence of tokens produced by the scanner.
 /// Effects:
