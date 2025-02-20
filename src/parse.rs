@@ -25,7 +25,7 @@ Big game of matching.
 A parser can be seen as an "attempt" to match.
 
 
-ORDER OF OPERATIONS MATTERS
+----------ORDER OF OPERATIONS MATTERS---------------
 */
 
 use crate::ast::*;
@@ -72,14 +72,16 @@ fn tag_keyword_gen(expected_token: Keyword) -> impl Fn(TokenSlice) -> IResult<To
     }
 }
 
-// -----------------------------------------------------------------------------------------------------
+// #################################################
+// 
+// #################################################
 
 /// Parses an identifier.
 fn parse_identifier(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("identifier now!!!");
+    // //println!("identifier now!!!");
     if let Some(Token::Identifier(id)) = input.0.first() {
-        println!("chilll");
-        println!("now woring with: {:?}", (TokenSlice(&input.0[1..])));
+        // //println!("chilll");
+        // //println!("now woring with: {:?}", (TokenSlice(&input.0[1..])));
         Ok((TokenSlice(&input.0[1..]), AST::Identifier(id.clone())))
     } else {
         Err(nom::Err::Error(Error::new(
@@ -125,7 +127,7 @@ fn parse_long_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_integer_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("ggimme that number");
+    // //println!("ggimme that number");
     match input.0.first() {
         Some(Token::Literal(Literal::HexInt(id))) => Ok((
             TokenSlice(&input.0[1..]),
@@ -160,15 +162,15 @@ fn parse_string_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
 /// For now, "-" parsed separately
 fn parse_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
     alt((
-        parse_integer_literal,
         parse_long_literal,
         parse_char_bool_literal,
+        parse_integer_literal,
     )).parse(input)
 }
 
 fn parse_type(input: TokenSlice) -> IResult<TokenSlice, Type> {
-    println!("Parsing type: {:?}", input);
-    println!("Starting with: {:?}", input.0.first());
+    //println!("Parsing type: {:?}", input);
+    //println!("Starting with: {:?}", input.0.first());
 
     match input.0.first() {
         Some(Token::Keyword(keyword)) => {
@@ -178,35 +180,41 @@ fn parse_type(input: TokenSlice) -> IResult<TokenSlice, Type> {
                 Keyword::Bool => Type::Bool,
                 _ => return Err(nom::Err::Error(Error::new(input, nom::error::ErrorKind::Tag))),
             };
-            println!("Success parsing type: {:?}", ast_type);
+            //println!("Success parsing type: {:?}", ast_type);
             Ok((TokenSlice(&input.0[1..]), ast_type))
         }
         _ => {
-            println!("Failed to parse type");
+            //println!("Failed to parse type");
             Err(nom::Err::Error(Error::new(input, nom::error::ErrorKind::Tag)))
         }
     }
 }
 
+// #################################################
+// 
+// #################################################
 
 /// Parses a single binary operator token
 fn parse_binaryop_token(input: TokenSlice) -> IResult<TokenSlice, BinaryOp> {
     alt((
-        // Matching order enforces `order of operations`
-        map(tag_operator_gen(Operator::Multiply), |_| BinaryOp::Add),
-        map(tag_operator_gen(Operator::Divide), |_| BinaryOp::Subtract),
+        // Matching order enforces `order of operations` (6-level hierarchy):: see 4.7 in spec
         map(tag_operator_gen(Operator::Plus), |_| BinaryOp::Multiply),
         map(tag_operator_gen(Operator::Minus), |_| BinaryOp::Divide),
         map(tag_operator_gen(Operator::Modulo), |_| BinaryOp::Modulo),
+        
+        map(tag_operator_gen(Operator::Multiply), |_| BinaryOp::Add),
+        map(tag_operator_gen(Operator::Divide), |_| BinaryOp::Subtract),
 
-        map(tag_operator_gen(Operator::Equal), |_| BinaryOp::Equal),
-        map(tag_operator_gen(Operator::NotEqual), |_| BinaryOp::NotEqual),
         map(tag_operator_gen(Operator::Less), |_| BinaryOp::Less),
         map(tag_operator_gen(Operator::Greater), |_| BinaryOp::Greater),
         map(tag_operator_gen(Operator::LessEqual), |_| BinaryOp::LessEqual),
         map(tag_operator_gen(Operator::GreaterEqual), |_| BinaryOp::GreaterEqual),
         
+        map(tag_operator_gen(Operator::Equal), |_| BinaryOp::Equal),
+        map(tag_operator_gen(Operator::NotEqual), |_| BinaryOp::NotEqual),
+
         map(tag_operator_gen(Operator::LogicalAnd), |_| BinaryOp::And),
+
         map(tag_operator_gen(Operator::LogicalOr), |_| BinaryOp::Or),
     )).parse(input)
 }
@@ -292,7 +300,7 @@ fn parse_cast(input: TokenSlice) -> IResult<TokenSlice, AST> {
             })))
         }
         Err(e) => {
-            eprintln!("Parse error in `parse_cast`: {:?}", e);
+            //println!("Parse error in `parse_cast`: {:?}", e);
             Err(e)
         }
     }
@@ -311,20 +319,22 @@ fn parse_parens(input: TokenSlice) -> IResult<TokenSlice, AST> {
             Ok((input, expr))
         }
         Err(e) => {
-            eprintln!("Parse error in `parse_parens`: {:?}", e);
+            //println!("Parse error in `parse_parens`: {:?}", e);
             Err(e)
         }
     }
 }
 
 fn parse_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    println!("parsing location");
+    println!("loco giv4w: {:?}", input);
     let parse_result = ((
         parse_identifier, // Variable name
-        opt(((
+        opt((
             tag_punctuation_gen(Punctuation::LeftBracket),
             parse_expr, // Array index expression
             tag_punctuation_gen(Punctuation::RightBracket),
-        ))),
+        )),
     ))
     .parse(input);
 
@@ -336,12 +346,14 @@ fn parse_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
             };
 
             if let Some((_, index, _)) = maybe_index {
+                println!("we boutta match e ");
                 // Array access
                 Ok((input, AST::Expr(Expr::ArrAccess {
                     id,
                     index: Box::new(index),
                 })))
             } else {
+                println!("we boutta match d");
                 // Variable access
                 Ok((input, AST::Identifier(id)))
             }
@@ -351,20 +363,24 @@ fn parse_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 
-/// Parse an expression -- TODO complete
+
 fn parse_expr(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    println!("parsing expr");
+    // Parse in precedence order!
     alt((
+        parse_unexpr,
+        parse_cast, 
+        parse_literal, // don't need args for funcs that just take [Token]
+        parse_parens,
+        parse_len,
+        parse_cast,
         parse_location,
         parse_method_call,
-        parse_literal, // don't need args for funcs that just take [Token]
-        parse_cast, 
-        parse_len,
         parse_binexpr,
         // parse_unexpr,
-        parse_cast,
-        parse_parens
     )).parse(input)
 }
+
 
 fn parse_if(input: TokenSlice) -> IResult<TokenSlice, AST> {
     // compose the parser
@@ -464,22 +480,30 @@ fn parse_break_continue(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_return(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    println!("yeppp");
+    println!("before: {:?}", input);
     let parse_result = ((
         tag_keyword_gen(Keyword::Return),
         opt(parse_expr),
         tag_punctuation_gen(Punctuation::Semicolon),
     ))
     .parse(input);
+    println!("afte: {:?}", input);
 
+    println!("no goood");
     match parse_result {
-        Ok((input, (_, retval, _))) => Ok(
+        Ok((input, (_, retval, _))) => {
+            println!("nice");
+            Ok(
             (input, AST::Statement(Statement::Return 
                 { 
                     expr: retval.map(Box::new)
                 })
             )
-        ),
-        Err(e) => Err(e),
+        )},
+        Err(e) => {
+            println!("shooot");
+            Err(e)},
     }
 }
 
@@ -588,7 +612,12 @@ fn parse_for_update(input: TokenSlice) -> IResult<TokenSlice, AST> {
     )).parse(input)
 }
 
+// #################################################
+// 
+// #################################################
+
 fn parse_statement(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    println!("we here");
     alt((
         // assigment sequence of two parsers; must manually map output here
         map(
@@ -633,7 +662,7 @@ fn parse_import_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("WE WANT THIS");
+    //println!("WE WANT THIS");
     let parse_result = ((
         parse_identifier, 
         tag_punctuation_gen(Punctuation::LeftBracket),
@@ -642,7 +671,7 @@ fn parse_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     ))
     .parse(input);
 
-    println!("GOOBOOBOBOOBOB");
+    //println!("GOOBOOBOBOOBOB");
     // return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
 
     match parse_result {
@@ -664,6 +693,7 @@ fn parse_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
 
 
 fn parse_method_call(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    println!("we goottttttttttt");
     let (input, method_name) = parse_identifier(input)?;
     let (input, _) = tag_punctuation_gen(Punctuation::LeftParen)(input)?;
     let (input, args) = separated_list1(tag_punctuation_gen(Punctuation::Comma), parse_expr).parse(input)?;
@@ -684,10 +714,20 @@ fn parse_method_call(input: TokenSlice) -> IResult<TokenSlice, AST> {
 
 fn parse_block(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, _) = tag_punctuation_gen(Punctuation::LeftBrace)(input)?; // Match '{'
+    println!("eee");
+    println!("cirrentl got: {:?}", input);
+
     let (input, field_decls) = many0(parse_field_decl).parse(input)?; // Parse field declarations
+    println!("wooaaaoo");
+    println!("cirrentl got: {:?}", input);
+
     let (input, statements) = many0(parse_statement).parse(input)?; // Parse statements
+    println!("bbbbb");
+    println!("cirrentl got: {:?}", input);
+
     let (input, _) = tag_punctuation_gen(Punctuation::RightBrace)(input)?; // Match '}'
 
+    println!(";;;");
     Ok((
         input,
         AST::Block {
@@ -698,13 +738,15 @@ fn parse_block(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    println!("parsing method decl");
     let (input, return_type) = alt((
-        map(tag_keyword_gen(Keyword::Void), |_| None), // Handle void as None
-        map(parse_type, Some), // Wrap return type in Some
+        // Keyword:: Void is our none return type
+        map(tag_keyword_gen(Keyword::Void), |_| Type::Void),
+        parse_type,
     )).parse(input)?;
 
+    println!("a");
     let (input, method_name) = parse_identifier(input)?; // Parse method name
-
     let (input, _) = tag_punctuation_gen(Punctuation::LeftParen)(input)?; // Match '('
     let (input, params) = separated_list1(
         tag_punctuation_gen(Punctuation::Comma),
@@ -720,10 +762,13 @@ fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
         ),
     ).parse(input)
     .unwrap_or((input, vec![])); // Allow empty parameter list
-    
-    
+
+    println!("b");
+    let (input, _) = tag_punctuation_gen(Punctuation::RightParen)(input)?; // Match '('
+    println!("g");
     let (input, body) = parse_block(input)?; // Parse method body
     
+    println!("c");
     Ok((
         input,
         AST::MethodDecl {
@@ -740,7 +785,7 @@ fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("Parsing field declaration...");
+    //println!("Parsing field declaration...");
 
     // Step 1: Parse the type (int, long, bool)
     let (input, field_type) = parse_type(input)?;
@@ -751,13 +796,13 @@ fn parse_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
         parse_id_or_array_field_decl, // Parses either an identifier or an array field declaration
     ).parse(input)?;
 
-    println!("okeeke");
-    println!("samller hopefilly: {:?}", input);
+    //println!("okeeke");
+    //println!("samller hopefilly: {:?}", input);
 
     // Step 3: Match the required `;` at the end
     let (input, _) = tag_punctuation_gen(Punctuation::Semicolon)(input)?;
 
-    println!("Parsed field declaration successfully.");
+    //println!("Parsed field declaration successfully.");
     Ok((
         input,
         AST::FieldDecl {
@@ -770,7 +815,7 @@ fn parse_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
 
 
 fn parse_id_or_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("we in");
+    //println!("we in");
     alt((
         parse_array_field_decl,
         parse_identifier,
@@ -781,22 +826,22 @@ fn parse_id_or_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
 
 fn parse_program(input: TokenSlice) -> IResult<TokenSlice, AST> {
     // Sequentially take in input slice and update it
-    // let (input, import_decls) = many0(parse_import_decl).parse(input)?;
+    let (input, import_decls) = many0(parse_import_decl).parse(input)?;
     // println!("import decls are: {:?}\n", import_decls);
     let (input, field_decls) = many0(parse_field_decl).parse(input)?;
-    println!("field decls are: {:?}\n", field_decls);
-    // let (input, method_decls) = many0(parse_method_decl).parse(input)?;
-    // println!("method decls are: {:?}\n", method_decls);
+    //println!("field decls are: {:?}\n", field_decls);
+    let (input, method_decls) = many0(parse_method_decl).parse(input)?;
+    println!("method decls are: {:?}\n", method_decls);
 
-    // Ok((
-    //     input,
-    //     AST::Program { 
-    //         imports: import_decls.into_iter().map(Box::new).collect(),
-    //         fields: field_decls.into_iter().map(Box::new).collect(),
-    //         methods: method_decls.into_iter().map(Box::new).collect()
-    //     }
-    // ))
-    Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
+    Ok((
+        input,
+        AST::Program { 
+            imports: import_decls.into_iter().map(Box::new).collect(),
+            fields: field_decls.into_iter().map(Box::new).collect(),
+            methods: method_decls.into_iter().map(Box::new).collect()
+        }
+    ))
+
 }
 
 fn parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
@@ -809,21 +854,18 @@ fn parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
 ///    - Verifies that tokens conform to valid Decaf via the language specification
 ///    - Outputs a syntax tree representation of the Decaf program
 pub fn parse(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>, verbose: bool) {
-    // use nom for parser
-    // enum for AST
-    println!("PARSING");
+    //println!("PARSING");
     let tokens: Vec<Token> = scan(file, filename, writer, false);
-    println!("Tokens are {:?}\n", &tokens);
 
-    // TokeSlice is a 
     let parse_result = parse_program(TokenSlice(&tokens));
 
     match parse_result {
         Ok((rest, parse_tree)) => {
-            println!("rest tokens are: {:?}", rest);
+            println!("TOKENS SHOULD BE EMPTY {:?}", rest); // if not empty, throw error
+            println!("PARSE TREE: {:?}", parse_tree);
             if verbose {
                 let template_string = format!(
-                    "SUCCESSFUL PARSE"
+                    "SUCCESSFUL PARSE==================\n"
                 );
                 writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
             }
@@ -832,7 +874,7 @@ pub fn parse(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>, v
         Err(parse_error) => {
             if verbose {
                 let template_string = format!(
-                    "ERROR PARSE"
+                    "ERROR PARSE===============\n"
                 );
                 writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
             }

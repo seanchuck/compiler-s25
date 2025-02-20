@@ -7,6 +7,7 @@ Some are reused from token.rs.
 
 use crate::token::{Literal};
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum AST {
     Program {
@@ -26,7 +27,8 @@ pub enum AST {
         size: String,
     },
     MethodDecl {
-        return_type: Option<Type>,
+        // return_type: Option<Type>, // We have Type::Void so is ok
+        return_type: Type,
         name: String,
         params: Vec<(Type, String)>,
         block: Box<AST>,
@@ -41,7 +43,7 @@ pub enum AST {
     Type(Type),
 }
 
-
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum Statement {
     Assignment {
@@ -80,7 +82,7 @@ pub enum Statement {
     Continue,
 }
 
-
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum Expr {
     // Location(Box<AST>),
