@@ -1,5 +1,5 @@
 /*
-Scanner.
+Parser.
 
 Idea: Use the nom parser combinator to build small parsers and 
 gradually compose them with `alt` (OR) or '' (AND) to parse 
@@ -23,6 +23,9 @@ Each parser follows the same pattern:
     
 Big game of matching.
 A parser can be seen as an "attempt" to match.
+
+
+ORDER OF OPERATIONS MATTERS
 */
 
 use crate::ast::*;
@@ -73,7 +76,10 @@ fn tag_keyword_gen(expected_token: Keyword) -> impl Fn(TokenSlice) -> IResult<To
 
 /// Parses an identifier.
 fn parse_identifier(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    println!("identifier now!!!");
     if let Some(Token::Identifier(id)) = input.0.first() {
+        println!("chilll");
+        println!("now woring with: {:?}", (TokenSlice(&input.0[1..])));
         Ok((TokenSlice(&input.0[1..]), AST::Identifier(id.clone())))
     } else {
         Err(nom::Err::Error(Error::new(
@@ -119,6 +125,7 @@ fn parse_long_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_integer_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    println!("ggimme that number");
     match input.0.first() {
         Some(Token::Literal(Literal::HexInt(id))) => Ok((
             TokenSlice(&input.0[1..]),
@@ -160,20 +167,24 @@ fn parse_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_type(input: TokenSlice) -> IResult<TokenSlice, Type> {
+    println!("Parsing type: {:?}", input);
+    println!("Starting with: {:?}", input.0.first());
+
     match input.0.first() {
-        Some(Token::Literal(Literal::String(id))) => {
-            let ast_type = match id.as_str() {
-                "int" => Type::Int,
-                "long" => Type::Long,
-                "bool" => Type::Bool,
+        Some(Token::Keyword(keyword)) => {
+            let ast_type = match keyword {
+                Keyword::Int => Type::Int,
+                Keyword::Long => Type::Long,
+                Keyword::Bool => Type::Bool,
                 _ => return Err(nom::Err::Error(Error::new(input, nom::error::ErrorKind::Tag))),
             };
+            println!("Success parsing type: {:?}", ast_type);
             Ok((TokenSlice(&input.0[1..]), ast_type))
         }
-        _ => Err(nom::Err::Error(Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        ))),
+        _ => {
+            println!("Failed to parse type");
+            Err(nom::Err::Error(Error::new(input, nom::error::ErrorKind::Tag)))
+        }
     }
 }
 
@@ -622,6 +633,7 @@ fn parse_import_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    println!("WE WANT THIS");
     let parse_result = ((
         parse_identifier, 
         tag_punctuation_gen(Punctuation::LeftBracket),
@@ -629,6 +641,9 @@ fn parse_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
         tag_punctuation_gen(Punctuation::RightBracket),
     ))
     .parse(input);
+
+    println!("GOOBOOBOBOOBOB");
+    // return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
 
     match parse_result {
         Ok((input, (id, _, size, _))) => {
@@ -725,46 +740,67 @@ fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    let (input, field_type) = parse_type(input)?; // Parse type (int, long, bool)
-    
+    println!("Parsing field declaration...");
+
+    // Step 1: Parse the type (int, long, bool)
+    let (input, field_type) = parse_type(input)?;
+
+    // Step 2: Parse at least one `{id} | {array_field_decl}`, comma-separated
     let (input, fields) = separated_list1(
         tag_punctuation_gen(Punctuation::Comma),
-        parse_id_or_array_field_decl, // Parses variable or array field
+        parse_id_or_array_field_decl, // Parses either an identifier or an array field declaration
     ).parse(input)?;
 
-    let (input, _) = tag_punctuation_gen(Punctuation::Semicolon)(input)?; // Match ';'
+    println!("okeeke");
+    println!("samller hopefilly: {:?}", input);
 
+    // Step 3: Match the required `;` at the end
+    let (input, _) = tag_punctuation_gen(Punctuation::Semicolon)(input)?;
+
+    println!("Parsed field declaration successfully.");
     Ok((
         input,
         AST::FieldDecl {
             typ: field_type,
-            decls: fields.into_iter().map(Box::new).collect(), // Vec<Box<T>>
+            decls: fields.into_iter().map(Box::new).collect(), // Wrap in `Box` to match AST format
         },
     ))
 }
 
 
+
 fn parse_id_or_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    println!("we in");
     alt((
+        parse_array_field_decl,
         parse_identifier,
-        parse_array_field_decl
     )).parse(input)
 }
 
+
+
 fn parse_program(input: TokenSlice) -> IResult<TokenSlice, AST> {
     // Sequentially take in input slice and update it
-    let (input, import_decls) = many0(parse_import_decl).parse(input)?;
+    // let (input, import_decls) = many0(parse_import_decl).parse(input)?;
+    // println!("import decls are: {:?}\n", import_decls);
     let (input, field_decls) = many0(parse_field_decl).parse(input)?;
-    let (input, method_decls) = many0(parse_method_decl).parse(input)?;
+    println!("field decls are: {:?}\n", field_decls);
+    // let (input, method_decls) = many0(parse_method_decl).parse(input)?;
+    // println!("method decls are: {:?}\n", method_decls);
 
-    Ok((
-        input,
-        AST::Program { 
-            imports: import_decls.into_iter().map(Box::new).collect(),
-            fields: field_decls.into_iter().map(Box::new).collect(),
-            methods: method_decls.into_iter().map(Box::new).collect()
-        }
-    ))
+    // Ok((
+    //     input,
+    //     AST::Program { 
+    //         imports: import_decls.into_iter().map(Box::new).collect(),
+    //         fields: field_decls.into_iter().map(Box::new).collect(),
+    //         methods: method_decls.into_iter().map(Box::new).collect()
+    //     }
+    // ))
+    Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
+}
+
+fn parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
 }
 
 
