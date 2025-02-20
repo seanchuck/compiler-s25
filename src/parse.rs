@@ -195,7 +195,7 @@ fn parse_type(input: TokenSlice) -> IResult<TokenSlice, Type> {
 // #################################################
 
 fn parse_expr(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("parsing expr");
+    // println!("parsing expr");
     // Parse in precedence order!
     alt((
         parse_binexpr,
@@ -391,8 +391,8 @@ fn parse_parens(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("parsing location");
-    println!("loco giv4w: {:?}", input);
+    // println!("parsing location");
+    // println!("loco giv4w: {:?}", input);
     let parse_result = ((
         parse_identifier, // Variable name
         opt((
@@ -530,20 +530,19 @@ fn parse_break_continue(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_return(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("yeppp");
-    println!("before: {:?}", input);
+    // println!("yeppp");
+    // println!("before: {:?}", input);
     let parse_result = ((
         tag_keyword_gen(Keyword::Return),
         opt(parse_expr),
         tag_punctuation_gen(Punctuation::Semicolon),
     ))
     .parse(input);
-    println!("afte: {:?}", input);
+    // println!("afte: {:?}", input);
 
-    println!("no goood");
+    // println!("no goood");
     match parse_result {
         Ok((input, (_, retval, _))) => {
-            println!("nice");
             Ok(
             (input, AST::Statement(Statement::Return 
                 { 
@@ -552,7 +551,6 @@ fn parse_return(input: TokenSlice) -> IResult<TokenSlice, AST> {
             )
         )},
         Err(e) => {
-            println!("shooot");
             Err(e)},
     }
 }
@@ -764,20 +762,10 @@ fn parse_method_call(input: TokenSlice) -> IResult<TokenSlice, AST> {
 
 fn parse_block(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, _) = tag_punctuation_gen(Punctuation::LeftBrace)(input)?; // Match '{'
-    println!("eee");
-    println!("cirrentl got: {:?}", input);
-
     let (input, field_decls) = many0(parse_field_decl).parse(input)?; // Parse field declarations
-    println!("wooaaaoo");
-    println!("cirrentl got: {:?}", input);
-
     let (input, statements) = many0(parse_statement).parse(input)?; // Parse statements
-    println!("bbbbb");
-    println!("cirrentl got: {:?}", input);
-
     let (input, _) = tag_punctuation_gen(Punctuation::RightBrace)(input)?; // Match '}'
 
-    println!(";;;");
     Ok((
         input,
         AST::Block {
@@ -788,14 +776,12 @@ fn parse_block(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("parsing method decl");
     let (input, return_type) = alt((
         // Keyword:: Void is our none return type
         map(tag_keyword_gen(Keyword::Void), |_| Type::Void),
         parse_type,
     )).parse(input)?;
 
-    println!("a");
     let (input, method_name) = parse_identifier(input)?; // Parse method name
     let (input, _) = tag_punctuation_gen(Punctuation::LeftParen)(input)?; // Match '('
     let (input, params) = separated_list1(
@@ -813,12 +799,9 @@ fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     ).parse(input)
     .unwrap_or((input, vec![])); // Allow empty parameter list
 
-    println!("b");
     let (input, _) = tag_punctuation_gen(Punctuation::RightParen)(input)?; // Match '('
-    println!("g");
     let (input, body) = parse_block(input)?; // Parse method body
     
-    println!("c");
     Ok((
         input,
         AST::MethodDecl {
@@ -881,7 +864,7 @@ fn parse_program(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, field_decls) = many0(parse_field_decl).parse(input)?;
     //println!("field decls are: {:?}\n", field_decls);
     let (input, method_decls) = many0(parse_method_decl).parse(input)?;
-    println!("method decls are: {:?}\n", method_decls);
+    // println!("method decls are: {:?}\n", method_decls);
 
     Ok((
         input,
@@ -911,8 +894,12 @@ pub fn parse(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>, v
 
     match parse_result {
         Ok((rest, parse_tree)) => {
-            println!("TOKENS SHOULD BE EMPTY {:?}", rest); // if not empty, throw error
-            println!("PARSE TREE: {:?}", parse_tree);
+            // println!("TOKENS SHOULD BE EMPTY {:?}", rest); // if not empty, throw error
+            // println!("PARSE TREE: {:?}", parse_tree);
+            if !rest.is_empty() {
+                println!("\n");
+                panic!()
+            }
             if verbose {
                 let template_string = format!(
                     "SUCCESSFUL PARSE==================\n"
