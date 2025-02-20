@@ -1,11 +1,11 @@
 /*
-Abstract syntax tree structures for parser, which 
+Abstract syntax tree structures for parser, which
 mimic tree-like structure of the Decaf grammar.
 
 Some are reused from token.rs.
 */
 
-use crate::token::{Literal};
+use crate::token::Literal;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -69,7 +69,6 @@ pub enum Statement {
     },
     Update {
         location: Box<AST>,
-
     },
     While {
         condition: Box<AST>,
@@ -104,15 +103,14 @@ pub enum Expr {
         expr: Box<AST>,
     },
     BinaryExpr {
-        left: Box<AST>,
         op: BinaryOp,
+        left: Box<AST>,
         right: Box<AST>,
     },
     Len {
         id: String,
     },
 }
-
 
 #[derive(Debug)]
 pub enum BinaryOp {
@@ -153,4 +151,3 @@ pub enum Type {
     Bool,
     Void,
 }
-

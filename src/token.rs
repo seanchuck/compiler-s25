@@ -98,15 +98,14 @@ pub enum Literal {
     Bool(bool),
 }
 
-
 /// A public wrapper around a slice of `Token`s to enable custom trait implementations.
-/// TokenSlice acts as a view (or a "window") over a Vec<Token>. 
+/// TokenSlice acts as a view (or a "window") over a Vec<Token>.
 /// It allows you to process tokens incrementally without copying or modifying the original vector.
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TokenSlice<'a>(pub &'a [Token]);
 
-/// Allow `TokenSlice` to behave like a standard 
+/// Allow `TokenSlice` to behave like a standard
 /// slice by implementing `Deref`.
 impl<'a> Deref for TokenSlice<'a> {
     type Target = [Token];
@@ -116,7 +115,7 @@ impl<'a> Deref for TokenSlice<'a> {
     }
 }
 
-/// Implement `nom::Input` for `TokenSlice`, 
+/// Implement `nom::Input` for `TokenSlice`,
 /// allowing it to be used in Nom parsers.
 impl<'a> nom::Input for TokenSlice<'a> {
     type Item = &'a Token;

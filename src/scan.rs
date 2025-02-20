@@ -35,7 +35,6 @@ fn consume(program: &mut Vec<char>, current_col: &mut i32, nchar: i32) {
     *current_col += nchar as i32;
 }
 
-
 /// Consume all whitespace characters before the next
 /// token or EOF.
 fn gobble_whitespace(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) {
@@ -53,7 +52,6 @@ fn gobble_whitespace(program: &mut Vec<char>, current_line: &mut i32, current_co
         break;
     }
 }
-
 
 /// Attempts to gobble a comment.
 /// Throws an error if a block comment is not closed.
@@ -100,7 +98,6 @@ fn gobble_comment(
         Err(anyhow!("Incomplete comment"))
     }
 }
-
 
 /// Helper to lex integer based on decimal or hex type.
 fn lex_numeric_helper(
@@ -176,7 +173,6 @@ fn lex_numeric_literal(
     // but we never actually hit this case
     Err(anyhow!("Numeric literal lexing ending unexpectedly"))
 }
-
 
 /// Lex a Keyword or Identifier.
 /// Attempt to match a Keyword first.
@@ -302,7 +298,6 @@ fn lex_keyword_or_identifier(
     }
 }
 
-
 /// Lex a string literal, identified by a leading quotation mark.
 /// Returns errors for incomplete strings and illegal characters.
 fn lex_string_literal(
@@ -359,7 +354,6 @@ fn lex_string_literal(
 
     Err(anyhow!("String literal missing closing quote"))
 }
-
 
 /// Lex a character literal, identified by a leading single quote.
 /// Returns errors for incomplete or illegal characters.
@@ -666,14 +660,18 @@ fn get_next_token(
     Err(anyhow!("Failed to generate next token"))
 }
 
-
 /// The main scan function for this file.
 ///  - Input: a Decaf source file String as input.
 ///  - Effects: Outputs a sequence of Tokens.
 ///     If verbose is specified, will print the sequence of tokens
 ///     using the provided writer
 ///     
-pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>, verbose: bool) -> Vec<Token> {
+pub fn scan(
+    file: &str,
+    filename: &str,
+    writer: &mut Box<dyn std::io::Write>,
+    verbose: bool,
+) -> Vec<Token> {
     let mut program: Vec<char> = file.chars().collect();
     let mut tokens: Vec<Token> = vec![];
     let mut found_err = false;
@@ -750,7 +748,8 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>, ve
                 };
 
                 if verbose {
-                    writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
+                    writeln!(writer, "{}", template_string)
+                        .expect("Failed to write error to stdout!");
                 }
                 tokens.push(token_info.token);
             }
@@ -762,7 +761,8 @@ pub fn scan(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>, ve
                     filename, current_line, current_col, token_value
                 );
                 if verbose {
-                    writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
+                    writeln!(writer, "{}", template_string)
+                        .expect("Failed to write error to stdout!");
                 }
             }
         }
