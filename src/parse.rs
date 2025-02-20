@@ -194,6 +194,46 @@ fn parse_type(input: TokenSlice) -> IResult<TokenSlice, Type> {
 // 
 // #################################################
 
+fn parse_expr(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    println!("parsing expr");
+    // Parse in precedence order!
+    alt((
+        parse_binexpr,
+        parse_unexpr,
+        parse_cast, 
+        parse_literal, // don't need args for funcs that just take [Token]
+        parse_parens,
+        parse_len,
+        parse_cast,
+        parse_location,
+        parse_method_call,
+        // parse_unexpr,
+    )).parse(input)
+}
+
+/// Parses a token of type UnaryOp
+fn parse_unaryop_token(input: TokenSlice) -> IResult<TokenSlice, UnaryOp> {
+    alt((
+        map(tag_operator_gen(Operator::Minus), |_| UnaryOp::Neg),
+        map(tag_operator_gen(Operator::LogicalNot), |_| UnaryOp::Not),
+    )).parse(input)
+}
+
+/// Parses a unary expression
+/// unary expressions take the form: unaryOp
+fn parse_unexpr(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    map(
+        // takes the form: [unary]
+        (parse_unaryop_token, parse_expr),
+        |(op, operand)| {
+            AST::Expr(Expr::UnaryExpr {
+                op,
+                expr: Box::new(operand),
+            })
+        },
+    ).parse(input)
+}
+
 /// Parses a single binary operator token
 fn parse_binaryop_token(input: TokenSlice) -> IResult<TokenSlice, BinaryOp> {
     alt((
@@ -201,7 +241,7 @@ fn parse_binaryop_token(input: TokenSlice) -> IResult<TokenSlice, BinaryOp> {
         map(tag_operator_gen(Operator::Plus), |_| BinaryOp::Multiply),
         map(tag_operator_gen(Operator::Minus), |_| BinaryOp::Divide),
         map(tag_operator_gen(Operator::Modulo), |_| BinaryOp::Modulo),
-        
+
         map(tag_operator_gen(Operator::Multiply), |_| BinaryOp::Add),
         map(tag_operator_gen(Operator::Divide), |_| BinaryOp::Subtract),
 
@@ -219,43 +259,68 @@ fn parse_binaryop_token(input: TokenSlice) -> IResult<TokenSlice, BinaryOp> {
     )).parse(input)
 }
 
-/// Parses a token of type UnaryOp
-fn parse_unaryop_token(input: TokenSlice) -> IResult<TokenSlice, UnaryOp> {
-    alt((
-        map(tag_operator_gen(Operator::Minus), |_| UnaryOp::Neg),
-        map(tag_operator_gen(Operator::LogicalNot), |_| UnaryOp::Not),
-    )).parse(input)
-}
-
 /// Parses a binary expression
 /// binary expressions take the form: left_expression binop right_expression
 fn parse_binexpr(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    map(
-        (parse_expr, parse_binaryop_token, parse_expr),
-        |(lexpr, op, rexpr)| {
-            AST::Expr(Expr::BinaryExpr {
-                left: Box::new(lexpr),
-                op,
-                right: Box::new(rexpr),
-            })
-        },
-    ).parse(input)
+    parse_add_expr.parse(input)
+    // map(
+    //     (parse_expr, parse_binaryop_token, parse_expr),
+    //     |(lexpr, op, rexpr)| {
+    //         AST::Expr(Expr::BinaryExpr {
+    //             left: Box::new(lexpr),
+    //             op,
+    //             right: Box::new(rexpr),
+    //         })
+    //     },
+    // ).parse(input)
 }
 
-/// Parses a unary expression
-/// unary expressions take the form: unaryOp
-fn parse_unexpr(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    map(
-        // takes the form: [unary]
-        (parse_unaryop_token, parse_expr),
-        |(op, operand)| {
-            AST::Expr(Expr::UnaryExpr {
-                op,
-                expr: Box::new(operand),
-            })
-        },
-    ).parse(input)
+
+/// Parses an additive expression (right-recursive)
+fn parse_add_expr(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    let (input, left) = parse_mul_expr(input)?;
+    parse_add_expr_tail(left, input)
 }
+
+fn parse_add_expr_tail(left: AST, input: TokenSlice) -> IResult<TokenSlice, AST> {
+    if let Ok((input, op)) = parse_binaryop_token(input) {
+        if matches!(op, BinaryOp::Add | BinaryOp::Subtract) {
+            let (input, right) = parse_mul_expr(input)?;
+            let new_ast = AST::Expr(Expr::BinaryExpr {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            });
+            return parse_add_expr_tail(new_ast, input);
+        }
+    }
+    Ok((input, left))
+}
+
+
+fn parse_mul_expr(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    let (input, left) = parse_unexpr(input)?;
+    parse_mul_expr_tail(left, input)
+}
+
+fn parse_mul_expr_tail(left: AST, input: TokenSlice) -> IResult<TokenSlice, AST> {
+    if let Ok((input, op)) = parse_binaryop_token(input) {
+        if matches!(op, BinaryOp::Multiply | BinaryOp::Divide) {
+            let (input, right) = parse_unexpr(input)?;
+            let new_ast = AST::Expr(Expr::BinaryExpr {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            });
+            return parse_mul_expr_tail(new_ast, input);
+        }
+    }
+    Ok((input, left))
+}
+
+// #################################################
+// 
+// #################################################
 
 fn parse_len(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let parse_result = ((
@@ -363,24 +428,9 @@ fn parse_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 
-
-fn parse_expr(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("parsing expr");
-    // Parse in precedence order!
-    alt((
-        parse_unexpr,
-        parse_cast, 
-        parse_literal, // don't need args for funcs that just take [Token]
-        parse_parens,
-        parse_len,
-        parse_cast,
-        parse_location,
-        parse_method_call,
-        parse_binexpr,
-        // parse_unexpr,
-    )).parse(input)
-}
-
+// #################################################
+// 
+// #################################################
 
 fn parse_if(input: TokenSlice) -> IResult<TokenSlice, AST> {
     // compose the parser
