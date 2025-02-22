@@ -13,44 +13,39 @@ However, some productions in the grammar don't need to be explicitly
 defined as they are covered by the other parsers.
 (e.g., alpha or digit are just covered by literals).
 
-nom's IResult types either return
-    - succesful parse : Ok(rest_tokens, AST)
-    - unsuccesfful parse : Err
-
 Each parser follows the same pattern:
     1. attempt to match something
     2. either build AST or throw error based on match result
 
-Big game of matching.
-A parser can be seen as an "attempt" to match.
+nom's IResult types either return
+    - succesful parse : Ok(rest_tokens, AST)
+    - unsuccesfful parse : Err
 
-
-----------ORDER OF OPERATIONS MATTERS---------------
-        PRECEDENCE AND PUNCTUATION
+Had to hack the grammar to deal with left recursion of expression.
+Ran into issues regarding precedence and redundant punctuation
+during debugging.
 */
-
-use std::fmt::Binary;
 
 use crate::ast::*;
 use crate::scan::scan;
 use crate::token::*;
 
+use nom::combinator::all_consuming;
 use nom::multi::{many0, separated_list0};
 use nom::sequence::{pair, preceded};
 use nom::{
     branch::alt,
-    bytes::complete::tag,
-    combinator::{map, opt, value},
+    combinator::{map, opt},
     error::Error,
-    multi::{fold_many1, separated_list1},
+    multi::separated_list1,
     sequence::delimited,
     IResult, Parser,
 };
 
-// The most basic parsers are tags, which match a simple pattern
-// Each parser follows th
-
-// -----------------------------------------------------------------------------------------------------
+// #################################################
+// TAG GENERATORS
+// #################################################
+// The most basic parser is a tag that matches very simple tokens.
 // These generators are great because we can use them to individually
 // match any grouping of operator, punctuation, identifier, or keyword.
 
@@ -101,13 +96,12 @@ fn tag_keyword_gen(expected_token: Keyword) -> impl Fn(TokenSlice) -> IResult<To
 }
 
 // #################################################
-//
+// LITERALS
 // #################################################
 
 /// Parses an identifier.
 fn parse_identifier(input: TokenSlice) -> IResult<TokenSlice, AST> {
     if let Some(Token::Identifier(id)) = input.0.first() {
-        println!("got identifier: {}", id);
         Ok((TokenSlice(&input.0[1..]), AST::Identifier(id.clone())))
     } else {
         Err(nom::Err::Error(Error::new(
@@ -154,26 +148,15 @@ fn parse_long_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_integer_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("parse integer: {:?}\n\n", input);
     match input.0.first() {
-        Some(Token::Literal(Literal::HexInt(id))) => {
-            println!("hex integer");
-            println!("{:?}", AST::Expr(Expr::Literal(Literal::HexInt(id.clone()))));
-            println!("reaming: {:?}", TokenSlice(&input.0[1..]));
-            Ok((
-                TokenSlice(&input.0[1..]),
-                AST::Expr(Expr::Literal(Literal::HexInt(id.clone()))),
-            ))
-        }
-        Some(Token::Literal(Literal::Int(id))) => {
-            println!("integer literal");
-            println!("id is {}", id);
-            println!("now we have: {:?}", TokenSlice(&input.0[1..]));
-            Ok((
-                TokenSlice(&input.0[1..]),
-                AST::Expr(Expr::Literal(Literal::Int(id.clone()))),
-            ))
-        }
+        Some(Token::Literal(Literal::HexInt(id))) => Ok((
+            TokenSlice(&input.0[1..]),
+            AST::Expr(Expr::Literal(Literal::HexInt(id.clone()))),
+        )),
+        Some(Token::Literal(Literal::Int(id))) => Ok((
+            TokenSlice(&input.0[1..]),
+            AST::Expr(Expr::Literal(Literal::Int(id.clone()))),
+        )),
         _ => Err(nom::Err::Error(Error::new(
             input,
             nom::error::ErrorKind::Tag,
@@ -195,20 +178,16 @@ fn parse_string_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 /// Parses all literals but type string
-/// For now, "-" parsed separately
 fn parse_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("before parsing literal: {:?}\n", input);
-    let ps = alt((
+    alt((
         parse_long_literal,
         parse_char_bool_literal,
         parse_integer_literal,
     ))
-    .parse(input);
-
-    println!("after parsing literal: {:?}\n", ps);
-    ps
+    .parse(input)
 }
 
+/// Parse a type
 fn parse_type(input: TokenSlice) -> IResult<TokenSlice, Type> {
     match input.0.first() {
         Some(Token::Keyword(keyword)) => {
@@ -233,10 +212,10 @@ fn parse_type(input: TokenSlice) -> IResult<TokenSlice, Type> {
 }
 
 // #################################################
-//
+// EXPRESSIONS
 // #################################################
 
-// Hacked Grammar:
+// Hacked Grammar: implies precedence to deal with amiguities
 // expr     = AND ( "||" AND )*
 // AND      = EQ  ( "&&" EQ )*
 // EQ       = REL ( ("==" | "!=") REL )*
@@ -245,7 +224,6 @@ fn parse_type(input: TokenSlice) -> IResult<TokenSlice, Type> {
 // MUL      = UNARY ( ("*" | "/" | "%") UNARY )*
 // UNARY    = ("-" | "!")? TYPE
 // TYPE     = ( "int()" | "long()" )? PRIMARY
-
 // PRIMARY  = IDENTIFIER
 //          | LITERAL
 //          | "(" expr ")"
@@ -253,36 +231,8 @@ fn parse_type(input: TokenSlice) -> IResult<TokenSlice, Type> {
 //          | location
 //          | method_call
 
-// location     = IDENTIFIER ("[" expr "]")?
-// method_call = IDENTIFIER "(" (expr ("," expr)*)? ")"
-
-/// Structure operator precedence to handle ambiguity
-
-// fn parse_binaryop_token(input: TokenSlice) -> IResult<TokenSlice, BinaryOp> {
-//     alt((
-//         // Matching order enforces `order of operations` (6-level hierarchy):: see 4.7 in spec
-//         map(tag_operator_gen(Operator::Plus), |_| BinaryOp::Multiply),
-//         map(tag_operator_gen(Operator::Minus), |_| BinaryOp::Divide),
-//         map(tag_operator_gen(Operator::Modulo), |_| BinaryOp::Modulo),
-//         map(tag_operator_gen(Operator::Multiply), |_| BinaryOp::Add),
-//         map(tag_operator_gen(Operator::Divide), |_| BinaryOp::Subtract),
-//         map(tag_operator_gen(Operator::Less), |_| BinaryOp::Less),
-//         map(tag_operator_gen(Operator::Greater), |_| BinaryOp::Greater),
-//         map(tag_operator_gen(Operator::LessEqual), |_| {
-//             BinaryOp::LessEqual
-//         }),
-//         map(tag_operator_gen(Operator::GreaterEqual), |_| {
-//             BinaryOp::GreaterEqual
-//         }),
-//         map(tag_operator_gen(Operator::Equal), |_| BinaryOp::Equal),
-//         map(tag_operator_gen(Operator::NotEqual), |_| BinaryOp::NotEqual),
-//         map(tag_operator_gen(Operator::LogicalAnd), |_| BinaryOp::And),
-//         map(tag_operator_gen(Operator::LogicalOr), |_| BinaryOp::Or),
-//     ))
-//     .parse(input)
-// }
-
 fn parse_expr(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    // An expression is a `logical or` of `and`
     parse_or.parse(input)
 }
 
@@ -301,10 +251,8 @@ fn parse_or(input: TokenSlice) -> IResult<TokenSlice, AST> {
             right: Box::new(right),
         })
     });
-
     Ok((input, expr))
 }
-
 
 fn parse_and(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, left) = parse_eq(input)?;
@@ -322,7 +270,6 @@ fn parse_and(input: TokenSlice) -> IResult<TokenSlice, AST> {
             right: Box::new(right),
         })
     });
-
     Ok((input, expr))
 }
 
@@ -480,7 +427,6 @@ fn parse_unary(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_cast(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("in the cast now");
     let (input, ty) = opt(map(
         alt((
             tag_keyword_gen(Keyword::Int),
@@ -510,9 +456,7 @@ fn parse_cast(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_primary(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("parse primary");
     alt((
-        // parse_identifier,
         parse_literal,
         parse_len,
         parse_method_call,
@@ -527,7 +471,7 @@ fn parse_primary(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 // #################################################
-//
+// INTERMEDIATE-LEVEL PARSERS
 // #################################################
 
 fn parse_len(input: TokenSlice) -> IResult<TokenSlice, AST> {
@@ -556,48 +500,7 @@ fn parse_len(input: TokenSlice) -> IResult<TokenSlice, AST> {
     }
 }
 
-// fn parse_cast(input: TokenSlice) -> IResult<TokenSlice, AST> {
-//     // Pattern match  of tokens: applies parsers sequentially
-//     let parse_result = ((
-//         alt((
-//             map(tag_keyword_gen(Keyword::Int), |_| Type::Int),
-//             map(tag_keyword_gen(Keyword::Long), |_| Type::Long),
-//         )),
-//         parse_parens,
-//     ))
-//         .parse(input);
-
-//     match parse_result {
-//         Ok((input, (cast_type, expr))) => {
-//             // Successfully parsed, return the AST node
-//             Ok((
-//                 input,
-//                 AST::Expr(Expr::Cast {
-//                     target_type: cast_type,
-//                     expr: Box::new(expr),
-//                 }),
-//             ))
-//         }
-//         Err(e) => Err(e),
-//     }
-// }
-
-fn parse_parens(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    let parse_result = ((
-        tag_punctuation_gen(Punctuation::LeftParen),
-        parse_expr,
-        tag_punctuation_gen(Punctuation::RightParen),
-    ))
-        .parse(input);
-
-    match parse_result {
-        Ok((input, (_, expr, _))) => Ok((input, expr)),
-        Err(e) => Err(e),
-    }
-}
-
 fn parse_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("Location parsing");
     let parse_result = ((
         parse_identifier, // Variable name
         opt((
@@ -607,8 +510,6 @@ fn parse_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
         )),
     ))
         .parse(input);
-
-    println!("LOCATION: {:?}", parse_result);
 
     match parse_result {
         Ok((input, (id, maybe_index))) => {
@@ -640,9 +541,6 @@ fn parse_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
     }
 }
 
-// #################################################
-//
-// #################################################
 fn parse_if(input: TokenSlice) -> IResult<TokenSlice, AST> {
     // compose the parser
     let parse_result = ((
@@ -713,7 +611,6 @@ fn parse_for_loop(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_while_loop(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("\n\nentering while loop {:?}\n\n", input);
     let parse_result = ((
         tag_keyword_gen(Keyword::While),
         tag_punctuation_gen(Punctuation::LeftParen),
@@ -722,7 +619,7 @@ fn parse_while_loop(input: TokenSlice) -> IResult<TokenSlice, AST> {
         parse_block,
     ))
         .parse(input);
-    println!("\n\nending while loop {:?}\n\n", parse_result);
+
     match parse_result {
         Ok((input, (_, _, expr, _, body))) => {
             Ok((
@@ -786,7 +683,6 @@ fn parse_increment_decrement(input: TokenSlice) -> IResult<TokenSlice, AST> {
                 AssignOp::MinusAssign
             }),
         )),
-        // tag_punctuation_gen(Punctuation::Semicolon),
     ))
         .parse(input);
 
@@ -801,7 +697,6 @@ fn parse_increment_decrement(input: TokenSlice) -> IResult<TokenSlice, AST> {
                     )))
                 }
             };
-
             Ok((
                 input,
                 AST::Statement(Statement::Assignment {
@@ -815,6 +710,7 @@ fn parse_increment_decrement(input: TokenSlice) -> IResult<TokenSlice, AST> {
     }
 }
 
+/// Parse a single assignment token
 fn parse_assignop_token(input: TokenSlice) -> IResult<TokenSlice, AssignOp> {
     alt((
         map(tag_operator_gen(Operator::Assign), |_| AssignOp::Assign),
@@ -837,6 +733,8 @@ fn parse_assignop_token(input: TokenSlice) -> IResult<TokenSlice, AssignOp> {
     .parse(input)
 }
 
+/// Parse an assignment expression, which consists of an incr/decr
+/// or an assignment token and expression
 fn parse_assignexpr(input: TokenSlice) -> IResult<TokenSlice, AST> {
     alt((
         (
@@ -856,15 +754,7 @@ fn parse_assignexpr(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_assign_to_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("assinging to location");
-    let parse_result = ((
-        parse_location,
-        parse_assignexpr,
-        // tag_punctuation_gen(Punctuation::Semicolon),
-    ))
-        .parse(input);
-
-    println!("after assign: {:?}", parse_result);
+    let parse_result = ((parse_location, parse_assignexpr)).parse(input);
 
     match parse_result {
         Ok((input, (loc, assign))) => {
@@ -910,11 +800,10 @@ fn parse_for_update(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 // #################################################
-//
+// TOP-LEVEL STRUCTURES
 // #################################################
 
 fn parse_statement(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("parsing statement----------");
     let result = alt((
         // location assignment
         map(
@@ -944,7 +833,6 @@ fn parse_statement(input: TokenSlice) -> IResult<TokenSlice, AST> {
         parse_break_continue,
     ))
     .parse(input);
-    println!("after parse_statement {:?}", result);
     result
 }
 
@@ -974,7 +862,6 @@ fn parse_import_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("heyyyy");
     let parse_result = ((
         parse_identifier,
         tag_punctuation_gen(Punctuation::LeftBracket),
@@ -982,33 +869,28 @@ fn parse_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
         tag_punctuation_gen(Punctuation::RightBracket),
     ))
         .parse(input);
-    println!("array result: {:?}", parse_result);
-    // return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
 
     match parse_result {
         Ok((input, (id, _, size, _))) => {
             let id = match id {
                 AST::Identifier(name) => name,
                 _ => {
-                    println!("c");
                     return Err(nom::Err::Error(nom::error::Error::new(
                         input,
                         nom::error::ErrorKind::Tag,
-                    )))
+                    )));
                 }
             };
             let size = match size {
                 AST::Expr(Expr::Literal(Literal::Int(value))) => value,
                 AST::Expr(Expr::Literal(Literal::HexInt(value))) => value,
                 _ => {
-                    println!("b");
                     return Err(nom::Err::Error(nom::error::Error::new(
                         input,
                         nom::error::ErrorKind::Tag,
-                    )))
+                    )));
                 }
             };
-            println!("we good");
             Ok((input, AST::ArrayFieldDecl { id, size }))
         }
         Err(e) => Err(e),
@@ -1047,14 +929,10 @@ fn parse_method_call(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_block(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    let (input, _) = tag_punctuation_gen(Punctuation::LeftBrace)(input)?; // Match '{'
-    println!("a with: {:?}\n", input);
-    let (input, field_decls) = many0(parse_field_decl).parse(input)?; // Parse field declarations
-    println!("b with: {:?}\n", input);
-    let (input, statements) = many0(parse_statement).parse(input)?; // Parse statements
-    println!("cc with: {:?}\n", input);
-    let (input, _) = tag_punctuation_gen(Punctuation::RightBrace)(input)?; // Match '}'
-    println!("ate it?");
+    let (input, _) = tag_punctuation_gen(Punctuation::LeftBrace)(input)?;
+    let (input, field_decls) = many0(parse_field_decl).parse(input)?;
+    let (input, statements) = many0(parse_statement).parse(input)?;
+    let (input, _) = tag_punctuation_gen(Punctuation::RightBrace)(input)?;
 
     Ok((
         input,
@@ -1066,8 +944,6 @@ fn parse_block(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("parse method decl");
-    // println!("a: {:?}\n", input);;
     let (input, return_type) = alt((
         // Keyword:: Void is our none return type
         map(tag_keyword_gen(Keyword::Void), |_| Type::Void),
@@ -1094,7 +970,6 @@ fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     .unwrap_or((input, vec![])); // Allow empty parameter list
 
     let (input, _) = tag_punctuation_gen(Punctuation::RightParen)(input)?; // Match '('
-                                                                           // println!("d: {:?}\n", input);
 
     let (input, body) = parse_block(input)?; // Parse method body
     Ok((
@@ -1110,26 +985,22 @@ fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
                     )))
                 }
             },
-            params,                // Correctly returns Vec<(Type, String)>
-            block: Box::new(body), // Ensure body is boxed correctly
+            params,
+            block: Box::new(body),
         },
     ))
 }
 
 fn parse_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    // Step 1: Parse the type (int, long, bool)
-    println!("field _decl parse");
     let (input, field_type) = parse_type(input)?;
 
-    // Step 2: Parse at least one `{id} | {array_field_decl}`, comma-separated
+    // Parse at least one `{id} | {array_field_decl}`, comma-separated
     let (input, fields) = separated_list1(
         tag_punctuation_gen(Punctuation::Comma),
-        parse_id_or_array_field_decl, // Parses either an identifier or an array field declaration
+        parse_id_or_array_field_decl,
     )
     .parse(input)?;
 
-    println!("we here: {:?}", input);
-    // Step 3: Match the required `;` at the end
     let (input, _) = tag_punctuation_gen(Punctuation::Semicolon)(input)?;
 
     Ok((
@@ -1142,18 +1013,13 @@ fn parse_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
 }
 
 fn parse_id_or_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    println!("parse_id_or_array_field_decl");
     alt((parse_array_field_decl, parse_identifier)).parse(input)
 }
 
 fn parse_program(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    // Sequentially take in input slice and update it
     let (input, import_decls) = many0(parse_import_decl).parse(input)?;
-    // println!("import decls are: {:?}\n", import_decls);
     let (input, field_decls) = many0(parse_field_decl).parse(input)?;
-    //println!("field decls are: {:?}\n", field_decls);
     let (input, method_decls) = many0(parse_method_decl).parse(input)?;
-    // println!("method decls are: {:?}\n", method_decls);
 
     Ok((
         input,
@@ -1165,7 +1031,8 @@ fn parse_program(input: TokenSlice) -> IResult<TokenSlice, AST> {
     ))
 }
 
-fn parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
+/// Always errors for testing
+fn _parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Tag,
@@ -1177,31 +1044,22 @@ fn parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
 ///    - Verifies that tokens conform to valid Decaf via the language specification
 ///    - Outputs a syntax tree representation of the Decaf program
 pub fn parse(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>, verbose: bool) {
-    println!("PARSING");
     let tokens: Vec<Token> = scan(file, filename, writer, false);
-    // println!("{:?}", tokens);
+    let parse_result = all_consuming(parse_program).parse(TokenSlice(&tokens));
 
-    let parse_result = parse_program(TokenSlice(&tokens));
     match parse_result {
-        Ok((rest, parse_tree)) => {
-            println!("TOKENS SHOULD BE EMPTY {:?}", rest); // if not empty, throw error
-            println!("PARSE TREE: {:?}", parse_tree);
-            if !rest.is_empty() {
-                println!("\n");
-                println!("ERRRORR-----------");
-                panic!()
-            }
+        Ok((_rest, parse_tree)) => {
             if verbose {
-                let template_string = format!("SUCCESSFUL PARSE==================\n");
-                writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
+                let template_string = format!("SUCCESSFUL PARSE\n Parse tree: {:?}", parse_tree);
+                writeln!(writer, "{}", template_string).expect("Failed to write output!");
             }
         }
-
         Err(parse_error) => {
             if verbose {
-                let template_string = format!("ERROR PARSE===============\n");
+                let template_string = format!("Error parsing: {} \n", parse_error.to_string());
                 writeln!(writer, "{}", template_string).expect("Failed to write error to stdout!");
             }
+            panic!()
         }
     }
 }

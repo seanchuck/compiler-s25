@@ -1,4 +1,3 @@
-void bar ( ) {
-  for ( i = 9; i >= 0; i++ ) {
-  }
+void main ( ) {
+    long a, b[32], c, d[44], e, f;
 }

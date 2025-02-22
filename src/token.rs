@@ -1,7 +1,7 @@
 /*
 Token data structures for scanner.
 */
-// use nom::{InputTake};
+
 use std::ops::Deref;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -99,6 +99,8 @@ pub enum Literal {
 }
 
 /// A public wrapper around a slice of `Token`s to enable custom trait implementations.
+/// Parser combinator `nom` requires implement custom trait `Input` to use combinators like
+/// many0 and separated lists.
 /// TokenSlice acts as a view (or a "window") over a Vec<Token>.
 /// It allows you to process tokens incrementally without copying or modifying the original vector.
 

@@ -1,39 +1,22 @@
-Hand-writing a parser:
+PHASE 2:
+    - Print as many semantic errors as possible
+    - Nested scopes
+
+
+    1. Build IR tree (symbol table) by recursing through AST
+    2. Pass IR tree into checker and do semantic checks
 
 
 
-# Use enum for Rust
-class Token:
-    pass
+// Example descriptor
+Class Function(IrNode):
+    name: str
+    scope: "Scope",
+    params,
+    return_type,
+    body: "block",
+    span: Span
 
-class OpenParen(Token):
-    pass
-
-
-
-
-
-class Scanner:
-    rest: str
-    def __init__(self, input: str)
-        self.rest = input
-
-    def is_end_of_file(self) -> bool:
-        return len(self.rest) == 0
-
-
-    def peek(self) -> str | None:
-        if not self.is_end_of_file():
-            return self.rest[0]
-
-    def gobble(self, ntoken: int) ->str | None:
-        if not self.is_end_of_file():
-            self.rest = self.rest[n:]
-
-
-
-
-
-
-
-
+class Span:
+    start: Position
+    end: Position

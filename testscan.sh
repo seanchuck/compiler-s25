@@ -37,6 +37,13 @@ for input_file in "$INPUT_DIR"/*.dcf; do
     # Extract the base name (without directory and extension)
     base_name=$(basename "$input_file" .dcf)
     
+    # Check if the filename contains "invalid" (case-insensitive)
+    if [[ "$base_name" == *invalid* ]]; then
+        expect_error=true
+    else
+        expect_error=false
+    fi
+
     # Define expected output file
     expected_output_file="$OUTPUT_DIR/$base_name.out"
     
@@ -54,15 +61,26 @@ for input_file in "$INPUT_DIR"/*.dcf; do
 
     # Run the command and capture output
     ./run.sh "$input_file" -t scan > "$TEMP_OUTPUT"
+    exit_code=$?
 
-    # Compare the generated output with the expected output
-    if diff -q "$TEMP_OUTPUT" "$expected_output_file" > /dev/null; then
-        echo "[PASS] $base_name"
-        ((passed_tests++))
+    # Validate based on expected behavior
+    if $expect_error; then
+        if [ $exit_code -ne 0 ]; then
+            echo "[PASS] $base_name (expected error)"
+            ((passed_tests++))
+        else
+            echo "[FAIL] $base_name (expected error but passed!)"
+            ((failed_tests++))
+        fi
     else
-        echo "[FAIL] $base_name - Output mismatch!"
-        diff "$TEMP_OUTPUT" "$expected_output_file" | head -10 # Show first 10 lines of difference
-        ((failed_tests++))
+        if diff -q "$TEMP_OUTPUT" "$expected_output_file" > /dev/null; then
+            echo "[PASS] $base_name"
+            ((passed_tests++))
+        else
+            echo "[FAIL] $base_name - Output mismatch!"
+            diff "$TEMP_OUTPUT" "$expected_output_file" | head -10 # Show first 10 lines of difference
+            ((failed_tests++))
+        fi
     fi
 done
 

@@ -27,7 +27,6 @@ pub enum AST {
         size: String,
     },
     MethodDecl {
-        // return_type: Option<Type>, // We have Type::Void so is ok
         return_type: Type,
         name: String,
         params: Vec<(Type, String)>,
@@ -84,7 +83,6 @@ pub enum Statement {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum Expr {
-    // Location(Box<AST>),
     ArrAccess {
         id: String,
         index: Box<AST>,
