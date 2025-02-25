@@ -21,3 +21,7 @@ public-tests/
 
 # File for debugging outputs
 out.out
+
+.DS_Store
+._*
+
