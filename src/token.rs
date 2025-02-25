@@ -103,7 +103,6 @@ pub enum Literal {
 /// many0 and separated lists.
 /// TokenSlice acts as a view (or a "window") over a Vec<Token>.
 /// It allows you to process tokens incrementally without copying or modifying the original vector.
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TokenSlice<'a>(pub &'a [Token]);
 
