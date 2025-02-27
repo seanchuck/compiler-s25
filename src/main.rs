@@ -5,9 +5,12 @@ mod utils;
 
 mod ast;
 mod token;
+mod symtable;
 
 mod parse;
 mod scan;
+mod inter;
+mod semantics;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
@@ -37,13 +40,15 @@ fn main() {
             panic!("Invalid target");
         }
         utils::cli::CompilerAction::Scan => {
-            scan::scan(&input, &filename, &mut writer, true);
+            scan::scan(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Parse => {
-            parse::parse(&input, &filename, &mut writer, true);
+            parse::parse(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Inter => {
-            todo!("inter");
+            inter::generate_IR(&input, &filename, &mut writer, args.debug);
+            todo!("check semantics");
+            // semantics::check_semantics(&input, &filename, &mut writer, true);
         }
         utils::cli::CompilerAction::Assembly => {
             todo!("assembly");
