@@ -14,14 +14,15 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 pub struct Scope {
     // allow multiple references to parent scope, while enabling
     // mutability as needed
-    parent: Option<Rc<RefCell<Scope>>>,
-    table: HashMap<String, TableEntry>,
+    pub parent: Option<Rc<RefCell<Scope>>>,
+    pub table: HashMap<String, TableEntry>,
 }
 
 /// Symbol table entry type, representing locally-
 /// declared variables or Method.
 /// Have just enough information to perform semantic
 /// check, without requiring, e.g., full method bodies.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum TableEntry {
     Variable {
@@ -38,6 +39,7 @@ pub enum TableEntry {
 
 /// Functions for creating new scopes
 /// and adding to symbol tables.
+#[allow(dead_code)]
 impl Scope {
     /// Create a new (global) scope.
     pub fn new() -> Self {

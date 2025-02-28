@@ -10,6 +10,8 @@ use std::fmt::Write;
 use std::fs::File;
 use std::io::Write as ioWrite;
 
+
+// Todo: Un-nest, this should not be an enum.
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum AST {
@@ -23,7 +25,7 @@ pub enum AST {
     },
     FieldDecl {
         typ: Type,
-        decls: Vec<Box<AST>>,
+        decls: Vec<Box<AST>>, // Identifier or ArrayFieldDecl
     },
     ArrayFieldDecl {
         id: String,

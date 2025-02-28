@@ -11,33 +11,44 @@ use crate::token::Literal; use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-
+/// The root intermediate representation (IR) enum
+#[allow(dead_code)]
 #[derive(Debug)]
-pub struct Program {
-    pub global_scope: Rc<RefCell<Scope>>,  // holds local vars and methods
-    pub methods: HashMap<String, IRMethod>,
+pub enum IRNode {
+    Program(IRProgram),
+    Method(IRMethod),
+    Block(IRBlock),
 }
 
+/// Represents the IR structure of a program
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct IRProgram {
+    pub global_scope: Rc<RefCell<Scope>>,  // Holds local vars and methods
+    pub methods: HashMap<String, Rc<IRMethod>>,  // Methods are shared references
+}
 
-// Represents the intermediate representation of a function
+/// Represents a method in the IR
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct IRMethod {
-    name: String,
-    return_type: Type,
-    params: Vec<(Type, String)>,
-    
-    // stores local variables
-    scope: Scope,
-    statements: Vec<IRStatement>,
+    pub name: String,
+    pub return_type: Type,
+    pub params: Vec<(Type, String)>,
+    pub scope: Rc<RefCell<Scope>>,  // Stores local variables
+    pub body: IRBlock, // Statements are reference-counted
 }
 
+/// Represents a block of statements in the IR
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct IRBlock {
-    scope: Scope,
-    statements: Vec<IRStatement>,
+    pub scope: Rc<RefCell<Scope>>,  // Holds variables declared inside the block
+    pub statements: Vec<Rc<IRStatement>>,  // Statements in this block
 }
 
-// IR representation for statements with semantic checks
+/// IR representation for statements
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum IRStatement {
     VarDecl {
@@ -55,19 +66,19 @@ pub enum IRStatement {
     },
     If {
         condition: IRExpr,
-        then_block: IRBlock,
-        else_block: Option<IRBlock>,
+        then_block: Rc<IRBlock>,
+        else_block: Option<Rc<IRBlock>>,
     },
     While {
         condition: IRExpr,
-        block: IRBlock,
+        block: Rc<IRBlock>,
     },
     For {
         var: String,
         init: IRExpr,
         condition: IRExpr,
         update: IRExpr,
-        block: IRBlock,
+        block: Rc<IRBlock>,
     },
     Return {
         expr: Option<IRExpr>,
@@ -76,33 +87,34 @@ pub enum IRStatement {
     Continue,
 }
 
-// IR representation for expressions with type information
+/// IR representation for expressions
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum IRExpr {
     Literal(Literal),
     Identifier(TableEntry),
     ArrayAccess {
         id: String,
-        index: Box<IRExpr>,
+        index: Rc<IRExpr>,
     },
     MethodCall {
         method_name: String,
-        args: Vec<IRExpr>,
+        args: Vec<Rc<IRExpr>>,
     },
     BinaryExpr {
         op: BinaryOp,
-        left: Box<IRExpr>,
-        right: Box<IRExpr>,
+        left: Rc<IRExpr>,
+        right: Rc<IRExpr>,
         typ: Type,
     },
     UnaryExpr {
         op: UnaryOp,
-        expr: Box<IRExpr>,
+        expr: Rc<IRExpr>,
         typ: Type,
     },
     Cast {
         target_type: Type,
-        expr: Box<IRExpr>,
+        expr: Rc<IRExpr>,
     },
     Len {
         id: String,
