@@ -13,7 +13,7 @@ use std::io::Write as ioWrite;
 
 // Todo: Un-nest, this should not be an enum.
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AST {
     Program {
         imports: Vec<Box<AST>>,
@@ -48,7 +48,7 @@ pub enum AST {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     Assignment {
         location: Box<AST>,
@@ -86,7 +86,7 @@ pub enum Statement {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     ArrAccess {
         id: String,
@@ -137,7 +137,7 @@ pub enum UnaryOp {
     Neg,
     Not,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AssignOp {
     Assign,
     PlusAssign,

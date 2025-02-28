@@ -4,7 +4,7 @@ needed for semantic validation, rather than full AST nodes.
 */
 
 use crate::ast::Type;
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::format, rc::Rc};
 
 
 /// Represents a scope in semantic analysis, containing:
@@ -16,6 +16,7 @@ pub struct Scope {
     // mutability as needed
     pub parent: Option<Rc<RefCell<Scope>>>,
     pub table: HashMap<String, TableEntry>,
+    pub id: Option<String> // for debugging purposes
 }
 
 /// Symbol table entry type, representing locally-
@@ -46,16 +47,22 @@ impl Scope {
         Scope {
             table: HashMap::new(),
             parent: None,
+            id: Some("Global scope".to_string())
         }
     }
 
     /// Create a new child scope from an existing parent.
-    pub fn add_child(parent: Rc<RefCell<Scope>>) -> Self {
-        Scope {
-            table: HashMap::new(),
-            parent: Some(parent.clone()), // Keep parent reference instead of moving ownership
-        }
+/// Create a new child scope from an existing parent.
+pub fn add_child(parent: Rc<RefCell<Scope>>) -> Self {
+    let parent_id = parent.borrow().id.clone().unwrap_or_else(|| "??".to_string());
+
+    Scope {
+        table: HashMap::new(),
+        parent: Some(Rc::clone(&parent)), 
+        id: Some(format!("Child of: {}", parent_id)),
     }
+}
+
     
 
     /// Insert a new symbol into the symbol table for the scope.

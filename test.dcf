@@ -1,5 +1,10 @@
-int zzzz;
+int a;
+void outer() {
+}
 
-void main() {
-  int x;
+void inner() {
+  a = 3;
+  if (3 > 2) {
+    a = 5;
+  }
 }

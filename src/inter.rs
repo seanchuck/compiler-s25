@@ -17,7 +17,7 @@ use crate::scope::*;
 pub fn build_program(ast: &AST) -> IRProgram {
     match ast {
         AST::Program { imports: _, fields, methods } => {
-            let mut globals = HashMap::new();
+            let global_scope = Rc::new(RefCell::new(Scope::new()));
             let mut method_bodies = HashMap::new();
 
             // Process global variables
@@ -27,7 +27,7 @@ pub fn build_program(ast: &AST) -> IRProgram {
                         for decl in decls {
                             match **decl {
                                 AST::Identifier(ref name) => {
-                                    globals.insert(name.clone(), TableEntry::Variable {
+                                    global_scope.borrow_mut().insert(name.clone(), TableEntry::Variable {
                                         name: name.clone(),
                                         typ: typ.clone(),
                                         is_array: false,
@@ -35,7 +35,7 @@ pub fn build_program(ast: &AST) -> IRProgram {
                                 }
                                 AST::ArrayFieldDecl { ref id, ref size } => {
                                     let _array_size = size.parse::<usize>().expect("Invalid array size");
-                                    globals.insert(id.clone(), TableEntry::Variable {
+                                    global_scope.borrow_mut().insert(id.clone(), TableEntry::Variable {
                                         name: id.clone(),
                                         typ: typ.clone(),
                                         is_array: true,
@@ -51,12 +51,21 @@ pub fn build_program(ast: &AST) -> IRProgram {
 
             // Process method definitions
             for method in methods {
-                let ir_method = build_method(method);
-                method_bodies.insert(ir_method.name.clone(), Rc::new(ir_method));
+                match **method {
+                    AST::MethodDecl { ref return_type, ref name, ref params, block: _ } => {
+                        // Build IR, and method to current scope
+                        let ir_method = build_method(method, Rc::clone(&global_scope));
+                        global_scope.borrow_mut().insert(ir_method.name.clone(), TableEntry::Method{name: name.clone(), return_type: return_type.clone(), params: params.clone()});
+                        method_bodies.insert(ir_method.name.clone(), Rc::new(ir_method));
+
+                    }
+                    _ => {panic!("expected method")}
+                }
+                
             }
 
             IRProgram {
-                global_scope: Rc::new(RefCell::new(Scope { parent: None, table: globals })),
+                global_scope: global_scope,
                 methods: method_bodies,
             }
         }
@@ -65,34 +74,31 @@ pub fn build_program(ast: &AST) -> IRProgram {
 }
 
 /// Builds an IR representation of a method
-pub fn build_method(ast_method: &AST) -> IRMethod {
+pub fn build_method(ast_method: &AST, parent_scope: Rc<RefCell<Scope>>) -> IRMethod {
     match ast_method {
-        AST::MethodDecl {
-            return_type,
-            name,
-            params,
-            block,
-        } => {
-            let scope = Rc::new(RefCell::new(Scope { parent: None, table: HashMap::new() }));
+        AST::MethodDecl { return_type, name, params, block } => {
+            let method_scope = Rc::new(RefCell::new(Scope::add_child(parent_scope))); // ✅ Create function scope
 
-            // Register parameters in the method scope
-            let param_list: Vec<(Type, String)> = params.iter().map(|(typ, name)| {
-                scope.borrow_mut().insert(name.clone(), TableEntry::Variable {
-                    name: name.clone(),
+            // Register parameters in the same scope as function body
+            for (typ, param_name) in params {
+                method_scope.borrow_mut().insert(param_name.clone(), TableEntry::Variable {
+                    name: param_name.clone(),
                     typ: typ.clone(),
                     is_array: false,
                 });
-                (typ.clone(), name.clone())
-            }).collect();
+            }
 
-            // Convert method body into IR block
-            let ir_body = build_block(block, Rc::clone(&scope));
+            // Pass `method_scope` directly instead of making a new one in `build_block`
+            let ir_body = match **block {
+                AST::Block { .. } => build_block(block, Rc::clone(&method_scope)), // ✅ Same scope for method body
+                _ => panic!("Expected method body to be a block"),
+            };
 
             IRMethod {
                 name: name.clone(),
                 return_type: return_type.clone(),
-                params: param_list,
-                scope,
+                params: params.clone(),
+                scope: Rc::clone(&method_scope), // Same scope shared with `block`
                 body: ir_body,
             }
         }
@@ -100,26 +106,29 @@ pub fn build_method(ast_method: &AST) -> IRMethod {
     }
 }
 
+
 /// Builds an IR representation of a block
 pub fn build_block(ast_block: &AST, parent_scope: Rc<RefCell<Scope>>) -> IRBlock {
     match ast_block {
         AST::Block { field_decls, statements } => {
-            // create new scope that inherits from the parent
-            let block_scope = Rc::new(RefCell::new(Scope {
-                parent: Some(Rc::clone(&parent_scope)),
-                table: HashMap::new(),
-            }));
+            let is_function_body = Rc::strong_count(&parent_scope) == 2; // Detect if this is a function body by checking the refcnt
+
+            let scope = if is_function_body {
+                Rc::clone(&parent_scope) // Reuse function scope if inside method
+            } else {
+                Rc::new(RefCell::new(Scope::add_child(parent_scope))) // Create a new scope only for nested blocks
+            };
 
             let mut ir_statements = Vec::new();
 
-            // first, process field declarations (variables inside the block)
+            // Process field declarations in the correct scope
             for field in field_decls {
                 match **field {
                     AST::FieldDecl { ref typ, ref decls } => {
                         for decl in decls {
                             match **decl {
                                 AST::Identifier(ref name) => {
-                                    block_scope.borrow_mut().insert(name.clone(), TableEntry::Variable {
+                                    scope.borrow_mut().insert(name.clone(), TableEntry::Variable {
                                         name: name.clone(),
                                         typ: typ.clone(),
                                         is_array: false,
@@ -134,7 +143,7 @@ pub fn build_block(ast_block: &AST, parent_scope: Rc<RefCell<Scope>>) -> IRBlock
                                 AST::ArrayFieldDecl { ref id, ref size } => {
                                     let _array_size = size.parse::<usize>().expect("Invalid array size");
 
-                                    block_scope.borrow_mut().insert(id.clone(), TableEntry::Variable {
+                                    scope.borrow_mut().insert(id.clone(), TableEntry::Variable {
                                         name: id.clone(),
                                         typ: typ.clone(),
                                         is_array: true,
@@ -155,19 +164,19 @@ pub fn build_block(ast_block: &AST, parent_scope: Rc<RefCell<Scope>>) -> IRBlock
             }
 
             for stmt in statements {
-                let ir_stmt = build_statement(stmt, Rc::clone(&block_scope));  // ✅ Pass correct scope
+                let ir_stmt = build_statement(stmt, Rc::clone(&scope));
                 ir_statements.push(Rc::new(ir_stmt));
             }
 
             IRBlock {
-                scope: Rc::clone(&block_scope),
+                scope: Rc::clone(&scope),
                 statements: ir_statements,
             }
         }
-
         _ => panic!("Expected AST::Block"),
     }
 }
+
 
 
 /// Build IR representation of statement
