@@ -1043,18 +1043,24 @@ fn _parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
 /// Effects:
 ///    - Verifies that tokens conform to valid Decaf via the language specification
 ///    - Outputs a syntax tree representation of the Decaf program
-pub fn parse(file: &str, filename: &str, writer: &mut Box<dyn std::io::Write>, debug: bool) {
+pub fn parse(
+    file: &str,
+    filename: &str,
+    writer: &mut Box<dyn std::io::Write>,
+    debug: bool,
+) -> Option<AST> {
     let tokens: Vec<Token> = scan(file, filename, writer, false);
     let parse_result = all_consuming(parse_program).parse(TokenSlice(&tokens));
 
     match parse_result {
         Ok((_rest, parse_tree)) => {
             if debug {
-                 // run `dot -Tpng ast.dot -o ast.png` from the CLI to generate a GraphViz of the AST
+                // run `dot -Tpng ast.dot -o ast.png` from the CLI to generate a GraphViz of the AST
                 save_dot_file(&parse_tree, "parse_ast.dot");
                 let template_string = format!("SUCCESSFUL PARSE\n Parse tree: {:?}", parse_tree);
                 writeln!(writer, "{}", template_string).expect("Failed to write output!");
             }
+            Some(parse_tree)
         }
         Err(parse_error) => {
             if debug {

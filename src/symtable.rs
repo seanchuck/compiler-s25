@@ -1,135 +1,110 @@
-// ir.rs
-//
-// Intermediate Representation (IR) module that uses a Scope for symbol management
-// and provides functions to convert the AST into a lower-level IR.
+/*
+Create IR by augmenting AST with scope to
+have stronger semantic understanding of the program.
+
+program, block, and method must contain scope
+*/
+use crate::ast::{BinaryOp,Type, UnaryOp};
+use crate::scope::{Scope, TableEntry};
+use crate::token::Literal; use std::cell::RefCell;
 
 use std::collections::HashMap;
-use crate::ast::{AST, Statement, Expr, Type, BinaryOp, UnaryOp};
-use crate::token::Literal; // if needed for literal values
+use std::rc::Rc;
 
-/// A simple datatype for IR. This mirrors our AST’s types.
-#[derive(Debug, Clone)]
-pub enum Datatype {
-    Int,
-    Long,
-    Bool,
-    Void,
-}
 
-/// A scope contains a symbol table (mapping variable names to their datatype)
-/// and an optional parent scope.
 #[derive(Debug)]
-pub struct Scope {
-    symbols: HashMap<String, Datatype>,
-    parent: Option<Box<Scope>>,
+pub struct Program {
+    pub global_scope: Rc<RefCell<Scope>>,  // holds local vars and methods
+    pub methods: HashMap<String, IRMethod>,
 }
 
-impl Scope {
-    /// Create a new (global) scope.
-    pub fn new() -> Self {
-        Scope {
-            symbols: HashMap::new(),
-            parent: None,
-        }
-    }
 
-    /// Create a new child scope from an existing parent.
-    pub fn new_child(parent: Scope) -> Self {
-        Scope {
-            symbols: HashMap::new(),
-            parent: Some(Box::new(parent)),
-        }
-    }
-
-    /// Insert a new symbol into the scope.
-    pub fn insert(&mut self, name: String, datatype: Datatype) {
-        self.symbols.insert(name, datatype);
-    }
-
-    /// Lookup a symbol in this scope or any parent scope.
-    pub fn lookup(&self, name: &str) -> Option<&Datatype> {
-        if let Some(datatype) = self.symbols.get(name) {
-            Some(datatype)
-        } else if let Some(ref parent_scope) = self.parent {
-            parent_scope.lookup(name)
-        } else {
-            None
-        }
-    }
-}
-
-/// The Intermediate Representation (IR) is defined as an enum.
-/// Here we represent programs, functions, variable declarations, assignments,
-/// control flow, and expressions.
+// Represents the intermediate representation of a function
 #[derive(Debug)]
-pub enum IR {
-    /// The entire program: globals and functions.
-    Program {
-        globals: Vec<IR>,
-        functions: Vec<IR>,
-    },
-    /// A function with a name, return type, parameters, body and a scope
-    /// for its local symbols.
-    Function {
-        name: String,
-        return_type: Datatype,
-        params: Vec<(String, Datatype)>,
-        body: Vec<IR>,
-        scope: Scope,
-    },
-    /// A variable declaration.
+pub struct IRMethod {
+    name: String,
+    return_type: Type,
+    params: Vec<(Type, String)>,
+    
+    // stores local variables
+    scope: Scope,
+    statements: Vec<IRStatement>,
+}
+
+#[derive(Debug)]
+pub struct IRBlock {
+    scope: Scope,
+    statements: Vec<IRStatement>,
+}
+
+// IR representation for statements with semantic checks
+#[derive(Debug)]
+pub enum IRStatement {
     VarDecl {
         name: String,
-        datatype: Datatype,
+        typ: Type,
+        is_array: bool,
     },
-    /// An assignment statement.
-    Assign {
+    Assignment {
         target: String,
-        expr: Box<IR>,
+        expr: IRExpr,
     },
-    /// An if statement with a condition and then/else bodies.
+    MethodCall {
+        method_name: String,
+        args: Vec<IRExpr>,
+    },
     If {
-        condition: Box<IR>,
-        then_body: Vec<IR>,
-        else_body: Option<Vec<IR>>,
+        condition: IRExpr,
+        then_block: IRBlock,
+        else_block: Option<IRBlock>,
     },
-    /// A while loop.
     While {
-        condition: Box<IR>,
-        body: Vec<IR>,
+        condition: IRExpr,
+        block: IRBlock,
     },
-    /// A for loop.
     For {
         var: String,
-        init: Box<IR>,
-        condition: Box<IR>,
-        update: Box<IR>,
-        body: Vec<IR>,
+        init: IRExpr,
+        condition: IRExpr,
+        update: IRExpr,
+        block: IRBlock,
     },
-    /// A return statement.
     Return {
-        expr: Option<Box<IR>>,
+        expr: Option<IRExpr>,
     },
-    /// An IR expression wrapped as a statement.
-    Expression(IRExpr),
+    Break,
+    Continue,
 }
 
-/// IR expressions. We re-use the BinaryOp and UnaryOp from the AST.
+// IR representation for expressions with type information
 #[derive(Debug)]
 pub enum IRExpr {
-    Binary {
+    Literal(Literal),
+    Identifier(TableEntry),
+    ArrayAccess {
+        id: String,
+        index: Box<IRExpr>,
+    },
+    MethodCall {
+        method_name: String,
+        args: Vec<IRExpr>,
+    },
+    BinaryExpr {
         op: BinaryOp,
         left: Box<IRExpr>,
         right: Box<IRExpr>,
+        typ: Type,
     },
-    Unary {
+    UnaryExpr {
         op: UnaryOp,
         expr: Box<IRExpr>,
+        typ: Type,
     },
-    Literal(String),
-    Identifier(String),
-    FunctionCall {
-        name: String,
-        args: Vec<IRExpr>,
+    Cast {
+        target_type: Type,
+        expr: Box<IRExpr>,
+    },
+    Len {
+        id: String,
     },
 }

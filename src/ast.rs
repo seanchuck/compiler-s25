@@ -113,7 +113,7 @@ pub enum Expr {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -130,7 +130,7 @@ pub enum BinaryOp {
     Or,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryOp {
     Neg,
     Not,
@@ -145,16 +145,15 @@ pub enum AssignOp {
     ModuloAssign,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Type {
     Int,
     Long,
     Bool,
     Void,
-    HexInt,
-    HexLong
+    // HexInt,
+    // HexLong
 }
-
 
 /// Implementation of the AST to allow tree visualization with GraphViz
 /// The parser will save the file to `parse_ast.dot` if --debug is passed
@@ -163,7 +162,12 @@ impl AST {
     pub fn to_dot(&self) -> String {
         let mut output = String::from("digraph AST {\n");
         let mut counter = 0;
-        fn generate_dot(node: &AST, parent: Option<usize>, counter: &mut usize, output: &mut String) -> usize {
+        fn generate_dot(
+            node: &AST,
+            parent: Option<usize>,
+            counter: &mut usize,
+            output: &mut String,
+        ) -> usize {
             let node_id = *counter;
             *counter += 1;
             let label = match node {
@@ -180,13 +184,17 @@ impl AST {
             };
 
             writeln!(output, "    {} [label=\"{}\"];", node_id, label).unwrap();
-            
+
             if let Some(parent_id) = parent {
                 writeln!(output, "    {} -> {};", parent_id, node_id).unwrap();
             }
 
             match node {
-                AST::Program { imports, fields, methods } => {
+                AST::Program {
+                    imports,
+                    fields,
+                    methods,
+                } => {
                     for child in imports.iter().chain(fields).chain(methods) {
                         generate_dot(child, Some(node_id), counter, output);
                     }
@@ -199,7 +207,10 @@ impl AST {
                 AST::MethodDecl { block, .. } => {
                     generate_dot(block, Some(node_id), counter, output);
                 }
-                AST::Block { field_decls, statements } => {
+                AST::Block {
+                    field_decls,
+                    statements,
+                } => {
                     for child in field_decls.iter().chain(statements) {
                         generate_dot(child, Some(node_id), counter, output);
                     }
@@ -215,9 +226,9 @@ impl AST {
     }
 }
 
-
 pub fn save_dot_file(ast: &AST, filename: &str) {
     let dot_representation = ast.to_dot();
     let mut file = File::create(filename).expect("Unable to create file");
-    file.write_all(dot_representation.as_bytes()).expect("Unable to write file");
+    file.write_all(dot_representation.as_bytes())
+        .expect("Unable to write file");
 }

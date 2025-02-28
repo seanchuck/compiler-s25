@@ -4,12 +4,13 @@ mod test;
 mod utils;
 
 mod ast;
-mod token;
+mod scope;
 mod symtable;
+mod token;
 
+mod inter;
 mod parse;
 mod scan;
-mod inter;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
@@ -45,8 +46,8 @@ fn main() {
             parse::parse(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Inter => {
-            inter::augment_ast(&input, &filename, &mut writer, args.debug);
             todo!("check semantics");
+            // inter::augment_ast(&input, &filename, &mut writer, args.debug);
             // semantics::check_semantics(&input, &filename, &mut writer, true);
         }
         utils::cli::CompilerAction::Assembly => {
