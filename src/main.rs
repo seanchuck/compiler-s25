@@ -10,7 +10,6 @@ mod symtable;
 mod parse;
 mod scan;
 mod inter;
-mod semantics;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
@@ -46,7 +45,7 @@ fn main() {
             parse::parse(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Inter => {
-            inter::generate_IR(&input, &filename, &mut writer, args.debug);
+            inter::augment_ast(&input, &filename, &mut writer, args.debug);
             todo!("check semantics");
             // semantics::check_semantics(&input, &filename, &mut writer, true);
         }

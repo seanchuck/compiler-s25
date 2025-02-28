@@ -151,6 +151,8 @@ pub enum Type {
     Long,
     Bool,
     Void,
+    HexInt,
+    HexLong
 }
 
 
