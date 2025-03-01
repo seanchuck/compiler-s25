@@ -4,18 +4,6 @@ Token data structures for scanner.
 
 use std::ops::Deref;
 
-// TODO: remove this wrapper and add `span`
-// to Token type instead
-// #[derive(Debug, Clone, PartialEq)]
-// #[allow(dead_code)]
-// pub struct TokenInfo {
-//     pub token: Token,
-//     pub display: String,
-//     pub line: i32,
-//     pub col: i32,
-// }
-
-
 /// Keep track of line information
 /// to throw more specific errors.
 #[derive(Debug, Clone, PartialEq)]

@@ -6,9 +6,11 @@ Some are reused from token.rs.
 */
 
 use crate::token::Literal;
+// use crate::token::Span;
 
 
-// Todo: Un-nest, this should not be an enum.
+// TODO: Un-nest, this should not be an enum.
+// TODO: add Option<Span> to each
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum AST {

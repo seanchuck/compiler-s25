@@ -716,7 +716,6 @@ pub fn scan(
                     | Token::Symbol { span, .. } => {
                         span.as_ref().map_or("unknown".to_string(), |s| s.sline.to_string())
                     }
-                    _ => unreachable!()
                 };
 
                 // extract token display for non-special tokens
@@ -727,7 +726,6 @@ pub fn scan(
                     | Token::Symbol { display, .. } => {
                         display.as_str()
                     }
-                    _ => unreachable!()
                 };
         
                 let template_string = match &token {
