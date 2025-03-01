@@ -43,10 +43,10 @@ fn main() {
             scan::scan(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Parse => {
-            parse::parse(&input, &filename, &mut writer, args.debug);
+            // parse::parse(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Inter => {
-            semcheck::check_semantics(&input, &filename, &mut writer, args.debug);
+            // semcheck::check_semantics(&input, &filename, &mut writer, args.debug);
             // semantics::check_semantics(&input, &filename, &mut writer, true);
         }
         utils::cli::CompilerAction::Assembly => {

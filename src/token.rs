@@ -6,22 +6,49 @@ use std::ops::Deref;
 
 // TODO: remove this wrapper and add `span`
 // to Token type instead
+// #[derive(Debug, Clone, PartialEq)]
+// #[allow(dead_code)]
+// pub struct TokenInfo {
+//     pub token: Token,
+//     pub display: String,
+//     pub line: i32,
+//     pub col: i32,
+// }
+
+
+/// Keep track of line information
+/// to throw more specific errors.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
-pub struct TokenInfo {
-    pub token: Token,
-    pub display: String,
-    pub line: i32,
-    pub col: i32,
+pub struct Span {
+    pub sline: i32,
+    pub scol: i32,
+    pub eline: i32,
+    pub ecol: i32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum Token {
-    Keyword(Keyword), // Keyword variant has type Keyword
-    Identifier(String),
-    Symbol(Symbol),
-    Literal(Literal),
+    Keyword {
+        value: Keyword,
+        span: Option<Span>,
+        display: String
+    },
+    Identifier {
+        value: String,
+        span: Option<Span>,
+        display: String,
+    },
+    Symbol {
+        value: Symbol,
+        span: Option<Span>,
+        display: String,
+    },
+    Literal {
+        value: Literal,
+        span: Option<Span>,
+        display: String,
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -99,6 +126,7 @@ pub enum Literal {
     HexLong(String),
     Bool(bool),
 }
+
 
 /// A public wrapper around a slice of `Token`s to enable custom trait implementations.
 /// Parser combinator `nom` requires implement custom trait `Input` to use combinators like
