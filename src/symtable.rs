@@ -40,7 +40,6 @@ pub struct IRMethod {
 }
 
 /// Represents a block of statements in the IR
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct IRBlock {
     pub scope: Rc<RefCell<Scope>>,  // Holds variables declared inside the block
@@ -48,7 +47,6 @@ pub struct IRBlock {
 }
 
 /// IR representation for statements
-#[allow(dead_code)]
 #[derive(Debug)]
 pub enum IRStatement {
     VarDecl {
@@ -88,7 +86,6 @@ pub enum IRStatement {
 }
 
 /// IR representation for expressions
-#[allow(dead_code)]
 #[derive(Debug)]
 pub enum IRExpr {
     Literal(Literal),

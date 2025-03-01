@@ -29,6 +29,7 @@ during debugging.
 use crate::ast::*;
 use crate::scan::scan;
 use crate::token::*;
+use crate::utils::print::save_dot_file;
 
 use nom::combinator::all_consuming;
 use nom::multi::{many0, separated_list0};

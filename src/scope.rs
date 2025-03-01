@@ -4,7 +4,7 @@ needed for semantic validation, rather than full AST nodes.
 */
 
 use crate::ast::Type;
-use std::{cell::RefCell, collections::HashMap, fmt::format, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 
 /// Represents a scope in semantic analysis, containing:
@@ -39,38 +39,32 @@ pub enum TableEntry {
 }
 
 /// Functions for creating new scopes
-/// and adding to symbol tables.
-#[allow(dead_code)]
+
+
+/// Scope Functions
 impl Scope {
-    /// Create a new (global) scope.
     pub fn new() -> Self {
         Scope {
             table: HashMap::new(),
             parent: None,
-            id: Some("Global scope".to_string())
+            id: Some("Global scope".to_string()),
         }
     }
 
-    /// Create a new child scope from an existing parent.
-/// Create a new child scope from an existing parent.
-pub fn add_child(parent: Rc<RefCell<Scope>>) -> Self {
-    let parent_id = parent.borrow().id.clone().unwrap_or_else(|| "??".to_string());
+    pub fn add_child(parent: Rc<RefCell<Scope>>) -> Self {
+        let parent_id = parent.borrow_mut().id.clone().unwrap_or_else(|| "??".to_string());
 
-    Scope {
-        table: HashMap::new(),
-        parent: Some(Rc::clone(&parent)), 
-        id: Some(format!("Child of: {}", parent_id)),
+        Scope {
+            table: HashMap::new(),
+            parent: Some(parent),
+            id: Some(format!("Child of: {}", parent_id)),
+        }
     }
-}
 
-    
-
-    /// Insert a new symbol into the symbol table for the scope.
     pub fn insert(&mut self, name: String, datatype: TableEntry) {
         self.table.insert(name, datatype);
     }
 
-    /// Lookup a symbol in this scope or any parent scope.
     pub fn lookup(&self, name: &str) -> Option<TableEntry> {
         if let Some(entry) = self.table.get(name) {
             Some(entry.clone())
@@ -80,6 +74,4 @@ pub fn add_child(parent: Rc<RefCell<Scope>>) -> Self {
             None
         }
     }
-    
-
 }

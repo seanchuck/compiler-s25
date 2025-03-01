@@ -1,6 +1,6 @@
 /*
-Build an IR that only has the information necessary
-for semantic checking.
+Perform semantic checks on the AST produced by parsing.
+Build a symbol table to enable these checks.
 */
 
 use core::panic;
@@ -11,6 +11,7 @@ use crate::ast::*;
 use crate::parse::parse;
 use crate::symtable::*;
 use crate::scope::*;
+use crate::utils::print::print_symtree;
 
 
 /// Builds the IR representation of a program
@@ -184,7 +185,7 @@ pub fn build_statement(ast_stmt: &AST, scope: Rc<RefCell<Scope>>) -> IRStatement
     match ast_stmt {
         AST::Statement(Statement::Assignment { location, expr, op: _ }) => {
             if let AST::Identifier(target) = location.as_ref() {
-                if scope.borrow().lookup(&target).is_none() {
+                if scope.borrow_mut().lookup(&target).is_none() {
                     panic!("Variable `{}` used before declaration", target);
                 }
 
@@ -274,7 +275,7 @@ pub fn build_expr(ast_expr: &AST, scope: Rc<RefCell<Scope>>) -> IRExpr {
         },
 
         AST::Identifier(name) => {
-            if let Some(entry) = scope.borrow().lookup(name) {
+            if let Some(entry) = scope.borrow_mut().lookup(name) {
                 IRExpr::Identifier(entry.clone())
             } else {
                 panic!("Variable `{}` used before declaration", name);
@@ -286,17 +287,41 @@ pub fn build_expr(ast_expr: &AST, scope: Rc<RefCell<Scope>>) -> IRExpr {
 }
 
 
+pub fn check_program(scoped_tree: &IRProgram) {
+    match scoped_tree {
+        IRProgram { global_scope, methods } => {
+            for (name, method_body) in methods.iter() {
+                println!("we got this method: {:?}", name);
+            }
+
+        }
+        _=> {
+            panic!("expected IRProgram!");
+        }
+    }
+}
+
+// pub fn check_method(scoped_tree: &IRMethod) {
+
+// }
+
+
 /// Generates the IR from an AST
-pub fn generate_ir(
+pub fn check_semantics(
     file: &str,
     filename: &str,
     writer: &mut Box<dyn std::io::Write>,
     verbose: bool,
 ) {
     let parse_tree = parse(file, filename, writer, false).expect("Parsing failed");
-    let ir_program = build_program(&parse_tree);
+    let sym_tree = build_program(&parse_tree);
 
     if verbose {
-        println!("{:#?}", ir_program);
+        // println!("{:#?}", scoped_tree);
+        println!("=================SYMBOL TABLE====================");
+        print_symtree(&sym_tree);
     }
+
+    check_program(&sym_tree);
+
 }

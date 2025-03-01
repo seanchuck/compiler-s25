@@ -8,7 +8,7 @@ mod scope;
 mod symtable;
 mod token;
 
-mod inter;
+mod semcheck;
 mod parse;
 mod scan;
 
@@ -46,7 +46,7 @@ fn main() {
             parse::parse(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Inter => {
-            inter::generate_ir(&input, &filename, &mut writer, args.debug);
+            semcheck::check_semantics(&input, &filename, &mut writer, args.debug);
             // semantics::check_semantics(&input, &filename, &mut writer, true);
         }
         utils::cli::CompilerAction::Assembly => {
