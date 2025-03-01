@@ -10,6 +10,7 @@ The following non-terminals create new scopes:
     - block
     - method
 */
+
 use crate::ast::{BinaryOp,Type, UnaryOp};
 use crate::scope::{Scope, TableEntry};
 use crate::token::Literal; use std::cell::RefCell;

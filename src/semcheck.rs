@@ -11,7 +11,7 @@ use crate::ast::*;
 use crate::parse::parse;
 use crate::symtable::*;
 use crate::scope::*;
-use crate::utils::print::print_symtree;
+use crate::utils::print::*;
 
 
 
@@ -81,8 +81,8 @@ pub fn build_symbol_table(ast: &AST) -> SymProgram {
 }
 
 /// Builds an IR representation of a method
-pub fn build_method(ast_method: &AST, parent_scope: Rc<RefCell<Scope>>) -> SymMethod {
-    match ast_method {
+pub fn build_method(method: &AST, parent_scope: Rc<RefCell<Scope>>) -> SymMethod {
+    match method {
         AST::MethodDecl { return_type, name, params, block } => {
             let method_scope = Rc::new(RefCell::new(Scope::add_child(parent_scope))); // ✅ Create function scope
 
@@ -115,8 +115,8 @@ pub fn build_method(ast_method: &AST, parent_scope: Rc<RefCell<Scope>>) -> SymMe
 
 
 /// Builds an IR representation of a block
-pub fn build_block(ast_block: &AST, parent_scope: Rc<RefCell<Scope>>) -> SymBlock {
-    match ast_block {
+pub fn build_block(block: &AST, parent_scope: Rc<RefCell<Scope>>) -> SymBlock {
+    match block {
         AST::Block { field_decls, statements } => {
             let is_function_body = Rc::strong_count(&parent_scope) == 2; // Detect if this is a function body by checking the refcnt
 
@@ -170,7 +170,9 @@ pub fn build_block(ast_block: &AST, parent_scope: Rc<RefCell<Scope>>) -> SymBloc
                 }
             }
 
+            // Process statements in the block
             for stmt in statements {
+                // println!("we in here");
                 let ir_stmt = build_statement(stmt, Rc::clone(&scope));
                 ir_statements.push(Rc::new(ir_stmt));
             }
@@ -187,8 +189,9 @@ pub fn build_block(ast_block: &AST, parent_scope: Rc<RefCell<Scope>>) -> SymBloc
 
 
 /// Build IR representation of statement
-pub fn build_statement(ast_stmt: &AST, scope: Rc<RefCell<Scope>>) -> IRStatement {
-    match ast_stmt {
+pub fn build_statement(statement: &AST, scope: Rc<RefCell<Scope>>) -> IRStatement {
+    // println!("statment ios  {:#?}", statement);
+    match statement {
         AST::Statement(Statement::Assignment { location, expr, op: _ }) => {
             if let AST::Identifier(target) = location.as_ref() {
                 if scope.borrow_mut().lookup(&target).is_none() {
@@ -227,15 +230,28 @@ pub fn build_statement(ast_stmt: &AST, scope: Rc<RefCell<Scope>>) -> IRStatement
                 typ: Type::Int, // TODO: Determine type dynamically
                 is_array: false,
             });
-
+        
+            // Ensure `update` is correctly converted into an expression
+            let update_expr = match update.as_ref() {
+                AST::Statement(Statement::Assignment { location, expr, op: _ }) => {
+                    if let AST::Identifier(_) = location.as_ref() {
+                        build_expr(expr, Rc::clone(&scope)) // ✅ Recursively convert the assignment RHS to an expression
+                    } else {
+                        panic!("For loop update must be an assignment to an identifier, got: {:#?}", location);
+                    }
+                }
+                _ => panic!("For loop update must be an assignment statement, got: {:#?}", update),
+            };
+        
             IRStatement::For {
                 var: var.clone(),
                 init: build_expr(init, Rc::clone(&scope)),
                 condition: build_expr(condition, Rc::clone(&scope)),
-                update: build_expr(update, Rc::clone(&scope)),
+                update: update_expr, // ✅ Correctly converted
                 block: Rc::new(build_block(block, Rc::clone(&scope))),
             }
         }
+        
 
         AST::Statement(Statement::Return { expr }) => IRStatement::Return {
             expr: expr.as_ref().map(|e| build_expr(e, Rc::clone(&scope))),
@@ -244,13 +260,13 @@ pub fn build_statement(ast_stmt: &AST, scope: Rc<RefCell<Scope>>) -> IRStatement
         AST::Statement(Statement::Break) => IRStatement::Break,
         AST::Statement(Statement::Continue) => IRStatement::Continue,
 
-        _ => panic!("Unexpected AST node in build_statement"),
+        _ => panic!("========\nError in build_statement: unexpected ast node:\n {:#?}\n========", statement)
     }
 }
 
 /// **Converts an AST expression into an IR expression**
-pub fn build_expr(ast_expr: &AST, scope: Rc<RefCell<Scope>>) -> IRExpr {
-    match ast_expr {
+pub fn build_expr(expr: &AST, scope: Rc<RefCell<Scope>>) -> IRExpr {
+    match expr {
         AST::Expr(Expr::Literal(lit)) => IRExpr::Literal(lit.clone()),
 
         AST::Expr(Expr::BinaryExpr { op, left, right }) => IRExpr::BinaryExpr {
@@ -288,7 +304,7 @@ pub fn build_expr(ast_expr: &AST, scope: Rc<RefCell<Scope>>) -> IRExpr {
             }
         },
 
-        _ => panic!("Unexpected AST node in build_expr"),
+        _ => panic!("========\nError in build_expr: unexpected ast node:\n {:#?}\n========", expr)
     }
 }
 
@@ -304,7 +320,7 @@ pub fn check_program(scoped_tree: &SymProgram) {
                 println!("we got this method: {:?}", name);
             }
 
-        }
+        },
         _=> {
             panic!("expected SymProgram!");
         }
@@ -324,7 +340,10 @@ pub fn check_semantics(
     verbose: bool,
 ) {
     let parse_tree = parse(file, filename, writer, false).expect("Parsing failed");
+    // save_dot_file(&parse_tree, "parse_tree");
     let sym_tree = build_symbol_table(&parse_tree);
+    println!("succesffully built symbol table!!!!!");
+
 
     if verbose {
         // println!("{:#?}", scoped_tree);

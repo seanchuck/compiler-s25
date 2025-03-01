@@ -824,11 +824,18 @@ fn parse_statement(input: TokenSlice) -> IResult<TokenSlice, AST> {
         // methodcall
         map(
             (
+                // method calls ending with semicolon are AST::Statement, otherwise they are AST::Expression
                 parse_method_call,
                 tag_punctuation_gen(Punctuation::Semicolon),
             ),
-            |(method_call, _)| method_call,
+            |(method_call, _)| match method_call {
+                AST::Expr(Expr::MethodCall { method_name, args }) => {
+                    AST::Statement(Statement::MethodCall { method_name, args })
+                }
+                _ => method_call, // Pass through if it's something else
+            },
         ),
+        
         parse_if,
         parse_for_loop,
         parse_while_loop,

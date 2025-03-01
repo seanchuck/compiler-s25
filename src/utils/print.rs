@@ -8,9 +8,19 @@ use std::fs::File;
 use std::io::Write as ioWrite;
 use std::rc::Rc;
 
+/// --> run `dot -Tpng ast.dot -o ast.png` to generate the png file.
+/// and visualize tree with GraphViz.
+pub fn save_dot_file(ast: &AST, filename: &str) {
+    println!("saving.....");
+    let dot_representation = ast.to_dot();
+    let mut file = File::create(filename).expect("Unable to create file");
+    file.write_all(dot_representation.as_bytes())
+        .expect("Unable to write file");
+}
+
+
 /// Implementation of the AST to allow tree visualization with GraphViz
 /// The parser will save the file to `parse_ast.dot` if --debug is passed
-/// run `dot -Tpng ast.dot -o ast.png` to generate the png file.
 impl AST {
     pub fn to_dot(&self) -> String {
         let mut output = String::from("digraph AST {\n");
@@ -79,21 +89,14 @@ impl AST {
     }
 }
 
-pub fn save_dot_file(ast: &AST, filename: &str) {
-    let dot_representation = ast.to_dot();
-    let mut file = File::create(filename).expect("Unable to create file");
-    file.write_all(dot_representation.as_bytes())
-        .expect("Unable to write file");
-}
-
 
 // #################################################
 // PRETTY PRINT SYMBOL TABLE TREE
 // #################################################
 
 /// Pretty-print an IR program
-pub fn print_symtree(ir: &IRProgram) {
-    println!("IRProgram {{");
+pub fn print_symtree(ir: &SymProgram) {
+    println!("SymProgram {{");
     print_scope(&ir.global_scope, 2);
     
     println!("\n  methods: {{");
@@ -105,10 +108,10 @@ pub fn print_symtree(ir: &IRProgram) {
 }
 
 /// Pretty-print an IR method
-fn print_method(method: &Rc<IRMethod>, indent: usize) {
+fn print_method(method: &Rc<SymMethod>, indent: usize) {
     let indent_str = " ".repeat(indent);
     
-    println!("{}IRMethod {{", indent_str);
+    println!("{}SymMethod {{", indent_str);
     println!("{}  name: \"{}\",", indent_str, method.name);
     println!("{}  return_type: {:?},", indent_str, method.return_type);
     println!("{}  params: {:?},", indent_str, method.params);
@@ -123,10 +126,10 @@ fn print_method(method: &Rc<IRMethod>, indent: usize) {
 }
 
 /// Pretty-print an IR block
-fn print_block(block: &IRBlock, indent: usize) {
+fn print_block(block: &SymBlock, indent: usize) {
     let indent_str = " ".repeat(indent);
     
-    println!("{}IRBlock {{", indent_str);
+    println!("{}SymBlock {{", indent_str);
     
     println!("\n{}  scope:", indent_str);
     print_scope(&block.scope, indent + 4);

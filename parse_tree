@@ -1,0 +1,21 @@
+digraph AST {
+    0 [label="Program"];
+    1 [label="Import: printf"];
+    0 -> 1;
+    2 [label="Method: bar"];
+    0 -> 2;
+    3 [label="Block"];
+    2 -> 3;
+    4 [label="FieldDecl: Int"];
+    3 -> 4;
+    5 [label="Identifier: i"];
+    4 -> 5;
+    6 [label="Statement"];
+    3 -> 6;
+    7 [label="Method: main"];
+    0 -> 7;
+    8 [label="Block"];
+    7 -> 8;
+    9 [label="Statement"];
+    8 -> 9;
+}}
