@@ -466,88 +466,205 @@ fn get_next_token(
     current_line: &mut i32,
     current_col: &mut i32,
 ) -> Result<Token> {
-    // Consume whitespace before capturing start position
-    gobble_whitespace(program, current_line, current_col);
-
-    // Track the **actual** starting column and line
-    let start_col = *current_col;
-    let start_line = *current_line;
-
     if let Some(&char1) = program.get(0) {
-        let mut span = Span {
-            sline: start_line,
-            scol: start_col,
-            eline: start_line,
-            ecol: start_col,  // ✅ Start with scol, update later
+        let span = Span {
+            sline: *current_line,
+            scol: *current_col,
+            eline: *current_line, // Assuming single-token span initially
+            ecol: *current_col + 1, // Adjust for token width
         };
-
-        // Try matching length-2 operators
+    
+        // Attempt to match length-2 symbols first
         if let Some(&char2) = program.get(1) {
             let token = match (char1, char2) {
-                ('=', '=') => Some(("==", Symbol::Operator(Operator::Equal))),
-                ('+', '+') => Some(("++", Symbol::Operator(Operator::Increment))),
-                ('-', '-') => Some(("--", Symbol::Operator(Operator::Decrement))),
-                ('!', '=') => Some(("!=", Symbol::Operator(Operator::NotEqual))),
-                ('<', '=') => Some(("<=", Symbol::Operator(Operator::LessEqual))),
-                ('>', '=') => Some((">=", Symbol::Operator(Operator::GreaterEqual))),
+                ('=', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::Equal),
+                    span: span.clone(),
+                    display: "==".to_string(),
+                }),
+                ('+', '+') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::Increment),
+                    span: span.clone(),
+                    display: "++".to_string(),
+                }),
+                ('-', '-') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::Decrement),
+                    span: span.clone(),
+                    display: "--".to_string(),
+                }),
+                ('!', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::NotEqual),
+                    span: span.clone(),
+                    display: "!=".to_string(),
+                }),
+                ('<', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::LessEqual),
+                    span: span.clone(),
+                    display: "<=".to_string(),
+                }),
+                ('>', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::GreaterEqual),
+                    span: span.clone(),
+                    display: ">=".to_string(),
+                }),
+                ('&', '&') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::LogicalAnd),
+                    span: span.clone(),
+                    display: "&&".to_string(),
+                }),
+                ('|', '|') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::LogicalOr),
+                    span: span.clone(),
+                    display: "||".to_string(),
+                }),
+                ('+', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::PlusAssign),
+                    span: span.clone(),
+                    display: "+=".to_string(),
+                }),
+                ('-', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::MinusAssign),
+                    span: span.clone(),
+                    display: "-=".to_string(),
+                }),
+                ('*', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::MultiplyAssign),
+                    span: span.clone(),
+                    display: "*=".to_string(),
+                }),
+                ('/', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::DivideAssign),
+                    span: span.clone(),
+                    display: "/=".to_string(),
+                }),
+                ('%', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::ModuloAssign),
+                    span: span.clone(),
+                    display: "%=".to_string(),
+                }),
                 _ => None,
             };
-
-            if let Some((display, symbol)) = token {
+    
+            if let Some(token) = token {
                 consume(program, current_col, 2);
-                span.ecol = *current_col;  // ✅ End column updated correctly
-                return Ok(Token::Symbol {
-                    value: symbol,
-                    span: span,
-                    display: display.to_string(),
-                });
+                return Ok(token);
             }
         }
-
+    
         // Match single-character symbols
         let token = match char1 {
-            '(' => Some(("(", Symbol::Punctuation(Punctuation::LeftParen))),
-            ')' => Some((")", Symbol::Punctuation(Punctuation::RightParen))),
-            '{' => Some(("{", Symbol::Punctuation(Punctuation::LeftBrace))),
-            '}' => Some(("}", Symbol::Punctuation(Punctuation::RightBrace))),
-            ';' => Some((";", Symbol::Punctuation(Punctuation::Semicolon))),
-            '=' => Some(("=", Symbol::Operator(Operator::Assign))),
-            '+' => Some(("+", Symbol::Operator(Operator::Plus))),
-            '-' => Some(("-", Symbol::Operator(Operator::Minus))),
-            '*' => Some(("*", Symbol::Operator(Operator::Multiply))),
-            '/' => Some(("/", Symbol::Operator(Operator::Divide))),
-            '<' => Some(("<", Symbol::Operator(Operator::Less))),
-            '>' => Some((">", Symbol::Operator(Operator::Greater))),
-            '!' => Some(("!", Symbol::Operator(Operator::LogicalNot))),
-            _ => None,
+            '(' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::LeftParen),
+                span: span.clone(),
+                display: "(".to_string(),
+            }),
+            ')' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::RightParen),
+                span: span.clone(),
+                display: ")".to_string(),
+            }),
+            '{' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::LeftBrace),
+                span: span.clone(),
+                display: "{".to_string(),
+            }),
+            '}' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::RightBrace),
+                span: span.clone(),
+                display: "}".to_string(),
+            }),
+            '[' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::LeftBracket),
+                span: span.clone(),
+                display: "[".to_string(),
+            }),
+            ']' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::RightBracket),
+                span: span.clone(),
+                display: "]".to_string(),
+            }),
+            ';' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::Semicolon),
+                span: span.clone(),
+                display: ";".to_string(),
+            }),
+            ',' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::Comma),
+                span: span.clone(),
+                display: ",".to_string(),
+            }),
+            '=' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Assign),
+                span: span.clone(),
+                display: "=".to_string(),
+            }),
+            '+' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Plus),
+                span: span.clone(),
+                display: "+".to_string(),
+            }),
+            '-' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Minus),
+                span: span.clone(),
+                display: "-".to_string(),
+            }),
+            '*' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Multiply),
+                span: span.clone(),
+                display: "*".to_string(),
+            }),
+            '/' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Divide),
+                span: span.clone(),
+                display: "/".to_string(),
+            }),
+            '%' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Modulo),
+                span: span.clone(),
+                display: "%".to_string(),
+            }),
+            '<' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Less),
+                span: span.clone(),
+                display: "<".to_string(),
+            }),
+            '>' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Greater),
+                span: span.clone(),
+                display: ">".to_string(),
+            }),
+            '!' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::LogicalNot),
+                span: span.clone(),
+                display: "!".to_string(),
+            }),
+    
+            // These fn handle their own consumption
+            '\'' => return lex_char_literal(program, current_line, current_col),
+            '"' => return lex_string_literal(program, current_line, current_col),
+
+            // If no direct match: lex as Keyword, Identifier, and Literal
+            _ => {
+                if char1.is_alphabetic() || char1 == '_' {
+                    return lex_keyword_or_identifier(program, current_line, current_col);
+                } else if char1.is_numeric() {
+                    return lex_numeric_literal(program, current_line, current_col);
+                } else {
+                    // Consume a character to prevent infinite loops!
+                    consume(program, current_col, 1);
+                    return Err(anyhow!("Character not recognized!"));
+                }
+            }
         };
 
-        if let Some((display, symbol)) = token {
+        // Consume for direct matches only
+        if token.is_some() {
             consume(program, current_col, 1);
-            span.ecol = *current_col;  // ✅ Correctly update end column
-            return Ok(Token::Symbol {
-                value: symbol,
-                span: span,
-                display: display.to_string(),
-            });
         }
-
-        // Keywords, Identifiers, and Literals
-        if char1.is_alphabetic() || char1 == '_' {
-            return lex_keyword_or_identifier(program, current_line, current_col);
-        } else if char1.is_numeric() {
-            return lex_numeric_literal(program, current_line, current_col);
-        }
-
-        // Handle unrecognized characters
-        consume(program, current_col, 1);
-        return Err(anyhow!("Character not recognized!"));
+        return Ok(token.unwrap());
     }
-
     Err(anyhow!("Failed to generate next token"))
 }
-
-
 
 /// The main scan function for this file.
 ///  - Input: a Decaf source file String as input.
@@ -662,7 +779,6 @@ pub fn scan(
                 }
                 tokens.push(token);
             }
-        
 
             Err(token_value) => {
                 found_err = true;
@@ -681,6 +797,10 @@ pub fn scan(
     if found_err {
         process::exit(1);
     }
+
+    // if debug {
+    //     println!("Successfully scanned! Tokens are:\n {:#?}", tokens);
+    // }
 
     tokens
 }

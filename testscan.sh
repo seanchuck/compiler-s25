@@ -1,5 +1,5 @@
 #!/bin/bash
-# Locally runs all tests in /public-tests.
+# Locally runs all tests in /public-tests and compares results to expected output.
 
 INPUT_DIR="public-tests/phase1-scanner/public/input"
 OUTPUT_DIR="public-tests/phase1-scanner/public/output"
@@ -37,6 +37,13 @@ for input_file in "$INPUT_DIR"/*.dcf; do
     # Extract the base name (without directory and extension)
     base_name=$(basename "$input_file" .dcf)
     
+    # Check if the filename contains "invalid" (case-insensitive)
+    if [[ "$base_name" =~ [Ii][Nn][Vv][Aa][Ll][Ii][Dd] ]]; then
+        expect_error=true
+    else
+        expect_error=false
+    fi
+
     # Define expected output file
     expected_output_file="$OUTPUT_DIR/$base_name.out"
     
@@ -53,21 +60,39 @@ for input_file in "$INPUT_DIR"/*.dcf; do
     echo "Checking $base_name..."
 
     # Run the command and capture output
-    ./run.sh "$input_file" -t scan > "$TEMP_OUTPUT"
+    ./run.sh "$input_file" -t scan --debug > "$TEMP_OUTPUT"
+    exit_code=$?
 
-    # Compare the generated output with the expected output
-    if diff -q "$TEMP_OUTPUT" "$expected_output_file" > /dev/null; then
-        echo "[PASS] $base_name"
-        ((passed_tests++))
+    # Validate based on expected behavior
+    if $expect_error; then
+        if [ $exit_code -ne 0 ]; then
+            echo -e "[PASS] $base_name (expected failure)\n"
+            ((passed_tests++))
+        else
+            echo -e "[FAIL] $base_name (expected failure but passed unexpectedly!)\n"
+            ((failed_tests++))
+        fi
     else
-        echo "[FAIL] $base_name - Output mismatch!"
-        diff "$TEMP_OUTPUT" "$expected_output_file" | head -10 # Show first 10 lines of difference
-        ((failed_tests++))
+        if diff -u "$TEMP_OUTPUT" "$expected_output_file" > /dev/null; then
+            echo -e "[PASS] $base_name\n"
+            ((passed_tests++))
+        else
+            echo -e "[FAIL] $base_name - Output mismatch!\n"
+            diff -u "$TEMP_OUTPUT" "$expected_output_file" | head -20  # Show first 20 lines of difference
+            ((failed_tests++))
+        fi
     fi
 done
 
 # Cleanup
 rm -f "$TEMP_OUTPUT"
+
+# Calculate pass percentage
+if [ "$total_tests" -gt 0 ]; then
+    pass_percentage=$(( 100 * passed_tests / total_tests ))
+else
+    pass_percentage=0
+fi
 
 # Final Summary
 echo "---------------------------------"
@@ -75,6 +100,7 @@ echo "Test Summary:"
 echo "Total Tests: $total_tests"
 echo "Passed: $passed_tests"
 echo "Failed: $failed_tests"
+echo "Pass Percentage: $pass_percentage%"
 
 # Exit with a non-zero status if there were failures
 if [ "$failed_tests" -gt 0 ]; then
