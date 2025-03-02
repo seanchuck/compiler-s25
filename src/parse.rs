@@ -1060,6 +1060,7 @@ pub fn parse(
     debug: bool,
 ) -> Option<AST> {
     let tokens: Vec<Token> = scan(file, filename, writer, false);
+    println!("TOKENS ARE: {:#?}", tokens);
     let parse_result = all_consuming(parse_program).parse(TokenSlice(&tokens));
 
     match parse_result {
