@@ -20,22 +20,22 @@ pub struct Span {
 pub enum Token {
     Keyword {
         value: Keyword,
-        span: Option<Span>,
+        span: Span,
         display: String
     },
     Identifier {
         value: String,
-        span: Option<Span>,
+        span: Span,
         display: String,
     },
     Symbol {
         value: Symbol,
-        span: Option<Span>,
+        span: Span,
         display: String,
     },
     Literal {
         value: Literal,
-        span: Option<Span>,
+        span: Span,
         display: String,
     }
 }

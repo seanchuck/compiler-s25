@@ -136,12 +136,12 @@ fn lex_numeric_helper(
                 
                 return Ok(Token::Literal {
                     value: literal_value,
-                    span: Some(Span {
+                    span: Span {
                         sline: start_line,
                         scol: start_col,
                         eline: *current_line,
                         ecol: *current_col,
-                    }),
+                    },
                     display: nliteral,
                 });
             }
@@ -156,12 +156,12 @@ fn lex_numeric_helper(
     };
     return Ok(Token::Literal {
         value: literal_value,
-        span: Some(Span {
+        span: Span {
             sline: start_line,
             scol: start_col,
             eline: *current_line,
             ecol: *current_col,
-        }),
+        },
         display: nliteral,
     });
 }
@@ -212,12 +212,12 @@ fn lex_keyword_or_identifier(
         }
     }
     
-    let span = Some(Span {
+    let span = Span {
         sline: start_line,
         scol: start_col,
         eline: *current_line,
         ecol: *current_col,
-    });
+    };
 
     let token = match keyword_or_identifier.as_str() {
         "if" => Token::Keyword {
@@ -342,12 +342,12 @@ fn lex_string_literal(
             '"' => {
                 return Ok(Token::Literal {
                     value: Literal::String(sliteral.clone()),
-                    span: Some(Span {
+                    span: Span {
                         sline: start_line,
                         scol: start_col,
                         eline: *current_line,
                         ecol: *current_col,
-                    }),
+                    },
                     display: sliteral.clone(),
                 });
                 
@@ -441,12 +441,12 @@ fn lex_char_literal(
             consume(program, current_col, 1); // Consume closing quote
             Ok(Token::Literal {
                 value: Literal::Char(char_value),
-                span: Some(Span {
+                span: Span {
                     sline: start_line,
                     scol: start_col,
                     eline: *current_line,
                     ecol: *current_col,
-                }),
+                },
                 display: char_value.to_string(),
             })
             
@@ -498,7 +498,7 @@ fn get_next_token(
                 span.ecol = *current_col;  // ✅ End column updated correctly
                 return Ok(Token::Symbol {
                     value: symbol,
-                    span: Some(span),
+                    span: span,
                     display: display.to_string(),
                 });
             }
@@ -527,7 +527,7 @@ fn get_next_token(
             span.ecol = *current_col;  // ✅ Correctly update end column
             return Ok(Token::Symbol {
                 value: symbol,
-                span: Some(span),
+                span: span,
                 display: display.to_string(),
             });
         }
@@ -602,8 +602,8 @@ pub fn scan(
                     | Token::Identifier { span, .. }
                     | Token::Literal { span, .. }
                     | Token::Symbol { span, .. } => {
-                        span.as_ref().map_or("unknown".to_string(), |s| s.sline.to_string())
-                    }
+                        span.sline
+                    }     
                 };
 
                 // extract token display for non-special tokens
