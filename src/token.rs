@@ -4,7 +4,7 @@ Token data structures for scanner.
 
 use std::ops::Deref;
 
-/// Keep track of line information
+/// Span keep track of line information
 /// to throw more specific errors.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Span {
@@ -14,6 +14,7 @@ pub struct Span {
     pub ecol: i32,
 }
 
+/// Token is the main data structure used by the scanner.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum Token {

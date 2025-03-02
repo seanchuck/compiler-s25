@@ -53,28 +53,32 @@ use nom::{
 /// Generates a parser that matches a specific `Operator`
 fn tag_operator_gen(
     expected_token: Operator,
-) -> impl Fn(TokenSlice) -> IResult<TokenSlice, Operator> {
-    // Access inner slice explicitly with input.0
+) -> impl Fn(TokenSlice) -> IResult<TokenSlice, (Operator, Span)> {
     move |input: TokenSlice| match input.0.split_first() {
-        Some((Token::Symbol { value: Symbol::Operator(first_token), .. }, rest))
-            if *first_token == expected_token =>
-        {
-            Ok((TokenSlice(rest), first_token.clone()))
-        } // Wrap rest in TokenSlice
+        Some((
+            Token::Symbol { value: Symbol::Operator(first_token), span, ..},
+            rest,
+        )) if *first_token == expected_token => {
+            Ok((TokenSlice(rest), (first_token.clone(), span.clone().expect("Expected span!"))))
+        }
         _ => Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
         ))),
     }
 }
+
 
 /// Generates a parser that matches a specific `Punctuation`
 fn tag_punctuation_gen(
     expected_token: Punctuation,
-) -> impl Fn(TokenSlice) -> IResult<TokenSlice, ()> {
-    move |input: TokenSlice| match input.first() {
-        Some(Token::Symbol { value: Symbol::Punctuation(first_token), .. }) if *first_token == expected_token => {
-            Ok((TokenSlice(&input.0[1..]), ()))
+) -> impl Fn(TokenSlice) -> IResult<TokenSlice, (Punctuation, Span)> {
+    move |input: TokenSlice| match input.0.split_first() {
+        Some((
+            Token::Symbol { value: Symbol::Punctuation(first_token), span, .. },
+            rest,
+        )) if *first_token == expected_token => {
+            Ok((TokenSlice(rest), (first_token.clone(), span.clone().expect("Expected span!"))))
         }
         _ => Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -83,11 +87,17 @@ fn tag_punctuation_gen(
     }
 }
 
+
 /// Generates a parser that matches a specific `Keyword`
-fn tag_keyword_gen(expected_token: Keyword) -> impl Fn(TokenSlice) -> IResult<TokenSlice, Keyword> {
+fn tag_keyword_gen(
+    expected_token: Keyword,
+) -> impl Fn(TokenSlice) -> IResult<TokenSlice, (Keyword, Span)> {
     move |input: TokenSlice| match input.0.split_first() {
-        Some((Token::Keyword { value: first_token, .. }, rest)) if *first_token == expected_token => {
-            Ok((TokenSlice(rest), first_token.clone()))
+        Some((
+            Token::Keyword { value: first_token, span, .. },
+            rest,
+        )) if *first_token == expected_token => {
+            Ok((TokenSlice(rest), (first_token.clone(), span.clone().expect("Expected span!"))))
         }
         _ => Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -95,6 +105,7 @@ fn tag_keyword_gen(expected_token: Keyword) -> impl Fn(TokenSlice) -> IResult<To
         ))),
     }
 }
+
 
 
 // #################################################
@@ -104,8 +115,14 @@ fn tag_keyword_gen(expected_token: Keyword) -> impl Fn(TokenSlice) -> IResult<To
 
 /// Parses an identifier.
 fn parse_identifier(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    if let Some(Token::Identifier { value, .. }) = input.0.first() {
-        Ok((TokenSlice(&input.0[1..]), AST::Identifier(value.clone())))
+    if let Some(Token::Identifier { value, span, .. }) = input.0.first() {
+        Ok((
+            TokenSlice(&input.0[1..]),
+            AST::Identifier {
+                name: value.clone(),
+                span: span.clone().expect("Expected span!"),
+            },
+        ))
     } else {
         Err(nom::Err::Error(Error::new(
             input,
@@ -113,6 +130,8 @@ fn parse_identifier(input: TokenSlice) -> IResult<TokenSlice, AST> {
         )))
     }
 }
+
+
 
 fn parse_char_bool_literal(input: TokenSlice) -> IResult<TokenSlice, AST> {
     // Extract
@@ -248,14 +267,19 @@ fn parse_or(input: TokenSlice) -> IResult<TokenSlice, AST> {
     .parse(input)?;
 
     let expr = exprs.into_iter().fold(left, |acc, (op, right)| {
+        let merged_span = merge_spans(&get_span(&acc), &get_span(&right)); // Extract spans and merge
+
         AST::Expr(Expr::BinaryExpr {
             op,
             left: Box::new(acc),
             right: Box::new(right),
+            span: merged_span,
         })
     });
+
     Ok((input, expr))
 }
+
 
 fn parse_and(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, left) = parse_eq(input)?;

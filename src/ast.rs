@@ -6,114 +6,197 @@ Some are reused from token.rs.
 */
 
 // Reuse Literal enum from token.rs
-use crate::token::Literal;
+use crate::token::{Literal, Span};
 
 
-// TODO: Un-nest, this should not be an enum.
-// TODO: add Option<Span> to each
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum AST {
-    Program {
-        imports: Vec<Box<AST>>,
-        fields: Vec<Box<AST>>,
-        methods: Vec<Box<AST>>,
-    },
-    ImportDecl {
-        id: String,
-    },
-    FieldDecl {
-        typ: Type,
-        decls: Vec<Box<AST>>, // Identifier or ArrayFieldDecl
-    },
-    ArrayFieldDecl {
-        id: String,
-        size: String,
-    },
-    MethodDecl {
-        return_type: Type,
-        name: String,
-        params: Vec<(Type, String)>,
-        block: Box<AST>,
-    },
-    Block {
-        field_decls: Vec<Box<AST>>,
-        statements: Vec<Box<AST>>,
-    },
+    Program(Program),
+    ImportDecl(ImportDecl),
+    FieldDecl(FieldDecl),
+    ArrayFieldDecl(ArrayFieldDecl),
+    MethodDecl(MethodDecl),
+    Block(Block),
     Statement(Statement),
     Expr(Expr),
-    Identifier(String),
-    Type(Type),
+    Identifier(Identifier),
+    Type(Type)
 }
 
-#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Program {
+    pub imports: Vec<Box<AST>>,
+    pub fields: Vec<Box<AST>>,
+    pub methods: Vec<Box<AST>>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportDecl {
+    pub id: String,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct FieldDecl {
+    pub typ: Type,
+    pub decls: Vec<Box<AST>>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct ArrayFieldDecl {
+    pub id: String,
+    pub size: String,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct MethodDecl {
+    pub return_type: Type,
+    pub name: String,
+    pub params: Vec<(Type, String, Span)>,
+    pub block: Box<AST>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct Block {
+    pub field_decls: Vec<Box<AST>>,
+    pub statements: Vec<Box<AST>>,
+    pub span: Span,
+}
+
 #[derive(Debug, Clone)]
 pub enum Statement {
-    Assignment {
-        location: Box<AST>,
-        expr: Box<AST>,
-        op: AssignOp,
-    },
-    MethodCall {
-        method_name: String,
-        args: Vec<Box<AST>>,
-    },
-    If {
-        condition: Box<AST>,
-        then_block: Box<AST>,
-        else_block: Option<Box<AST>>,
-    },
-    For {
-        var: String,
-        init: Box<AST>,
-        condition: Box<AST>,
-        update: Box<AST>,
-        block: Box<AST>,
-    },
-    Update {
-        location: Box<AST>,
-    },
-    While {
-        condition: Box<AST>,
-        block: Box<AST>,
-    },
-    Return {
-        expr: Option<Box<AST>>,
-    },
+    Assignment(Assignment),
+    MethodCall(MethodCall),
+    If(If),
+    For(For),
+    Update(Update),
+    While(While),
+    Return(Return),
     Break,
     Continue,
 }
 
-#[allow(dead_code)]
+
 #[derive(Debug, Clone)]
-pub enum Expr {
-    ArrAccess {
-        id: String,
-        index: Box<AST>,
-    },
-    MethodCall {
-        method_name: String,
-        args: Vec<Box<AST>>,
-    },
-    Literal(Literal),
-    Cast {
-        target_type: Type,
-        expr: Box<AST>,
-    },
-    UnaryExpr {
-        op: UnaryOp,
-        expr: Box<AST>,
-    },
-    BinaryExpr {
-        op: BinaryOp,
-        left: Box<AST>,
-        right: Box<AST>,
-    },
-    Len {
-        id: String,
-    },
+pub struct Assignment {
+    pub location: Box<AST>,
+    pub expr: Box<AST>,
+    pub span: Span,
 }
 
+#[derive(Debug, Clone)]
+pub struct MethodCall {
+    pub method_name: String,
+    pub args: Vec<Box<AST>>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct If {
+    pub condition: Box<AST>,
+    pub then_block: Box<AST>,
+    pub else_block: Option<Box<AST>>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct For {
+    pub var: String,
+    pub init: Box<AST>,
+    pub condition: Box<AST>,
+    pub update: Box<AST>,
+    pub block: Box<AST>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct Update {
+    location: Box<AST>,
+    pub span: Span
+}
+
+#[derive(Debug, Clone)]
+pub struct While {
+    pub condition: Box<AST>,
+    pub block: Box<AST>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct Return {
+    pub expr: Option<Box<AST>>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct Identifier {
+    pub id: String,
+    pub span: Span
+}
+
+/// EXPRESSION ENUM
+#[derive(Debug, Clone)]
+pub enum Expr {
+    ArrAccess(ArrAccess),
+    MethodCall(MethodCallExpr),
+    Literal(LiteralExpr),
+    Cast(CastExpr),
+    UnaryExpr(UnaryExpr),
+    BinaryExpr(BinaryExpr),
+    Len(LenExpr),
+}
+
+#[derive(Debug, Clone)]
+pub struct ArrAccess {
+    pub id: String,
+    pub index: Box<AST>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct MethodCallExpr {
+    pub method_name: String,
+    pub args: Vec<Box<AST>>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct LiteralExpr {
+    pub value: Literal,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct CastExpr {
+    pub target_type: Type,
+    pub expr: Box<AST>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct UnaryExpr {
+    pub expr: Box<AST>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct BinaryExpr {
+    pub left: Box<AST>,
+    pub right: Box<AST>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct LenExpr {
+    pub id: String,
+    pub span: Span,
+}
+
+/// BINARYOP ENUM
 #[derive(Debug, Clone)]
 pub enum BinaryOp {
     Add,
@@ -131,11 +214,14 @@ pub enum BinaryOp {
     Or,
 }
 
+/// UNARYOP ENUM
 #[derive(Debug, Clone)]
 pub enum UnaryOp {
     Neg,
     Not,
 }
+
+/// ASSIGNOP ENUM
 #[derive(Debug, Clone)]
 pub enum AssignOp {
     Assign,
@@ -146,12 +232,27 @@ pub enum AssignOp {
     ModuloAssign,
 }
 
+/// TYPE ENUM
 #[derive(Debug, Clone)]
 pub enum Type {
     Int,
     Long,
     Bool,
     Void,
-    // HexInt,
-    // HexLong
+}
+
+
+/// merge the spans of multiple tokens to cover both of them.
+pub fn merge_spans(left: &Option<Span>, right: &Option<Span>) -> Option<Span> {
+    match (left, right) {
+        (Some(s1), Some(s2)) => Some(Span {
+            sline: s1.sline,
+            scol: s1.scol,
+            eline: s2.eline,
+            ecol: s2.ecol,
+        }),
+        (Some(s1), None) => Some(s1.clone()),
+        (None, Some(s2)) => Some(s2.clone()),
+        _ => None,
+    }
 }
