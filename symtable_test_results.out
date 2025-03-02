@@ -1,0 +1,903 @@
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-01.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-01.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-02.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-02.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-03.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-03.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-04.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-04.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-05.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-05.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-06.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-06.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-07.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-07.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-08.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-08.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-09.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-09.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-10.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-10.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-11.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-11.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-12.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:44:77:
+Invalid array size: ParseIntError { kind: InvalidDigit }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-12.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:44:77:
+Invalid array size: ParseIntError { kind: InvalidDigit }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-13.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-13.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-14.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-14.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-15.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-15.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-16.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-16.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-17.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-17.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-18.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-18.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-19.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-19.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-20.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-20.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-21.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `b` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-21.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `b` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-22.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "b",
+                index: Expr(
+                    BinaryExpr {
+                        op: Add,
+                        left: Expr(
+                            Literal(
+                                Int(
+                                    "4",
+                                ),
+                            ),
+                        ),
+                        right: Identifier(
+                            "i",
+                        ),
+                    },
+                ),
+            },
+        ),
+        expr: Expr(
+            Literal(
+                Int(
+                    "524",
+                ),
+            ),
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-22.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "b",
+                index: Expr(
+                    BinaryExpr {
+                        op: Add,
+                        left: Expr(
+                            Literal(
+                                Int(
+                                    "4",
+                                ),
+                            ),
+                        ),
+                        right: Identifier(
+                            "i",
+                        ),
+                    },
+                ),
+            },
+        ),
+        expr: Expr(
+            Literal(
+                Int(
+                    "524",
+                ),
+            ),
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-23.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `b` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-23.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `b` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-24.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "b",
+                index: Expr(
+                    BinaryExpr {
+                        op: Add,
+                        left: Expr(
+                            Literal(
+                                Int(
+                                    "4",
+                                ),
+                            ),
+                        ),
+                        right: Identifier(
+                            "i",
+                        ),
+                    },
+                ),
+            },
+        ),
+        expr: Expr(
+            Literal(
+                Int(
+                    "524",
+                ),
+            ),
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-24.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "b",
+                index: Expr(
+                    BinaryExpr {
+                        op: Add,
+                        left: Expr(
+                            Literal(
+                                Int(
+                                    "4",
+                                ),
+                            ),
+                        ),
+                        right: Identifier(
+                            "i",
+                        ),
+                    },
+                ),
+            },
+        ),
+        expr: Expr(
+            Literal(
+                Int(
+                    "524",
+                ),
+            ),
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-25.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "A",
+                index: Identifier(
+                    "i",
+                ),
+            },
+        ),
+        expr: Identifier(
+            "i",
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-25.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "A",
+                index: Identifier(
+                    "i",
+                ),
+            },
+        ),
+        expr: Identifier(
+            "i",
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-27.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "A",
+                index: Identifier(
+                    "i",
+                ),
+            },
+        ),
+        expr: Identifier(
+            "i",
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-27.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "A",
+                index: Identifier(
+                    "i",
+                ),
+            },
+        ),
+        expr: Identifier(
+            "i",
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-28.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-28.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-29.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-29.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-30.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-30.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-31.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:303:17:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-31.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:303:17:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-32.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:303:17:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-32.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:303:17:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-33.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:303:17:
+Variable `b` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-33.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:303:17:
+Variable `b` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-34.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "a",
+                index: Expr(
+                    Literal(
+                        Int(
+                            "5",
+                        ),
+                    ),
+                ),
+            },
+        ),
+        expr: Expr(
+            Literal(
+                Char(
+                    '\t',
+                ),
+            ),
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-34.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "a",
+                index: Expr(
+                    Literal(
+                        Int(
+                            "5",
+                        ),
+                    ),
+                ),
+            },
+        ),
+        expr: Expr(
+            Literal(
+                Char(
+                    '	',
+                ),
+            ),
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-35.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:303:17:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-35.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:303:17:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-36.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-36.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-37.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-37.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-38.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-38.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-39.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-39.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-40.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-40.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-41.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:303:17:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-41.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:303:17:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-42.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-42.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-43.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "A",
+                index: Identifier(
+                    "i",
+                ),
+            },
+        ),
+        expr: Identifier(
+            "i",
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-43.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "A",
+                index: Identifier(
+                    "i",
+                ),
+            },
+        ),
+        expr: Identifier(
+            "i",
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-45.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-45.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-46.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-46.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:198:21:
+Variable `a` used before declaration
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-47.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-47.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-48.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-48.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-49.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-49.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-50.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-50.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-51.dcf -t inter
+----------------------------------------
+succesffully built symbol table!!!!!
+PASS: public-tests/phase1-parser/public/legal/legal-51.dcf
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-52.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:307:14:
+========
+Error in build_expr: unexpected ast node:
+ Expr(
+    Cast {
+        target_type: Long,
+        expr: Expr(
+            BinaryExpr {
+                op: Multiply,
+                left: Expr(
+                    Cast {
+                        target_type: Int,
+                        expr: Expr(
+                            BinaryExpr {
+                                op: Multiply,
+                                left: Expr(
+                                    Cast {
+                                        target_type: Long,
+                                        expr: Identifier(
+                                            "x",
+                                        ),
+                                    },
+                                ),
+                                right: Expr(
+                                    Cast {
+                                        target_type: Long,
+                                        expr: Identifier(
+                                            "y",
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                right: Expr(
+                    Literal(
+                        Int(
+                            "2",
+                        ),
+                    ),
+                ),
+            },
+        ),
+    },
+)
+========
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-52.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:307:14:
+========
+Error in build_expr: unexpected ast node:
+ Expr(
+    Cast {
+        target_type: Long,
+        expr: Expr(
+            BinaryExpr {
+                op: Multiply,
+                left: Expr(
+                    Cast {
+                        target_type: Int,
+                        expr: Expr(
+                            BinaryExpr {
+                                op: Multiply,
+                                left: Expr(
+                                    Cast {
+                                        target_type: Long,
+                                        expr: Identifier(
+                                            "x",
+                                        ),
+                                    },
+                                ),
+                                right: Expr(
+                                    Cast {
+                                        target_type: Long,
+                                        expr: Identifier(
+                                            "y",
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                right: Expr(
+                    Literal(
+                        Int(
+                            "2",
+                        ),
+                    ),
+                ),
+            },
+        ),
+    },
+)
+========
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Running: ../run.sh public-tests/phase1-parser/public/legal/legal-53.dcf -t inter
+----------------------------------------
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "memoization",
+                index: Identifier(
+                    "n",
+                ),
+            },
+        ),
+        expr: Identifier(
+            "res",
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-53.dcf)
+
+Error details:
+thread 'main' panicked at src/semcheck.rs:206:17:
+Unsupported assignment target in AST: Statement(
+    Assignment {
+        location: Expr(
+            ArrAccess {
+                id: "memoization",
+                index: Identifier(
+                    "n",
+                ),
+            },
+        ),
+        expr: Identifier(
+            "res",
+        ),
+        op: Assign,
+    },
+)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+========================================
+Execution completed. Results saved in symtable_test_results.out.
+Total Passed: 28
+Total Failed: 23

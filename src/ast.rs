@@ -5,8 +5,8 @@ mimic tree-like structure of the Decaf grammar.
 Some are reused from token.rs.
 */
 
+// Reuse Literal enum from token.rs
 use crate::token::Literal;
-// use crate::token::Span;
 
 
 // TODO: Un-nest, this should not be an enum.

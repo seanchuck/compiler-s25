@@ -203,7 +203,7 @@ pub fn build_statement(statement: &AST, scope: Rc<RefCell<Scope>>) -> IRStatemen
                     expr: build_expr(expr, Rc::clone(&scope)), // ✅ Pass scope to `build_expr`
                 }
             } else {
-                panic!("Unsupported assignment target in AST");
+                panic!("Unsupported assignment target in AST: {:#?}", statement);
             }
         }
 
@@ -313,19 +313,19 @@ pub fn build_expr(expr: &AST, scope: Rc<RefCell<Scope>>) -> IRExpr {
 // SEMANTIC CHECKING
 // #################################################
 
-pub fn check_program(scoped_tree: &SymProgram) {
-    match scoped_tree {
-        SymProgram { global_scope, methods } => {
-            for (name, method_body) in methods.iter() {
-                println!("we got this method: {:?}", name);
-            }
+// pub fn check_program(scoped_tree: &SymProgram) {
+//     match scoped_tree {
+//         SymProgram { global_scope, methods } => {
+//             for (name, method_body) in methods.iter() {
+//                 println!("we got this method: {:?}", name);
+//             }
 
-        },
-        _=> {
-            panic!("expected SymProgram!");
-        }
-    }
-}
+//         },
+//         _=> {
+//             panic!("expected SymProgram!");
+//         }
+//     }
+// }
 
 // pub fn check_method(scoped_tree: &SymMethod) {
 
@@ -351,6 +351,6 @@ pub fn check_semantics(
         print_symtree(&sym_tree);
     }
 
-    check_program(&sym_tree);
+    // check_program(&sym_tree);
 
 }
