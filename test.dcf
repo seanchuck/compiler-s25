@@ -1,1 +1,9 @@
-int A[0xA];
+int x;
+
+void main() {
+  int y;
+  if (5 > 3) {
+    y = 4;
+  }
+
+}

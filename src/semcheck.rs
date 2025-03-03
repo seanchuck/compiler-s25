@@ -1,6 +1,9 @@
 /*
 Perform semantic checks on the AST produced by parsing.
 Build a symbol table to enable these checks.
+
+
+TODO: AVOID MULTIPLE MESSAGES FOR SAME ERROR
 */
 
 use core::panic;
@@ -13,6 +16,7 @@ use crate::ast::*;
 use crate::parse::parse;
 use crate::scope::*;
 use crate::symtable::*;
+use crate::token::Literal;
 use crate::token::Span;
 use crate::utils::print::*;
 
@@ -39,6 +43,23 @@ pub fn build_symbol_table(
             // RULE 1: No duplicate imports
             check_duplicate_imports(imports, filename, writer);
             check_main_exists(methods, filename, writer);
+
+            // Process import methods, which are handled slightly diff. from method_decls
+            for import in imports {
+                match **import {
+                    AST::ImportDecl { ref id, span } => {
+
+                        global_scope.borrow_mut().insert(
+                            id.clone(),
+                            TableEntry::Import { 
+                                name: id.clone(),
+                                span // implements copy
+                            }
+                        );
+                    }
+                    _ => panic!("Invalid import!")
+                }
+            }
 
             // Process global variables
             for field in fields {
@@ -82,11 +103,11 @@ pub fn build_symbol_table(
                                         },
                                     );
                                 }
-                                _ => panic!("Unexpected field declaration")
+                                _ => panic!("Unexpected field declaration type")
                             }
                         }
                     }
-                    _ => unreachable!(),
+                    _ => panic!("invalid field declaration!")
                 }
             }
 
@@ -379,14 +400,18 @@ pub fn build_statement(
         AST::Statement(Statement::MethodCall {
             method_name,
             args,
-            span,
-        }) => SymStatement::MethodCall {
+            span,}) => {
+
+            check_methodcall(&method_name, &args, scope.clone(), false, filename, writer);
+
+            SymStatement::MethodCall {
             method_name: method_name.clone(),
             args: args
                 .iter()
                 .map(|arg| build_expr(arg, Rc::clone(&scope), filename, writer))
                 .collect(),
             span: span.clone(),
+            }
         },
 
         AST::Statement(Statement::If {
@@ -509,13 +534,16 @@ pub fn build_expr(
             method_name,
             args,
             span,
-        }) => SymExpr::MethodCall {
+        }) => {
+            check_methodcall(&method_name, args, scope.clone(), true, filename, writer);
+            SymExpr::MethodCall {
             method_name: method_name.clone(),
             args: args
                 .iter()
                 .map(|arg| Rc::new(build_expr(arg, Rc::clone(&scope), filename, writer)))
                 .collect(),
             span: span.clone(),
+            }
         },
 
         AST::Expr(Expr::ArrAccess { id, index, span }) => SymExpr::ArrayAccess {
@@ -566,12 +594,11 @@ pub fn build_expr(
     }
 }
 
+
+
 // #################################################
-// SEMANTIC CHECKING
+// HELPERS
 // #################################################
-// There are 23 semantic rules we need to follow
-// Some are checked while the SymTree is being made.
-// Others are checked later explicitly.
 
 fn format_error_message(id: &str, span: Option<&Span>, filename: &str, msg: &str) -> String {
     match span {
@@ -585,6 +612,130 @@ fn format_error_message(id: &str, span: Option<&Span>, filename: &str, msg: &str
         ),
     }
 }
+
+/// Infer the type of an expression from the given scope
+fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
+    match expr {
+        // Integer, Boolean, and Long Literals
+        AST::Expr(Expr::Literal { lit, .. }) => match lit {
+            Literal::Int(_) => Type::Int,
+            Literal::Bool(_) => Type::Bool,
+            Literal::Long(_) => Type::Long,
+            _=> Type::Unknown
+        },
+
+        // Variable Reference (Check Scope)
+        AST::Identifier { id, .. } => match scope.lookup(id) {
+            Some(TableEntry::Variable { typ, .. }) => typ.clone(),
+            _ => Type::Unknown,
+        },
+
+        // Binary Expressions (`+`, `-`, `*`, `/`, `%`, etc.)
+        AST::Expr(Expr::BinaryExpr { left, right, op, .. }) => {
+            let left_type = infer_expr_type(left, scope);
+            let right_type = infer_expr_type(right, scope);
+
+            match op {
+                BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply |
+                BinaryOp::Divide | BinaryOp::Modulo => {
+                    if left_type == Type::Int && right_type == Type::Int {
+                        Type::Int
+                    } else if left_type == Type::Long && right_type == Type::Long {
+                        Type::Long
+                    } else {
+                        Type::Unknown // Type mismatch
+                    }
+                }
+                BinaryOp::And | BinaryOp::Or => {
+                    if left_type == Type::Bool && right_type == Type::Bool {
+                        Type::Bool
+                    } else {
+                        Type::Unknown
+                    }
+                }
+                BinaryOp::Equal | BinaryOp::NotEqual | BinaryOp::Less |
+                BinaryOp::Greater | BinaryOp::LessEqual | BinaryOp::GreaterEqual => Type::Bool,
+            }
+        },
+
+        // Unary Expressions (`-`, `!`)
+        AST::Expr(Expr::UnaryExpr { op, expr, .. }) => {
+            let expr_type = infer_expr_type(expr, scope);
+            match op {
+                UnaryOp::Neg => {
+                    if expr_type == Type::Int || expr_type == Type::Long {
+                        expr_type
+                    } else {
+                        Type::Unknown
+                    }
+                }
+                UnaryOp::Not => {
+                    if expr_type == Type::Bool {
+                        Type::Bool
+                    } else {
+                        Type::Unknown
+                    }
+                }
+            }
+        },
+
+        // Array Access (`arr[i]`)
+        AST::Expr(Expr::ArrAccess { id, index, .. }) => {
+            let index_type = infer_expr_type(index, scope);
+            if index_type != Type::Int {
+                return Type::Unknown; // Array indices must be `int`
+            }
+
+            match scope.lookup(id) {
+                Some(TableEntry::Variable { typ, .. }) => match typ {
+                    Type::Int => Type::Int,
+                    Type::Long => Type::Long,
+                    Type::Bool => Type::Bool,
+                    _ => Type::Unknown,
+                },
+                _ => Type::Unknown, // Array not found in scope
+            }
+        },
+
+        // Method Call (`foo(5, true)`)
+        AST::Expr(Expr::MethodCall { method_name, args, .. }) => {
+            match scope.lookup(method_name) {
+                Some(TableEntry::Method { return_type, params, .. }) => {
+                    return_type.clone()
+                },
+                // Imports always return `int`
+                Some(TableEntry::Import { name, span }) => Type::Int,
+                _ => Type::Unknown, // Undefined method
+            }
+        },
+
+        // Casting (`(int) x`)
+        AST::Expr(Expr::Cast { target_type, expr, .. }) => {
+            let expr_type = infer_expr_type(expr, scope);
+            if expr_type == Type::Int || expr_type == Type::Long {
+                target_type.clone()
+            } else {
+                Type::Unknown // Invalid cast
+            }
+        },
+
+        // `len(arr)`
+        AST::Expr(Expr::Len { id, span }) => {
+            Type::Int
+        },
+
+        // Unknown return type
+        _ => Type::Unknown,
+    }
+}
+
+
+// #################################################
+// SEMANTIC CHECKING
+// #################################################
+// There are 23 semantic rules we need to follow
+// Some are checked while the SymTree is being made.
+// Others are checked later explicitly.
 
 /// RULE 1
 fn check_duplicate_imports(imports: &[Box<AST>], filename: &str, writer: &mut dyn std::io::Write) {
@@ -642,12 +793,104 @@ fn check_main_exists(methods: &Vec<Box<AST>>, filename: &str, writer: &mut dyn s
             _ => continue,
         }
     }
-
     if !has_main {
         let error_msg = format_error_message("main", None, filename, "Missing entry point:");
         writeln!(writer, "{}", error_msg).expect("Failed to write error message");
     }
 }
+
+/// Rules 4-6
+fn check_methodcall(
+    method_name: &String,
+    args: &Vec<Box<AST>>, // Now considering actual arguments
+    scope: Rc<RefCell<Scope>>,
+    is_expr: bool,
+    filename: &str,
+    writer: &mut dyn std::io::Write,
+) {
+    // Lookup the method in the scope
+    let scope = scope.borrow(); // Borrow Scope
+    let method_entry = scope.lookup(method_name);
+
+    match method_entry {
+        // 1. Regular method
+        Some(TableEntry::Method { return_type, params, span, .. }) => {
+            // Validate argument count
+            if args.len() != params.len() {
+                let err_msg = format_error_message(
+                    method_name,
+                    Some(&span),
+                    filename,
+                    &format!(
+                        "Incorrect number of arguments for method. Expected {}, but got {}.",
+                        params.len(),
+                        args.len()
+                    ),
+                );
+                writeln!(writer, "{}", err_msg).unwrap();
+            }
+
+            // Validate argument types; string and char not allowed for non-imports
+            for ((expected_type, param_name), arg) in params.iter().zip(args.iter()) {
+                let arg_type = infer_expr_type(arg, &scope); // Assuming `infer_expr_type()` exists
+                if arg_type != *expected_type {
+                    let err_msg = format_error_message(
+                        method_name,
+                        Some(&span),
+                        filename,
+                        &format!(
+                            "Type mismatch for parameter `{}`. Expected `{:?}`, but got `{:?}`.",
+                            param_name, expected_type, arg_type
+                        ),
+                    );
+                    writeln!(writer, "{}", err_msg).unwrap();
+                }
+            }
+
+            // Check if method returns a value when used in an expression
+            if is_expr && matches!(return_type, Type::Void) {
+                let err_msg = format_error_message(
+                    method_name,
+                    Some(&span),
+                    filename,
+                    "Method does not return a value but is used in an expression.",
+                );
+                writeln!(writer, "{}", err_msg).unwrap();
+            }
+        },
+
+        // 2. Imported method (external function)
+        Some(TableEntry::Import { name, span }) => {
+            // For imports, we only need to validate their existence
+            return;
+        },
+
+        // 3. Method declaration is shadowed by variable declaration in stricter scope
+        Some(TableEntry::Variable { name, typ, is_array, span }) => {
+            let err_msg = format_error_message(
+                method_name,
+                Some(&span),
+                filename,
+                "Variable declaration shadows method declaration"
+            );
+            writeln!(writer, "{}", err_msg).unwrap();
+
+        },
+
+        // Method is not found in the scope → Report error
+        None => {
+            let err_msg = format_error_message(
+                method_name,
+                None,
+                filename,
+                "Undefined method.",
+            );
+            writeln!(writer, "{}", err_msg).unwrap();
+        }
+    }
+}
+
+
 
 fn check_array_size(size: &str, span: &Span, filename: &str, writer: &mut dyn std::io::Write) {
     let is_valid = if let Some(stripped) = size.strip_prefix("0x") {

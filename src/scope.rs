@@ -38,6 +38,10 @@ pub enum TableEntry {
         params: Vec<(Type, String)>,
         span: Span,
     },
+    Import {
+        name: String,
+        span: Span,
+    }
 }
 
 /// Functions for creating new scopes

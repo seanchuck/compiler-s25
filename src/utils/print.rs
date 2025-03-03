@@ -142,7 +142,7 @@ fn print_block(block: &SymBlock, indent: usize) {
     println!("{}}}", indent_str);
 }
 
-/// Pretty-print a scope while keeping the parent ID instead of full scope details
+/// Pretty-/// Pretty-print a scope while keeping the parent ID instead of full scope details
 fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
     let indent_str = " ".repeat(indent);
     let scope = scope.borrow();
@@ -156,7 +156,12 @@ fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
         None => "None".to_string(),
     };
 
-    println!("{}Scope {{", indent_str);
+    println!("{}**SCOPE** {{", indent_str);
+    
+    // Print ID first
+    println!("{}  id: {:?},", indent_str, scope.id);
+
+    // Then print the parent ID
     println!("{}  parent: \"{}\",", indent_str, parent_id);
 
     println!("\n{}  table: {{", indent_str);
@@ -184,10 +189,16 @@ fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
                     "{}    \"{}\": Method {{ return_type: {:?}, params: {:?}, span: {:?} }},",
                     indent_str, name, return_type, params, span
                 );
+            },
+            TableEntry::Import { name, span } => {
+                println!(
+                    "{}    \"{}\": Import {{ return_type: int,span: {:?} }},",
+                    indent_str, name, span
+                );
             }
         }
     }
-    println!("{}  }},\n", indent_str);
-    println!("{}  id: {:?},", indent_str, scope.id);
-    println!("{}}}", indent_str);
+    println!("{}  }}", indent_str); // Closing table
+
+    println!("{}}}", indent_str); // Closing scope
 }

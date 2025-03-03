@@ -1,5 +1,10 @@
 #!/bin/bash
 
+
+# Runs the semantic checker on all legal parser test files.
+# Not all should pass since some (about half) are semantically
+# invalid. So be sure to check the results manually!
+
 # Set the base directory for valid parser tests
 BASE_DIR="public-tests/phase1-parser/public/legal"
 

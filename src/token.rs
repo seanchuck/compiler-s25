@@ -6,7 +6,7 @@ use std::ops::Deref;
 
 /// Span keep track of line information
 /// to throw more specific errors.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub struct Span {
     pub sline: i32,
     pub scol: i32,

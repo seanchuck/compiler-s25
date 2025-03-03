@@ -196,6 +196,7 @@ pub enum Type {
     Long,
     Bool,
     Void,
+    Unknown,
 }
 
 /// Implementation of Expr to enable changing the span!

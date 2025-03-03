@@ -40,6 +40,7 @@ pub struct SymProgram {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct SymMethod {
+    // pub is_import: bool,
     pub name: String,
     pub return_type: Type,
     pub params: Vec<(Type, String, Span)>,
