@@ -2,6 +2,11 @@
 Perform semantic checks on the AST produced by parsing.
 Build a symbol table to enable these checks.
 
+Some of the 23 semantic checks are performed while building the 
+symbol table, and others are performed explicitly after.
+
+Use-before-declaration is caught by the grammar/parser.
+
 
 TODO: AVOID MULTIPLE MESSAGES FOR SAME ERROR
 */

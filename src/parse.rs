@@ -133,6 +133,8 @@ fn _parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
     )))
 }
 
+
+
 // #################################################
 // TAG GENERATORS
 // #################################################
@@ -1266,26 +1268,41 @@ pub fn parse(
         }
 
         // Print parse error message
+        // TODO: make error messages better
         Err(_parse_error) => {
-            let error_message = format!(
-                "\nPARSING ERROR! Invalid tokens:\n{}",
-                tokens
+            if let Some((first_token, last_token)) = tokens.first().zip(tokens.last()) {
+                let first_span = extract_span_from_token(first_token);
+                let last_span = extract_span_from_token(last_token);
+        
+                let start_line = first_span.sline;
+                let start_col = first_span.scol;
+                let end_line = last_span.eline;
+                let end_col = last_span.ecol;
+        
+                // Reconstruct the invalid section from token `display` values
+                let invalid_code = tokens
                     .iter()
-                    .map(|token| {
-                        let span = extract_span_from_token(token);
-                        format!(
-                            "  → `{}` at line {}, column {}",
-                            get_token_display(token),
-                            span.sline,
-                            span.scol
-                        )
-                    })
+                    .map(|token| get_token_display(token)) // Get readable token representation
                     .collect::<Vec<_>>()
-                    .join("\n")
-            );
-
-            writeln!(writer, "{}", error_message).expect("Failed to write error to stdout!");
-            panic!("Parsing failed.");
+                    .join(" ");
+        
+                let error_message = format!(
+                    "\nPARSING ERROR! Invalid syntax from line {}, column {} to line {}, column {}:\n  {}\nReason: {}",
+                    start_line, start_col, end_line, end_col,
+                    invalid_code,
+                    "Invalid token sequence or unsupported syntax."
+                );
+        
+                writeln!(writer, "{}", error_message).expect("Failed to write error to stdout!");
+                panic!("Parsing failed.");
+            } else {
+                // Case where no tokens are found (completely empty or malformed input)
+                writeln!(writer, "\nPARSING ERROR! No valid tokens found. Unable to determine error location.")
+                    .expect("Failed to write error to stdout!");
+                panic!("Parsing failed.");
+            }
         }
+        
+
     }
 }
