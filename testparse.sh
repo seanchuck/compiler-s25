@@ -18,7 +18,7 @@ for dir in "illegal" "legal"; do
     for file in "$BASE_DIR/$dir"/*; do
         if [[ -f "$file" ]]; then
             echo -e "\n========================================" | tee -a "$OUTPUT_FILE"
-            echo "Running: ./run.sh $file -t parse" | tee -a "$OUTPUT_FILE"
+            echo "Running: ./run.sh $file -t parse --debug" | tee -a "$OUTPUT_FILE"
             echo "----------------------------------------" | tee -a "$OUTPUT_FILE"
             
             # Run the script and capture error status

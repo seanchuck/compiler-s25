@@ -58,6 +58,7 @@ pub enum AST {
     },
     Statement(Statement),
     Expr(Expr),
+    Empty
 }
 
 #[derive(Debug)]
