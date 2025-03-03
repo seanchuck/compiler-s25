@@ -4,14 +4,14 @@ mimic tree-like structure of the Decaf grammar.
 
 Some are reused from token.rs.
 
-BUG NOTE: Many places use Box<AST> instead of the 
+BUG NOTE: Many places use Box<AST> instead of the
 more specific type (i.e., Box<Expr) for ease-of-use.
 This may lead to BUGS(!) so be sure to check the validity.
     - Idiomatic Rust also probably has structs instead
     of packing stuff in enums, but whatever.
 */
 
-use crate::token::{Span, Literal};
+use crate::token::{Literal, Span};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -20,7 +20,7 @@ pub enum AST {
         imports: Vec<Box<AST>>,
         fields: Vec<Box<AST>>,
         methods: Vec<Box<AST>>,
-        span: Span
+        span: Span,
     },
     ImportDecl {
         id: String,
@@ -50,15 +50,15 @@ pub enum AST {
     },
     Identifier {
         id: String,
-        span: Span
+        span: Span,
     },
     Type {
         typ: Type,
-        span: Span
+        span: Span,
     },
     Statement(Statement),
     Expr(Expr),
-    Empty
+    Empty,
 }
 
 #[derive(Debug)]
@@ -67,7 +67,6 @@ pub struct Param {
     pub name: Box<AST>,
     pub span: Span,
 }
-
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -115,7 +114,7 @@ pub enum Statement {
     },
     Continue {
         span: Span,
-    }
+    },
 }
 
 #[allow(dead_code)]
@@ -133,7 +132,7 @@ pub enum Expr {
     },
     Literal {
         lit: Literal,
-        span: Span
+        span: Span,
     },
     Cast {
         target_type: Type,
@@ -156,7 +155,6 @@ pub enum Expr {
         span: Span,
     },
 }
-
 
 #[derive(Debug)]
 pub enum BinaryOp {
@@ -198,7 +196,6 @@ pub enum Type {
     Void,
 }
 
-
 /// Implementation of Expr to enable changing the span!
 impl Expr {
     pub fn set_span(&mut self, span: Span) {
@@ -238,7 +235,7 @@ impl Expr {
 //             };
 
 //             writeln!(output, "    {} [label=\"{}\"];", node_id, label).unwrap();
-            
+
 //             if let Some(parent_id) = parent {
 //                 writeln!(output, "    {} -> {};", parent_id, node_id).unwrap();
 //             }
@@ -272,7 +269,6 @@ impl Expr {
 //         output
 //     }
 // }
-
 
 // pub fn save_dot_file(ast: &AST, filename: &str) {
 //     let dot_representation = ast.to_dot();

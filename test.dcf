@@ -1,4 +1,4 @@
 void main ( ) {
-
-    l = long(x); // should be able to parse casts
+  Int b;
+  // should be int
 }

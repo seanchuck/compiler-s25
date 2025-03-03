@@ -1,8 +1,8 @@
 /*
 Data structure for creating symbol tables.
 
-Symbol table AST is a tree similar to the result of the 
-parse, but augmented with scope to have 
+Symbol table AST is a tree similar to the result of the
+parse, but augmented with scope to have
 tronger semantic understanding of the program.
 
 The following non-terminals create new scopes:
@@ -11,9 +11,10 @@ The following non-terminals create new scopes:
     - method
 */
 
-use crate::ast::{BinaryOp,Type, UnaryOp};
+use crate::ast::{BinaryOp, Type, UnaryOp};
 use crate::scope::{Scope, TableEntry};
-use crate::token::Literal; use std::cell::RefCell;
+use crate::token::Literal;
+use std::cell::RefCell;
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -31,8 +32,8 @@ pub enum SymNode {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct SymProgram {
-    pub global_scope: Rc<RefCell<Scope>>,  // Holds local vars and methods
-    pub methods: HashMap<String, Rc<SymMethod>>,  // Methods are shared references
+    pub global_scope: Rc<RefCell<Scope>>, // Holds local vars and methods
+    pub methods: HashMap<String, Rc<SymMethod>>, // Methods are shared references
 }
 
 /// Represents a method in the IR
@@ -42,15 +43,15 @@ pub struct SymMethod {
     pub name: String,
     pub return_type: Type,
     pub params: Vec<(Type, String)>,
-    pub scope: Rc<RefCell<Scope>>,  // Stores local variables
-    pub body: SymBlock, // Statements are reference-counted
+    pub scope: Rc<RefCell<Scope>>, // Stores local variables
+    pub body: SymBlock,            // Statements are reference-counted
 }
 
 /// Represents a block of statements in the IR
 #[derive(Debug)]
 pub struct SymBlock {
-    pub scope: Rc<RefCell<Scope>>,  // Holds variables declared inside the block
-    pub statements: Vec<Rc<IRStatement>>,  // Statements in this block
+    pub scope: Rc<RefCell<Scope>>, // Holds variables declared inside the block
+    pub statements: Vec<Rc<IRStatement>>, // Statements in this block
 }
 
 /// IR representation for statements

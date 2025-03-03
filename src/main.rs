@@ -8,9 +8,9 @@ mod scope;
 mod symtable;
 mod token;
 
-mod semcheck;
 mod parse;
 mod scan;
+mod semcheck;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {

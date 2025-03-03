@@ -1,11 +1,10 @@
 /*
-The symbol table stores only essential type information 
+The symbol table stores only essential type information
 needed for semantic validation, rather than full AST nodes.
 */
 
 use crate::ast::Type;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
-
 
 /// Represents a scope in semantic analysis, containing:
 ///     - A symbol table that maps variable and method names to TableEntry
@@ -16,7 +15,7 @@ pub struct Scope {
     // mutability as needed
     pub parent: Option<Rc<RefCell<Scope>>>,
     pub table: HashMap<String, TableEntry>,
-    pub id: Option<String> // for debugging purposes
+    pub id: Option<String>, // for debugging purposes
 }
 
 /// Symbol table entry type, representing locally-
@@ -40,7 +39,6 @@ pub enum TableEntry {
 
 /// Functions for creating new scopes
 
-
 /// Scope Functions
 impl Scope {
     pub fn new() -> Self {
@@ -52,7 +50,11 @@ impl Scope {
     }
 
     pub fn add_child(parent: Rc<RefCell<Scope>>) -> Self {
-        let parent_id = parent.borrow_mut().id.clone().unwrap_or_else(|| "??".to_string());
+        let parent_id = parent
+            .borrow_mut()
+            .id
+            .clone()
+            .unwrap_or_else(|| "??".to_string());
 
         Scope {
             table: HashMap::new(),

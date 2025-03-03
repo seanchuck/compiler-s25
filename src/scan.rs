@@ -38,7 +38,6 @@ fn consume(program: &mut Vec<char>, current_col: &mut i32, nchar: i32) {
     }
 }
 
-
 /// Consume all whitespace characters before the next
 /// token or EOF.
 fn gobble_whitespace(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) {
@@ -56,7 +55,6 @@ fn gobble_whitespace(program: &mut Vec<char>, current_line: &mut i32, current_co
         }
     }
 }
-
 
 /// Attempts to gobble a comment.
 /// Throws an error if a block comment is not closed.
@@ -128,12 +126,12 @@ fn lex_numeric_helper(
             }
             'L' => {
                 consume(program, current_col, 1);
-                
+
                 let literal_value = match is_hex {
                     true => Literal::HexLong(nliteral.clone()),
                     false => Literal::Long(nliteral.clone()),
                 };
-                
+
                 return Ok(Token::Literal {
                     value: literal_value,
                     span: Span {
@@ -211,7 +209,7 @@ fn lex_keyword_or_identifier(
             break;
         }
     }
-    
+
     let span = Span {
         sline: start_line,
         scol: start_col,
@@ -285,7 +283,7 @@ fn lex_keyword_or_identifier(
             span: span.clone(),
             display: "void".to_string(),
         },
-    
+
         // Boolean literals
         "false" => Token::Literal {
             value: Literal::Bool(false),
@@ -297,7 +295,7 @@ fn lex_keyword_or_identifier(
             span: span.clone(),
             display: "true".to_string(),
         },
-    
+
         // Identifiers
         _ => Token::Identifier {
             value: keyword_or_identifier.clone(),
@@ -305,11 +303,8 @@ fn lex_keyword_or_identifier(
             display: keyword_or_identifier.clone(),
         },
     };
-    
-    return Ok(token);
-    
-    
 
+    return Ok(token);
 }
 
 /// Lex a string literal, identified by a leading quotation mark.
@@ -322,7 +317,7 @@ fn lex_string_literal(
     let mut sliteral = String::new();
     let start_line = *current_line;
     let start_col = *current_col;
-    
+
     consume(program, current_col, 1);
 
     while let Some(&char1) = program.get(0) {
@@ -350,7 +345,6 @@ fn lex_string_literal(
                     },
                     display: sliteral.clone(),
                 });
-                
             }
             '\'' => return Err(anyhow!("Illegal single quote in string literal")),
             '\\' => match program.get(0) {
@@ -449,7 +443,6 @@ fn lex_char_literal(
                 },
                 display: char_value.to_string(),
             })
-            
         }
         _ => Err(anyhow!("Character literal missing closing quote")),
     }
@@ -470,10 +463,10 @@ fn get_next_token(
         let span = Span {
             sline: *current_line,
             scol: *current_col,
-            eline: *current_line, // Assuming single-token span initially
+            eline: *current_line,   // Assuming single-token span initially
             ecol: *current_col + 1, // Adjust for token width
         };
-    
+
         // Attempt to match length-2 symbols first
         if let Some(&char2) = program.get(1) {
             let token = match (char1, char2) {
@@ -544,13 +537,13 @@ fn get_next_token(
                 }),
                 _ => None,
             };
-    
+
             if let Some(token) = token {
                 consume(program, current_col, 2);
                 return Ok(token);
             }
         }
-    
+
         // Match single-character symbols
         let token = match char1 {
             '(' => Some(Token::Symbol {
@@ -638,7 +631,7 @@ fn get_next_token(
                 span: span.clone(),
                 display: "!".to_string(),
             }),
-    
+
             // These fn handle their own consumption
             '\'' => return lex_char_literal(program, current_line, current_col),
             '"' => return lex_string_literal(program, current_line, current_col),
@@ -718,9 +711,7 @@ pub fn scan(
                     Token::Keyword { span, .. }
                     | Token::Identifier { span, .. }
                     | Token::Literal { span, .. }
-                    | Token::Symbol { span, .. } => {
-                        span.sline
-                    }     
+                    | Token::Symbol { span, .. } => span.sline,
                 };
 
                 // extract token display for non-special tokens
@@ -728,16 +719,17 @@ pub fn scan(
                     Token::Keyword { display, .. }
                     | Token::Identifier { display, .. }
                     | Token::Literal { display, .. }
-                    | Token::Symbol { display, .. } => {
-                        display.as_str()
-                    }
+                    | Token::Symbol { display, .. } => display.as_str(),
                 };
-        
+
                 let template_string = match &token {
                     Token::Identifier { value, .. } => {
                         format!("{} IDENTIFIER {}", line_number, value)
                     }
-                    Token::Literal { value: Literal::Char(text), .. } => {
+                    Token::Literal {
+                        value: Literal::Char(text),
+                        ..
+                    } => {
                         let display_char = match text {
                             '\n' => "\\n".to_string(),
                             '\t' => "\\t".to_string(),
@@ -750,29 +742,47 @@ pub fn scan(
                         };
                         format!("{} CHARLITERAL \'{}\'", line_number, display_char)
                     }
-                    Token::Literal { value: Literal::String(text), .. } => {
+                    Token::Literal {
+                        value: Literal::String(text),
+                        ..
+                    } => {
                         format!("{} STRINGLITERAL \"{}\"", line_number, text)
                     }
-                    Token::Literal { value: Literal::Int(value), .. } => {
+                    Token::Literal {
+                        value: Literal::Int(value),
+                        ..
+                    } => {
                         format!("{} INTLITERAL {}", line_number, value)
                     }
-                    Token::Literal { value: Literal::Long(value), .. } => {
+                    Token::Literal {
+                        value: Literal::Long(value),
+                        ..
+                    } => {
                         format!("{} LONGLITERAL {}L", line_number, value)
                     }
-                    Token::Literal { value: Literal::HexInt(value), .. } => {
+                    Token::Literal {
+                        value: Literal::HexInt(value),
+                        ..
+                    } => {
                         format!("{} INTLITERAL 0x{}", line_number, value)
                     }
-                    Token::Literal { value: Literal::HexLong(value), .. } => {
+                    Token::Literal {
+                        value: Literal::HexLong(value),
+                        ..
+                    } => {
                         format!("{} LONGLITERAL 0x{}L", line_number, value)
                     }
-                    Token::Literal { value: Literal::Bool(value), .. } => {
+                    Token::Literal {
+                        value: Literal::Bool(value),
+                        ..
+                    } => {
                         format!("{} BOOLEANLITERAL {}", line_number, value)
                     }
                     _ => {
                         format!("{} {}", line_number, token_display)
                     }
                 };
-        
+
                 if debug {
                     writeln!(writer, "{}", template_string)
                         .expect("Failed to write error to stdout!");

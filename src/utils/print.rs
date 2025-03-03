@@ -18,7 +18,6 @@
 //         .expect("Unable to write file");
 // }
 
-
 // /// Implementation of the AST to allow tree visualization with GraphViz
 // /// The parser will save the file to `parse_ast.dot` if --debug is passed
 // impl AST {
@@ -89,7 +88,6 @@
 //     }
 // }
 
-
 // // #################################################
 // // PRETTY PRINT SYMBOL TABLE TREE
 // // #################################################
@@ -98,7 +96,7 @@
 // pub fn print_symtree(ir: &SymProgram) {
 //     println!("SymProgram {{");
 //     print_scope(&ir.global_scope, 2);
-    
+
 //     println!("\n  methods: {{");
 //     for (name, method) in &ir.methods {
 //         println!("\n    \"{}\":", name);
@@ -110,36 +108,36 @@
 // /// Pretty-print an IR method
 // fn print_method(method: &Rc<SymMethod>, indent: usize) {
 //     let indent_str = " ".repeat(indent);
-    
+
 //     println!("{}SymMethod {{", indent_str);
 //     println!("{}  name: \"{}\",", indent_str, method.name);
 //     println!("{}  return_type: {:?},", indent_str, method.return_type);
 //     println!("{}  params: {:?},", indent_str, method.params);
-    
+
 //     println!("\n{}  scope:", indent_str);
 //     print_scope(&method.scope, indent + 4);
-    
+
 //     println!("\n{}  body:", indent_str);
 //     print_block(&method.body, indent + 4);
-    
+
 //     println!("{}}}", indent_str);
 // }
 
 // /// Pretty-print an IR block
 // fn print_block(block: &SymBlock, indent: usize) {
 //     let indent_str = " ".repeat(indent);
-    
+
 //     println!("{}SymBlock {{", indent_str);
-    
+
 //     println!("\n{}  scope:", indent_str);
 //     print_scope(&block.scope, indent + 4);
-    
+
 //     println!("\n{}  statements: [", indent_str);
 //     for stmt in &block.statements {
 //         println!("{}    {:?},", indent_str, stmt);
 //     }
 //     println!("{}  ]", indent_str);
-    
+
 //     println!("{}}}", indent_str);
 // }
 
@@ -155,7 +153,7 @@
 
 //     println!("{}Scope {{", indent_str);
 //     println!("{}  parent: \"{}\",", indent_str, parent_id);
-    
+
 //     println!("\n{}  table: {{", indent_str);
 //     for (_, entry) in &scope.table {
 //         match entry {

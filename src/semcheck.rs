@@ -2,7 +2,6 @@
 // Perform semantic checks on the AST produced by parsing.
 // Build a symbol table to enable these checks.
 // */
-
 // use core::panic;
 // use std::cell::RefCell;
 // use std::rc::Rc;
@@ -13,12 +12,9 @@
 // use crate::scope::*;
 // use crate::utils::print::*;
 
-
-
 // // #################################################
 // // AST --> SYMBOL TABLE AST CONSTRUCTION
 // // #################################################
-
 
 // /// Builds the IR representation of a program
 // pub fn build_symbol_table(ast: &AST) -> SymProgram {
@@ -68,7 +64,7 @@
 //                     }
 //                     _ => {panic!("expected method")}
 //                 }
-                
+
 //             }
 
 //             SymProgram {
@@ -112,7 +108,6 @@
 //         _ => panic!("Expected AST::MethodDecl"),
 //     }
 // }
-
 
 // /// Builds an IR representation of a block
 // pub fn build_block(block: &AST, parent_scope: Rc<RefCell<Scope>>) -> SymBlock {
@@ -186,8 +181,6 @@
 //     }
 // }
 
-
-
 // /// Build IR representation of statement
 // pub fn build_statement(statement: &AST, scope: Rc<RefCell<Scope>>) -> IRStatement {
 //     // println!("statment ios  {:#?}", statement);
@@ -230,7 +223,7 @@
 //                 typ: Type::Int, // TODO: Determine type dynamically
 //                 is_array: false,
 //             });
-        
+
 //             // Ensure `update` is correctly converted into an expression
 //             let update_expr = match update.as_ref() {
 //                 AST::Statement(Statement::Assignment { location, expr, op: _ }) => {
@@ -242,7 +235,7 @@
 //                 }
 //                 _ => panic!("For loop update must be an assignment statement, got: {:#?}", update),
 //             };
-        
+
 //             IRStatement::For {
 //                 var: var.clone(),
 //                 init: build_expr(init, Rc::clone(&scope)),
@@ -251,7 +244,6 @@
 //                 block: Rc::new(build_block(block, Rc::clone(&scope))),
 //             }
 //         }
-        
 
 //         AST::Statement(Statement::Return { expr }) => IRStatement::Return {
 //             expr: expr.as_ref().map(|e| build_expr(e, Rc::clone(&scope))),
@@ -308,7 +300,6 @@
 //     }
 // }
 
-
 // // #################################################
 // // SEMANTIC CHECKING
 // // #################################################
@@ -331,7 +322,6 @@
 
 // // }
 
-
 // /// Generates the IR from an AST
 // pub fn check_semantics(
 //     file: &str,
@@ -343,7 +333,6 @@
 //     // save_dot_file(&parse_tree, "parse_tree");
 //     let sym_tree = build_symbol_table(&parse_tree);
 //     println!("succesffully built symbol table!!!!!");
-
 
 //     if verbose {
 //         // println!("{:#?}", scoped_tree);

@@ -21,7 +21,7 @@ pub enum Token {
     Keyword {
         value: Keyword,
         span: Span,
-        display: String
+        display: String,
     },
     Identifier {
         value: String,
@@ -37,7 +37,7 @@ pub enum Token {
         value: Literal,
         span: Span,
         display: String,
-    }
+    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -115,7 +115,6 @@ pub enum Literal {
     HexLong(String),
     Bool(bool),
 }
-
 
 /// A public wrapper around a slice of `Token`s to enable custom trait implementations.
 /// Parser combinator `nom` requires implement custom trait `Input` to use combinators like
