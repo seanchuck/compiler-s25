@@ -1,0 +1,15 @@
+"// This is a comment
+
+/* 
+This is a multi-line comment
+*/
+
+class Main {
+    a = 5;
+    void main() {
+        if (a > 0) {
+            Print("Hello, World!");
+        }
+    }
+}
+"

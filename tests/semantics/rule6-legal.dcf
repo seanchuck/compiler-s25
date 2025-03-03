@@ -1,0 +1,9 @@
+import foo;
+
+void main() {
+    int x;            // ✅ Declare `x` correctly
+    int x_arr[3];     // ✅ Correct array declaration
+
+    foo("hello");     // ✅ Passing a string literal to an imported function is valid
+    foo(x_arr);       // ✅ Passing an array is valid for imports
+}
