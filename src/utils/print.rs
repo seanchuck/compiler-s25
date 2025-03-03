@@ -2,8 +2,8 @@
 // use std::fmt::Write;
 // use std::fs::File;
 // use std::io::Write as ioWrite;
-use crate::symtable::*;
 use crate::scope::*;
+use crate::symtable::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -148,7 +148,11 @@ fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
     let scope = scope.borrow();
 
     let parent_id = match &scope.parent {
-        Some(parent) => parent.borrow().id.clone().unwrap_or_else(|| "Unknown".to_string()),
+        Some(parent) => parent
+            .borrow()
+            .id
+            .clone()
+            .unwrap_or_else(|| "Unknown".to_string()),
         None => "None".to_string(),
     };
 
@@ -158,14 +162,24 @@ fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
     println!("\n{}  table: {{", indent_str);
     for (_, entry) in &scope.table {
         match entry {
-            TableEntry::Variable { name, typ, is_array, span } => {
+            TableEntry::Variable {
+                name,
+                typ,
+                is_array,
+                span,
+            } => {
                 let array_str = if *is_array { "[]" } else { "" };
                 println!(
                     "{}    \"{}\": Variable {{ typ: {:?}{}, span: {:?} }},",
                     indent_str, name, typ, array_str, span
                 );
             }
-            TableEntry::Method { name, return_type, params, span } => {
+            TableEntry::Method {
+                name,
+                return_type,
+                params,
+                span,
+            } => {
                 println!(
                     "{}    \"{}\": Method {{ return_type: {:?}, params: {:?}, span: {:?} }},",
                     indent_str, name, return_type, params, span

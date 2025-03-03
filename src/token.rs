@@ -6,7 +6,7 @@ use std::ops::Deref;
 
 /// Span keep track of line information
 /// to throw more specific errors.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Span {
     pub sline: i32,
     pub scol: i32,
@@ -105,7 +105,7 @@ pub enum Punctuation {
     Comma,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Literal {
     Char(char),
     String(String),

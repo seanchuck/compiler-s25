@@ -109,7 +109,7 @@ fn build_binary_expr(left: AST, op: BinaryOp, right: AST) -> AST {
 
 fn extract_span_from_token(token: &Token) -> Span {
     match token {
-        Token::Keyword { span, .. } 
+        Token::Keyword { span, .. }
         | Token::Identifier { span, .. }
         | Token::Symbol { span, .. }
         | Token::Literal { span, .. } => span.clone(),
@@ -132,7 +132,6 @@ fn _parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
         nom::error::ErrorKind::Tag,
     )))
 }
-
 
 // #################################################
 // TAG GENERATORS
@@ -702,10 +701,12 @@ fn parse_if(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, condition) = parse_expr(input)?;
     let (input, _) = tag_punctuation_gen(Punctuation::RightParen)(input)?;
     let (input, then_block) = parse_block(input)?;
-    let (input, else_block) = opt(preceded(tag_keyword_gen(Keyword::Else), parse_block)).parse(input)?;
+    let (input, else_block) =
+        opt(preceded(tag_keyword_gen(Keyword::Else), parse_block)).parse(input)?;
 
     // Merge spans: `if` to the end of the last block (either `else` or `then`)
-    let end_span = else_block.as_ref()
+    let end_span = else_block
+        .as_ref()
         .map(|blk| get_span(blk))
         .unwrap_or_else(|| get_span(&then_block));
     let full_span = merge_spans(&if_span, &end_span);
@@ -772,7 +773,6 @@ fn parse_while_loop(input: TokenSlice) -> IResult<TokenSlice, AST> {
         }),
     ))
 }
-
 
 fn parse_break_continue(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let parse_result = ((
@@ -1073,7 +1073,6 @@ fn parse_method_call_or_string_literal(input: TokenSlice) -> IResult<TokenSlice,
     alt((parse_expr, parse_string_literal)).parse(input)
 }
 
-
 fn parse_method_call(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, method_name) = parse_identifier(input)?;
     let (input, (_, _)) = tag_punctuation_gen(Punctuation::LeftParen)(input)?;
@@ -1099,7 +1098,6 @@ fn parse_method_call(input: TokenSlice) -> IResult<TokenSlice, AST> {
         }),
     ))
 }
-
 
 fn parse_block(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, (_, left_span)) = tag_punctuation_gen(Punctuation::LeftBrace)(input)?; // `{`
@@ -1173,7 +1171,6 @@ fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     ))
 }
 
-
 fn parse_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, field_type) = parse_type(input)?;
     let (input, fields) = separated_list1(
@@ -1198,7 +1195,6 @@ fn parse_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
         },
     ))
 }
-
 
 fn parse_id_or_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     alt((parse_array_field_decl, parse_identifier)).parse(input)
@@ -1242,8 +1238,6 @@ fn parse_program(input: TokenSlice) -> IResult<TokenSlice, AST> {
     ))
 }
 
-
-
 /// Input: a sequence of tokens produced by the scanner.
 /// Effects:
 ///    - Verifies that tokens conform to valid Decaf via the language specification
@@ -1251,7 +1245,7 @@ fn parse_program(input: TokenSlice) -> IResult<TokenSlice, AST> {
 pub fn parse(
     file: &str,
     filename: &str,
-    writer: &mut Box<dyn std::io::Write>,
+    writer: &mut dyn std::io::Write,
     debug: bool,
 ) -> Option<AST> {
     let tokens: Vec<Token> = scan(file, filename, writer, false);
@@ -1269,24 +1263,29 @@ pub fn parse(
                 writeln!(writer, "{}", template_string).expect("Failed to write output!");
             }
             Some(parse_tree)
-        },
+        }
 
         // Print parse error message
         Err(_parse_error) => {
             let error_message = format!(
                 "\nPARSING ERROR! Invalid tokens:\n{}",
-                tokens.iter()
+                tokens
+                    .iter()
                     .map(|token| {
                         let span = extract_span_from_token(token);
-                        format!("  → `{}` at line {}, column {}", get_token_display(token), span.sline, span.scol)
+                        format!(
+                            "  → `{}` at line {}, column {}",
+                            get_token_display(token),
+                            span.sline,
+                            span.scol
+                        )
                     })
                     .collect::<Vec<_>>()
                     .join("\n")
             );
-        
+
             writeln!(writer, "{}", error_message).expect("Failed to write error to stdout!");
             panic!("Parsing failed.");
         }
-        
     }
 }

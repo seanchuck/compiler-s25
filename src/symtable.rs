@@ -57,6 +57,7 @@ pub struct SymBlock {
 }
 
 /// IR representation for statements
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum SymStatement {
     VarDecl {
@@ -107,6 +108,7 @@ pub enum SymStatement {
 }
 
 /// IR representation for expressions
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum SymExpr {
     Literal {

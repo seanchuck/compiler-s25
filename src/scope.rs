@@ -3,8 +3,8 @@ The symbol table stores only essential type information
 needed for semantic validation, rather than full AST nodes.
 */
 
-use crate::token::Span;
 use crate::ast::Type;
+use crate::token::Span;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 /// Represents a scope in semantic analysis, containing:

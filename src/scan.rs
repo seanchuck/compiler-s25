@@ -668,7 +668,7 @@ fn get_next_token(
 pub fn scan(
     file: &str,
     filename: &str,
-    writer: &mut Box<dyn std::io::Write>,
+    writer: &mut dyn std::io::Write,
     debug: bool,
 ) -> Vec<Token> {
     let mut program: Vec<char> = file.chars().collect();

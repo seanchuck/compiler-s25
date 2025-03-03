@@ -9,7 +9,7 @@ PASS: public-tests/phase1-parser/public/legal/legal-01.dcf
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-02.dcf -t inter
 ----------------------------------------
-
+digit is 10
 PASS: public-tests/phase1-parser/public/legal/legal-02.dcf
 
 
@@ -23,13 +23,13 @@ PASS: public-tests/phase1-parser/public/legal/legal-03.dcf
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-04.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-04.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -72,7 +72,7 @@ PASS: public-tests/phase1-parser/public/legal/legal-09.dcf
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-10.dcf -t inter
 ----------------------------------------
-
+digit is 200
 PASS: public-tests/phase1-parser/public/legal/legal-10.dcf
 
 
@@ -86,14 +86,16 @@ PASS: public-tests/phase1-parser/public/legal/legal-11.dcf
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-12.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:40:77:
-Invalid array size: ParseIntError { kind: InvalidDigit }
+digit is A
+thread 'main' panicked at src/semcheck.rs:49:77:
+Invalid array size: "A": ParseIntError { kind: InvalidDigit }
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-12.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:40:77:
-Invalid array size: ParseIntError { kind: InvalidDigit }
+digit is A
+thread 'main' panicked at src/semcheck.rs:49:77:
+Invalid array size: "A": ParseIntError { kind: InvalidDigit }
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 
@@ -156,13 +158,13 @@ PASS: public-tests/phase1-parser/public/legal/legal-20.dcf
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-21.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `b` used before declaration at line 4, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-21.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `b` used before declaration at line 4, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -170,161 +172,21 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-22.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "b",
-                index: Expr(
-                    BinaryExpr {
-                        op: Add,
-                        left: Expr(
-                            Literal {
-                                lit: Int(
-                                    "4",
-                                ),
-                                span: Span {
-                                    sline: 7,
-                                    scol: 5,
-                                    eline: 7,
-                                    ecol: 6,
-                                },
-                            },
-                        ),
-                        right: Identifier {
-                            id: "i",
-                            span: Span {
-                                sline: 7,
-                                scol: 7,
-                                eline: 7,
-                                ecol: 8,
-                            },
-                        },
-                        span: Span {
-                            sline: 7,
-                            scol: 5,
-                            eline: 7,
-                            ecol: 8,
-                        },
-                    },
-                ),
-                span: Span {
-                    sline: 7,
-                    scol: 3,
-                    eline: 7,
-                    ecol: 8,
-                },
-            },
-        ),
-        expr: Expr(
-            Literal {
-                lit: Int(
-                    "524",
-                ),
-                span: Span {
-                    sline: 7,
-                    scol: 12,
-                    eline: 7,
-                    ecol: 15,
-                },
-            },
-        ),
-        op: Assign,
-        span: Span {
-            sline: 7,
-            scol: 3,
-            eline: 7,
-            ecol: 15,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-22.dcf)
-
-Error details:
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "b",
-                index: Expr(
-                    BinaryExpr {
-                        op: Add,
-                        left: Expr(
-                            Literal {
-                                lit: Int(
-                                    "4",
-                                ),
-                                span: Span {
-                                    sline: 7,
-                                    scol: 5,
-                                    eline: 7,
-                                    ecol: 6,
-                                },
-                            },
-                        ),
-                        right: Identifier {
-                            id: "i",
-                            span: Span {
-                                sline: 7,
-                                scol: 7,
-                                eline: 7,
-                                ecol: 8,
-                            },
-                        },
-                        span: Span {
-                            sline: 7,
-                            scol: 5,
-                            eline: 7,
-                            ecol: 8,
-                        },
-                    },
-                ),
-                span: Span {
-                    sline: 7,
-                    scol: 3,
-                    eline: 7,
-                    ecol: 8,
-                },
-            },
-        ),
-        expr: Expr(
-            Literal {
-                lit: Int(
-                    "524",
-                ),
-                span: Span {
-                    sline: 7,
-                    scol: 12,
-                    eline: 7,
-                    ecol: 15,
-                },
-            },
-        ),
-        op: Assign,
-        span: Span {
-            sline: 7,
-            scol: 3,
-            eline: 7,
-            ecol: 15,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+digit is 24
+digit is 200
+PASS: public-tests/phase1-parser/public/legal/legal-22.dcf
 
 
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-23.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `b` used before declaration at line 3, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-23.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `b` used before declaration at line 3, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -332,345 +194,35 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-24.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "b",
-                index: Expr(
-                    BinaryExpr {
-                        op: Add,
-                        left: Expr(
-                            Literal {
-                                lit: Int(
-                                    "4",
-                                ),
-                                span: Span {
-                                    sline: 8,
-                                    scol: 5,
-                                    eline: 8,
-                                    ecol: 6,
-                                },
-                            },
-                        ),
-                        right: Identifier {
-                            id: "i",
-                            span: Span {
-                                sline: 8,
-                                scol: 7,
-                                eline: 8,
-                                ecol: 8,
-                            },
-                        },
-                        span: Span {
-                            sline: 8,
-                            scol: 5,
-                            eline: 8,
-                            ecol: 8,
-                        },
-                    },
-                ),
-                span: Span {
-                    sline: 8,
-                    scol: 3,
-                    eline: 8,
-                    ecol: 8,
-                },
-            },
-        ),
-        expr: Expr(
-            Literal {
-                lit: Int(
-                    "524",
-                ),
-                span: Span {
-                    sline: 8,
-                    scol: 12,
-                    eline: 8,
-                    ecol: 15,
-                },
-            },
-        ),
-        op: Assign,
-        span: Span {
-            sline: 8,
-            scol: 3,
-            eline: 8,
-            ecol: 15,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-24.dcf)
-
-Error details:
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "b",
-                index: Expr(
-                    BinaryExpr {
-                        op: Add,
-                        left: Expr(
-                            Literal {
-                                lit: Int(
-                                    "4",
-                                ),
-                                span: Span {
-                                    sline: 8,
-                                    scol: 5,
-                                    eline: 8,
-                                    ecol: 6,
-                                },
-                            },
-                        ),
-                        right: Identifier {
-                            id: "i",
-                            span: Span {
-                                sline: 8,
-                                scol: 7,
-                                eline: 8,
-                                ecol: 8,
-                            },
-                        },
-                        span: Span {
-                            sline: 8,
-                            scol: 5,
-                            eline: 8,
-                            ecol: 8,
-                        },
-                    },
-                ),
-                span: Span {
-                    sline: 8,
-                    scol: 3,
-                    eline: 8,
-                    ecol: 8,
-                },
-            },
-        ),
-        expr: Expr(
-            Literal {
-                lit: Int(
-                    "524",
-                ),
-                span: Span {
-                    sline: 8,
-                    scol: 12,
-                    eline: 8,
-                    ecol: 15,
-                },
-            },
-        ),
-        op: Assign,
-        span: Span {
-            sline: 8,
-            scol: 3,
-            eline: 8,
-            ecol: 15,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+digit is 24
+digit is 200
+PASS: public-tests/phase1-parser/public/legal/legal-24.dcf
 
 
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-25.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "A",
-                index: Identifier {
-                    id: "i",
-                    span: Span {
-                        sline: 5,
-                        scol: 7,
-                        eline: 5,
-                        ecol: 8,
-                    },
-                },
-                span: Span {
-                    sline: 5,
-                    scol: 5,
-                    eline: 5,
-                    ecol: 8,
-                },
-            },
-        ),
-        expr: Identifier {
-            id: "i",
-            span: Span {
-                sline: 5,
-                scol: 12,
-                eline: 5,
-                ecol: 13,
-            },
-        },
-        op: Assign,
-        span: Span {
-            sline: 5,
-            scol: 5,
-            eline: 5,
-            ecol: 13,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-25.dcf)
-
-Error details:
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "A",
-                index: Identifier {
-                    id: "i",
-                    span: Span {
-                        sline: 5,
-                        scol: 7,
-                        eline: 5,
-                        ecol: 8,
-                    },
-                },
-                span: Span {
-                    sline: 5,
-                    scol: 5,
-                    eline: 5,
-                    ecol: 8,
-                },
-            },
-        ),
-        expr: Identifier {
-            id: "i",
-            span: Span {
-                sline: 5,
-                scol: 12,
-                eline: 5,
-                ecol: 13,
-            },
-        },
-        op: Assign,
-        span: Span {
-            sline: 5,
-            scol: 5,
-            eline: 5,
-            ecol: 13,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+digit is 10
+PASS: public-tests/phase1-parser/public/legal/legal-25.dcf
 
 
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-27.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "A",
-                index: Identifier {
-                    id: "i",
-                    span: Span {
-                        sline: 5,
-                        scol: 7,
-                        eline: 5,
-                        ecol: 8,
-                    },
-                },
-                span: Span {
-                    sline: 5,
-                    scol: 5,
-                    eline: 5,
-                    ecol: 8,
-                },
-            },
-        ),
-        expr: Identifier {
-            id: "i",
-            span: Span {
-                sline: 5,
-                scol: 12,
-                eline: 5,
-                ecol: 13,
-            },
-        },
-        op: Assign,
-        span: Span {
-            sline: 5,
-            scol: 5,
-            eline: 5,
-            ecol: 13,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-27.dcf)
-
-Error details:
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "A",
-                index: Identifier {
-                    id: "i",
-                    span: Span {
-                        sline: 5,
-                        scol: 7,
-                        eline: 5,
-                        ecol: 8,
-                    },
-                },
-                span: Span {
-                    sline: 5,
-                    scol: 5,
-                    eline: 5,
-                    ecol: 8,
-                },
-            },
-        ),
-        expr: Identifier {
-            id: "i",
-            span: Span {
-                sline: 5,
-                scol: 12,
-                eline: 5,
-                ecol: 13,
-            },
-        },
-        op: Assign,
-        span: Span {
-            sline: 5,
-            scol: 5,
-            eline: 5,
-            ecol: 13,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+digit is 10
+PASS: public-tests/phase1-parser/public/legal/legal-27.dcf
 
 
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-28.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-28.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -685,13 +237,13 @@ PASS: public-tests/phase1-parser/public/legal/legal-29.dcf
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-30.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-30.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -699,13 +251,13 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-31.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:348:17:
+thread 'main' panicked at src/semcheck.rs:388:17:
 Variable `a` used before declaration at line 2, column 8
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-31.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:348:17:
+thread 'main' panicked at src/semcheck.rs:388:17:
 Variable `a` used before declaration at line 2, column 8
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -713,13 +265,13 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-32.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:348:17:
+thread 'main' panicked at src/semcheck.rs:388:17:
 Variable `a` used before declaration at line 2, column 8
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-32.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:348:17:
+thread 'main' panicked at src/semcheck.rs:388:17:
 Variable `a` used before declaration at line 2, column 8
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -727,13 +279,13 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-33.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:348:17:
+thread 'main' panicked at src/semcheck.rs:388:17:
 Variable `b` used before declaration at line 3, column 14
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-33.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:348:17:
+thread 'main' panicked at src/semcheck.rs:388:17:
 Variable `b` used before declaration at line 3, column 14
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -741,121 +293,27 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-34.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "a",
-                index: Expr(
-                    Literal {
-                        lit: Int(
-                            "5",
-                        ),
-                        span: Span {
-                            sline: 2,
-                            scol: 5,
-                            eline: 2,
-                            ecol: 6,
-                        },
-                    },
-                ),
-                span: Span {
-                    sline: 2,
-                    scol: 3,
-                    eline: 2,
-                    ecol: 6,
-                },
-            },
-        ),
-        expr: Expr(
-            Literal {
-                lit: Char(
-                    '\t',
-                ),
-                span: Span {
-                    sline: 2,
-                    scol: 11,
-                    eline: 2,
-                    ecol: 14,
-                },
-            },
-        ),
-        op: Assign,
-        span: Span {
-            sline: 2,
-            scol: 3,
-            eline: 2,
-            ecol: 14,
-        },
-    },
-)
+thread 'main' panicked at src/semcheck.rs:249:25:
+Array `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-34.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "a",
-                index: Expr(
-                    Literal {
-                        lit: Int(
-                            "5",
-                        ),
-                        span: Span {
-                            sline: 2,
-                            scol: 5,
-                            eline: 2,
-                            ecol: 6,
-                        },
-                    },
-                ),
-                span: Span {
-                    sline: 2,
-                    scol: 3,
-                    eline: 2,
-                    ecol: 6,
-                },
-            },
-        ),
-        expr: Expr(
-            Literal {
-                lit: Char(
-                    '	',
-                ),
-                span: Span {
-                    sline: 2,
-                    scol: 11,
-                    eline: 2,
-                    ecol: 14,
-                },
-            },
-        ),
-        op: Assign,
-        span: Span {
-            sline: 2,
-            scol: 3,
-            eline: 2,
-            ecol: 14,
-        },
-    },
-)
+thread 'main' panicked at src/semcheck.rs:249:25:
+Array `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-35.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:348:17:
+thread 'main' panicked at src/semcheck.rs:388:17:
 Variable `a` used before declaration at line 2, column 9
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-35.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:348:17:
+thread 'main' panicked at src/semcheck.rs:388:17:
 Variable `a` used before declaration at line 2, column 9
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -863,20 +321,20 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-36.dcf -t inter
 ----------------------------------------
-
+digit is 7
 PASS: public-tests/phase1-parser/public/legal/legal-36.dcf
 
 
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-37.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-37.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -884,13 +342,13 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-38.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-38.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -898,13 +356,13 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-39.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-39.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -919,13 +377,13 @@ PASS: public-tests/phase1-parser/public/legal/legal-40.dcf
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-41.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:348:17:
+thread 'main' panicked at src/semcheck.rs:388:17:
 Variable `a` used before declaration at line 2, column 8
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-41.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:348:17:
+thread 'main' panicked at src/semcheck.rs:388:17:
 Variable `a` used before declaration at line 2, column 8
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -940,93 +398,8 @@ PASS: public-tests/phase1-parser/public/legal/legal-42.dcf
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-43.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "A",
-                index: Identifier {
-                    id: "i",
-                    span: Span {
-                        sline: 5,
-                        scol: 7,
-                        eline: 5,
-                        ecol: 8,
-                    },
-                },
-                span: Span {
-                    sline: 5,
-                    scol: 5,
-                    eline: 5,
-                    ecol: 8,
-                },
-            },
-        ),
-        expr: Identifier {
-            id: "i",
-            span: Span {
-                sline: 5,
-                scol: 12,
-                eline: 5,
-                ecol: 13,
-            },
-        },
-        op: Assign,
-        span: Span {
-            sline: 5,
-            scol: 5,
-            eline: 5,
-            ecol: 13,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-43.dcf)
-
-Error details:
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "A",
-                index: Identifier {
-                    id: "i",
-                    span: Span {
-                        sline: 5,
-                        scol: 7,
-                        eline: 5,
-                        ecol: 8,
-                    },
-                },
-                span: Span {
-                    sline: 5,
-                    scol: 5,
-                    eline: 5,
-                    ecol: 8,
-                },
-            },
-        ),
-        expr: Identifier {
-            id: "i",
-            span: Span {
-                sline: 5,
-                scol: 12,
-                eline: 5,
-                ecol: 13,
-            },
-        },
-        op: Assign,
-        span: Span {
-            sline: 5,
-            scol: 5,
-            eline: 5,
-            ecol: 13,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+digit is 10
+PASS: public-tests/phase1-parser/public/legal/legal-43.dcf
 
 
 ========================================
@@ -1039,13 +412,13 @@ PASS: public-tests/phase1-parser/public/legal/legal-45.dcf
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-46.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-46.dcf)
 
 Error details:
-thread 'main' panicked at src/semcheck.rs:216:21:
+thread 'main' panicked at src/semcheck.rs:228:25:
 Variable `a` used before declaration at line 2, column 3
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
@@ -1088,308 +461,20 @@ PASS: public-tests/phase1-parser/public/legal/legal-51.dcf
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-52.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:355:14:
-========
-Error in build_expr: unexpected AST node:
- Expr(
-    Cast {
-        target_type: Long,
-        expr: Expr(
-            BinaryExpr {
-                op: Multiply,
-                left: Expr(
-                    Cast {
-                        target_type: Int,
-                        expr: Expr(
-                            BinaryExpr {
-                                op: Multiply,
-                                left: Expr(
-                                    Cast {
-                                        target_type: Long,
-                                        expr: Identifier {
-                                            id: "x",
-                                            span: Span {
-                                                sline: 5,
-                                                scol: 23,
-                                                eline: 5,
-                                                ecol: 24,
-                                            },
-                                        },
-                                        span: Span {
-                                            sline: 5,
-                                            scol: 18,
-                                            eline: 5,
-                                            ecol: 24,
-                                        },
-                                    },
-                                ),
-                                right: Expr(
-                                    Cast {
-                                        target_type: Long,
-                                        expr: Identifier {
-                                            id: "y",
-                                            span: Span {
-                                                sline: 5,
-                                                scol: 33,
-                                                eline: 5,
-                                                ecol: 34,
-                                            },
-                                        },
-                                        span: Span {
-                                            sline: 5,
-                                            scol: 28,
-                                            eline: 5,
-                                            ecol: 34,
-                                        },
-                                    },
-                                ),
-                                span: Span {
-                                    sline: 5,
-                                    scol: 17,
-                                    eline: 5,
-                                    ecol: 36,
-                                },
-                            },
-                        ),
-                        span: Span {
-                            sline: 5,
-                            scol: 14,
-                            eline: 5,
-                            ecol: 36,
-                        },
-                    },
-                ),
-                right: Expr(
-                    Literal {
-                        lit: Int(
-                            "2",
-                        ),
-                        span: Span {
-                            sline: 5,
-                            scol: 39,
-                            eline: 5,
-                            ecol: 40,
-                        },
-                    },
-                ),
-                span: Span {
-                    sline: 5,
-                    scol: 13,
-                    eline: 5,
-                    ecol: 41,
-                },
-            },
-        ),
-        span: Span {
-            sline: 5,
-            scol: 9,
-            eline: 5,
-            ecol: 41,
-        },
-    },
-)
-========
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-52.dcf)
 
-Error details:
-thread 'main' panicked at src/semcheck.rs:355:14:
-========
-Error in build_expr: unexpected AST node:
- Expr(
-    Cast {
-        target_type: Long,
-        expr: Expr(
-            BinaryExpr {
-                op: Multiply,
-                left: Expr(
-                    Cast {
-                        target_type: Int,
-                        expr: Expr(
-                            BinaryExpr {
-                                op: Multiply,
-                                left: Expr(
-                                    Cast {
-                                        target_type: Long,
-                                        expr: Identifier {
-                                            id: "x",
-                                            span: Span {
-                                                sline: 5,
-                                                scol: 23,
-                                                eline: 5,
-                                                ecol: 24,
-                                            },
-                                        },
-                                        span: Span {
-                                            sline: 5,
-                                            scol: 18,
-                                            eline: 5,
-                                            ecol: 24,
-                                        },
-                                    },
-                                ),
-                                right: Expr(
-                                    Cast {
-                                        target_type: Long,
-                                        expr: Identifier {
-                                            id: "y",
-                                            span: Span {
-                                                sline: 5,
-                                                scol: 33,
-                                                eline: 5,
-                                                ecol: 34,
-                                            },
-                                        },
-                                        span: Span {
-                                            sline: 5,
-                                            scol: 28,
-                                            eline: 5,
-                                            ecol: 34,
-                                        },
-                                    },
-                                ),
-                                span: Span {
-                                    sline: 5,
-                                    scol: 17,
-                                    eline: 5,
-                                    ecol: 36,
-                                },
-                            },
-                        ),
-                        span: Span {
-                            sline: 5,
-                            scol: 14,
-                            eline: 5,
-                            ecol: 36,
-                        },
-                    },
-                ),
-                right: Expr(
-                    Literal {
-                        lit: Int(
-                            "2",
-                        ),
-                        span: Span {
-                            sline: 5,
-                            scol: 39,
-                            eline: 5,
-                            ecol: 40,
-                        },
-                    },
-                ),
-                span: Span {
-                    sline: 5,
-                    scol: 13,
-                    eline: 5,
-                    ecol: 41,
-                },
-            },
-        ),
-        span: Span {
-            sline: 5,
-            scol: 9,
-            eline: 5,
-            ecol: 41,
-        },
-    },
-)
-========
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+PASS: public-tests/phase1-parser/public/legal/legal-52.dcf
 
 
 ========================================
 Running: ../run.sh public-tests/phase1-parser/public/legal/legal-53.dcf -t inter
 ----------------------------------------
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "memoization",
-                index: Identifier {
-                    id: "n",
-                    span: Span {
-                        sline: 35,
-                        scol: 17,
-                        eline: 35,
-                        ecol: 18,
-                    },
-                },
-                span: Span {
-                    sline: 35,
-                    scol: 5,
-                    eline: 35,
-                    ecol: 18,
-                },
-            },
-        ),
-        expr: Identifier {
-            id: "res",
-            span: Span {
-                sline: 35,
-                scol: 22,
-                eline: 35,
-                ecol: 25,
-            },
-        },
-        op: Assign,
-        span: Span {
-            sline: 35,
-            scol: 5,
-            eline: 35,
-            ecol: 25,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-FAIL: Unexpected error occurred. (public-tests/phase1-parser/public/legal/legal-53.dcf)
-
-Error details:
-thread 'main' panicked at src/semcheck.rs:228:17:
-Unsupported assignment target in AST: Statement(
-    Assignment {
-        location: Expr(
-            ArrAccess {
-                id: "memoization",
-                index: Identifier {
-                    id: "n",
-                    span: Span {
-                        sline: 35,
-                        scol: 17,
-                        eline: 35,
-                        ecol: 18,
-                    },
-                },
-                span: Span {
-                    sline: 35,
-                    scol: 5,
-                    eline: 35,
-                    ecol: 18,
-                },
-            },
-        ),
-        expr: Identifier {
-            id: "res",
-            span: Span {
-                sline: 35,
-                scol: 22,
-                eline: 35,
-                ecol: 25,
-            },
-        },
-        op: Assign,
-        span: Span {
-            sline: 35,
-            scol: 5,
-            eline: 35,
-            ecol: 25,
-        },
-    },
-)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+digit is 2
+digit is 100
+digit is 100
+PASS: public-tests/phase1-parser/public/legal/legal-53.dcf
 
 
 ========================================
 Execution completed. Results saved in symtable_test_results.out.
-Total Passed: 28
-Total Failed: 23
+Total Passed: 35
+Total Failed: 16

@@ -14,7 +14,7 @@ This may lead to BUGS(!) so be sure to check the validity.
 use crate::token::{Literal, Span};
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 pub enum AST {
     Program {
         imports: Vec<Box<AST>>,
@@ -62,7 +62,7 @@ pub enum AST {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 pub struct Param {
     pub typ: Type,
     pub name: Box<AST>,
@@ -70,7 +70,7 @@ pub struct Param {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 pub enum Statement {
     Assignment {
         location: Box<AST>,
@@ -119,27 +119,8 @@ pub enum Statement {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 pub enum Expr {
-    ArrAccess {
-        id: String,
-        index: Box<AST>,
-        span: Span,
-    },
-    MethodCall {
-        method_name: String,
-        args: Vec<Box<AST>>,
-        span: Span,
-    },
-    Literal {
-        lit: Literal,
-        span: Span,
-    },
-    Cast {
-        target_type: Type,
-        expr: Box<AST>,
-        span: Span,
-    },
     UnaryExpr {
         op: UnaryOp,
         expr: Box<AST>,
@@ -151,13 +132,32 @@ pub enum Expr {
         right: Box<AST>,
         span: Span,
     },
+    ArrAccess {
+        id: String,
+        index: Box<AST>,
+        span: Span,
+    },
+    MethodCall {
+        method_name: String,
+        args: Vec<Box<AST>>,
+        span: Span,
+    },
+    Cast {
+        target_type: Type,
+        expr: Box<AST>,
+        span: Span,
+    },
     Len {
         id: Box<AST>,
         span: Span,
     },
+    Literal {
+        lit: Literal,
+        span: Span,
+    },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -174,12 +174,13 @@ pub enum BinaryOp {
     Or,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum UnaryOp {
     Neg,
     Not,
 }
-#[derive(Debug)]
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum AssignOp {
     Assign,
     PlusAssign,
@@ -189,7 +190,7 @@ pub enum AssignOp {
     ModuloAssign,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Type {
     Int,
     Long,
