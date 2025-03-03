@@ -61,6 +61,7 @@ pub enum AST {
     Empty,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Param {
     pub typ: Type,
@@ -156,7 +157,7 @@ pub enum Expr {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -173,7 +174,7 @@ pub enum BinaryOp {
     Or,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryOp {
     Neg,
     Not,

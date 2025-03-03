@@ -46,7 +46,7 @@ fn main() {
             parse::parse(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Inter => {
-            // semcheck::check_semantics(&input, &filename, &mut writer, args.debug);
+            semcheck::check_semantics(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Assembly => {
             todo!("assembly");

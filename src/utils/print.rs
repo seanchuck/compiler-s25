@@ -1,15 +1,14 @@
 // use crate::ast::*;
-// use crate::symtable::*;
-// use crate::scope::*;
-
-// use std::cell::RefCell;
 // use std::fmt::Write;
 // use std::fs::File;
 // use std::io::Write as ioWrite;
-// use std::rc::Rc;
+use crate::symtable::*;
+use crate::scope::*;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-// /// --> run `dot -Tpng ast.dot -o ast.png` to generate the png file.
-// /// and visualize tree with GraphViz.
+/// --> run `dot -Tpng ast.dot -o ast.png` to generate the png file.
+/// and visualize tree with GraphViz.
 // pub fn save_dot_file(ast: &AST, filename: &str) {
 //     println!("saving.....");
 //     let dot_representation = ast.to_dot();
@@ -88,88 +87,93 @@
 //     }
 // }
 
-// // #################################################
-// // PRETTY PRINT SYMBOL TABLE TREE
-// // #################################################
+// #################################################
+// PRETTY PRINT SYMBOL TABLE TREE
+// #################################################
+/// Pretty-print an IR program
+pub fn print_symtree(ir: &SymProgram) {
+    println!("SymProgram {{");
+    println!("  span: {:?},", ir.span);
+    print_scope(&ir.global_scope, 2);
 
-// /// Pretty-print an IR program
-// pub fn print_symtree(ir: &SymProgram) {
-//     println!("SymProgram {{");
-//     print_scope(&ir.global_scope, 2);
+    println!("\n  methods: {{");
+    for (name, method) in &ir.methods {
+        println!("\n    \"{}\":", name);
+        print_method(method, 6);
+    }
+    println!("  }}\n}}");
+}
 
-//     println!("\n  methods: {{");
-//     for (name, method) in &ir.methods {
-//         println!("\n    \"{}\":", name);
-//         print_method(method, 6);
-//     }
-//     println!("  }}\n}}");
-// }
+/// Pretty-print an IR method
+fn print_method(method: &Rc<SymMethod>, indent: usize) {
+    let indent_str = " ".repeat(indent);
 
-// /// Pretty-print an IR method
-// fn print_method(method: &Rc<SymMethod>, indent: usize) {
-//     let indent_str = " ".repeat(indent);
+    println!("{}SymMethod {{", indent_str);
+    println!("{}  name: \"{}\",", indent_str, method.name);
+    println!("{}  return_type: {:?},", indent_str, method.return_type);
+    println!("{}  params: {:?},", indent_str, method.params);
+    println!("{}  span: {:?},", indent_str, method.span);
 
-//     println!("{}SymMethod {{", indent_str);
-//     println!("{}  name: \"{}\",", indent_str, method.name);
-//     println!("{}  return_type: {:?},", indent_str, method.return_type);
-//     println!("{}  params: {:?},", indent_str, method.params);
+    println!("\n{}  scope:", indent_str);
+    print_scope(&method.scope, indent + 4);
 
-//     println!("\n{}  scope:", indent_str);
-//     print_scope(&method.scope, indent + 4);
+    println!("\n{}  body:", indent_str);
+    print_block(&method.body, indent + 4);
 
-//     println!("\n{}  body:", indent_str);
-//     print_block(&method.body, indent + 4);
+    println!("{}}}", indent_str);
+}
 
-//     println!("{}}}", indent_str);
-// }
+/// Pretty-print an IR block
+fn print_block(block: &SymBlock, indent: usize) {
+    let indent_str = " ".repeat(indent);
 
-// /// Pretty-print an IR block
-// fn print_block(block: &SymBlock, indent: usize) {
-//     let indent_str = " ".repeat(indent);
+    println!("{}SymBlock {{", indent_str);
+    println!("{}  span: {:?},", indent_str, block.span);
 
-//     println!("{}SymBlock {{", indent_str);
+    println!("\n{}  scope:", indent_str);
+    print_scope(&block.scope, indent + 4);
 
-//     println!("\n{}  scope:", indent_str);
-//     print_scope(&block.scope, indent + 4);
+    println!("\n{}  statements: [", indent_str);
+    for stmt in &block.statements {
+        println!("{}    {:?},", indent_str, stmt);
+    }
+    println!("{}  ]", indent_str);
 
-//     println!("\n{}  statements: [", indent_str);
-//     for stmt in &block.statements {
-//         println!("{}    {:?},", indent_str, stmt);
-//     }
-//     println!("{}  ]", indent_str);
+    println!("{}}}", indent_str);
+}
 
-//     println!("{}}}", indent_str);
-// }
+/// Pretty-print a scope while keeping the parent ID instead of full scope details
+fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
+    let indent_str = " ".repeat(indent);
+    let scope = scope.borrow();
 
-// /// Pretty-print a scope while keeping the parent ID instead of full scope details
-// fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
-//     let indent_str = " ".repeat(indent);
-//     let scope = scope.borrow();
+    let parent_id = match &scope.parent {
+        Some(parent) => parent.borrow().id.clone().unwrap_or_else(|| "Unknown".to_string()),
+        None => "None".to_string(),
+    };
 
-//     let parent_id = match &scope.parent {
-//         Some(parent) => parent.borrow().id.clone().unwrap_or_else(|| "Unknown".to_string()),
-//         None => "None".to_string(),
-//     };
+    println!("{}Scope {{", indent_str);
+    println!("{}  parent: \"{}\",", indent_str, parent_id);
 
-//     println!("{}Scope {{", indent_str);
-//     println!("{}  parent: \"{}\",", indent_str, parent_id);
-
-//     println!("\n{}  table: {{", indent_str);
-//     for (_, entry) in &scope.table {
-//         match entry {
-//             TableEntry::Variable { name, typ, is_array } => {
-//                 let array_str = if *is_array { "[]" } else { "" };
-//                 println!("{}    \"{}\": Variable {{ typ: {:?}{} }},", indent_str, name, typ, array_str);
-//             }
-//             TableEntry::Method { name, return_type, params } => {
-//                 println!(
-//                     "{}    \"{}\": Method {{ return_type: {:?}, params: {:?} }},",
-//                     indent_str, name, return_type, params
-//                 );
-//             }
-//         }
-//     }
-//     println!("{}  }},\n", indent_str);
-//     println!("{}  id: {:?},", indent_str, scope.id);
-//     println!("{}}}", indent_str);
-// }
+    println!("\n{}  table: {{", indent_str);
+    for (_, entry) in &scope.table {
+        match entry {
+            TableEntry::Variable { name, typ, is_array, span } => {
+                let array_str = if *is_array { "[]" } else { "" };
+                println!(
+                    "{}    \"{}\": Variable {{ typ: {:?}{}, span: {:?} }},",
+                    indent_str, name, typ, array_str, span
+                );
+            }
+            TableEntry::Method { name, return_type, params, span } => {
+                println!(
+                    "{}    \"{}\": Method {{ return_type: {:?}, params: {:?}, span: {:?} }},",
+                    indent_str, name, return_type, params, span
+                );
+            }
+        }
+    }
+    println!("{}  }},\n", indent_str);
+    println!("{}  id: {:?},", indent_str, scope.id);
+    println!("{}}}", indent_str);
+}

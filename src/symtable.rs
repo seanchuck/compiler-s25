@@ -13,13 +13,13 @@ The following non-terminals create new scopes:
 
 use crate::ast::{BinaryOp, Type, UnaryOp};
 use crate::scope::{Scope, TableEntry};
-use crate::token::Literal;
+use crate::token::{Literal, Span};
 use std::cell::RefCell;
 
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// The root intermediate representation (IR) enum
+/// The root for the symbol table AST
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum SymNode {
@@ -28,12 +28,12 @@ pub enum SymNode {
     Block(SymBlock),
 }
 
-/// Represents the IR structure of a program
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct SymProgram {
     pub global_scope: Rc<RefCell<Scope>>, // Holds local vars and methods
     pub methods: HashMap<String, Rc<SymMethod>>, // Methods are shared references
+    pub span: Span,
 }
 
 /// Represents a method in the IR
@@ -42,86 +42,111 @@ pub struct SymProgram {
 pub struct SymMethod {
     pub name: String,
     pub return_type: Type,
-    pub params: Vec<(Type, String)>,
+    pub params: Vec<(Type, String, Span)>,
     pub scope: Rc<RefCell<Scope>>, // Stores local variables
     pub body: SymBlock,            // Statements are reference-counted
+    pub span: Span,
 }
 
 /// Represents a block of statements in the IR
 #[derive(Debug)]
 pub struct SymBlock {
     pub scope: Rc<RefCell<Scope>>, // Holds variables declared inside the block
-    pub statements: Vec<Rc<IRStatement>>, // Statements in this block
+    pub statements: Vec<Rc<SymStatement>>, // Statements in this block
+    pub span: Span,
 }
 
 /// IR representation for statements
 #[derive(Debug)]
-pub enum IRStatement {
+pub enum SymStatement {
     VarDecl {
         name: String,
         typ: Type,
         is_array: bool,
+        span: Span,
     },
     Assignment {
         target: String,
-        expr: IRExpr,
+        expr: SymExpr,
+        span: Span,
     },
     MethodCall {
         method_name: String,
-        args: Vec<IRExpr>,
+        args: Vec<SymExpr>,
+        span: Span,
     },
     If {
-        condition: IRExpr,
+        condition: SymExpr,
         then_block: Rc<SymBlock>,
         else_block: Option<Rc<SymBlock>>,
+        span: Span,
     },
     While {
-        condition: IRExpr,
+        condition: SymExpr,
         block: Rc<SymBlock>,
+        span: Span,
     },
     For {
         var: String,
-        init: IRExpr,
-        condition: IRExpr,
-        update: IRExpr,
+        init: SymExpr,
+        condition: SymExpr,
+        update: SymExpr,
         block: Rc<SymBlock>,
+        span: Span,
     },
     Return {
-        expr: Option<IRExpr>,
+        expr: Option<SymExpr>,
+        span: Span,
     },
-    Break,
-    Continue,
+    Break {
+        span: Span,
+    },
+    Continue {
+        span: Span,
+    },
 }
 
 /// IR representation for expressions
 #[derive(Debug)]
-pub enum IRExpr {
-    Literal(Literal),
-    Identifier(TableEntry),
+pub enum SymExpr {
+    Literal {
+        value: Literal,
+        span: Span,
+    },
+    Identifier {
+        entry: TableEntry,
+        span: Span,
+    },
     ArrayAccess {
         id: String,
-        index: Rc<IRExpr>,
+        index: Rc<SymExpr>,
+        span: Span,
     },
     MethodCall {
         method_name: String,
-        args: Vec<Rc<IRExpr>>,
+        args: Vec<Rc<SymExpr>>,
+        span: Span,
     },
     BinaryExpr {
         op: BinaryOp,
-        left: Rc<IRExpr>,
-        right: Rc<IRExpr>,
+        left: Rc<SymExpr>,
+        right: Rc<SymExpr>,
         typ: Type,
+        span: Span,
     },
     UnaryExpr {
         op: UnaryOp,
-        expr: Rc<IRExpr>,
+        expr: Rc<SymExpr>,
         typ: Type,
+        span: Span,
     },
     Cast {
         target_type: Type,
-        expr: Rc<IRExpr>,
+        expr: Rc<SymExpr>,
+        span: Span,
     },
     Len {
         id: String,
+        span: Span,
     },
 }

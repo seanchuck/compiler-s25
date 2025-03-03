@@ -107,6 +107,33 @@ fn build_binary_expr(left: AST, op: BinaryOp, right: AST) -> AST {
     })
 }
 
+fn extract_span_from_token(token: &Token) -> Span {
+    match token {
+        Token::Keyword { span, .. } 
+        | Token::Identifier { span, .. }
+        | Token::Symbol { span, .. }
+        | Token::Literal { span, .. } => span.clone(),
+    }
+}
+
+fn get_token_display(token: &Token) -> String {
+    match token {
+        Token::Keyword { display, .. }
+        | Token::Identifier { display, .. }
+        | Token::Symbol { display, .. }
+        | Token::Literal { display, .. } => display.clone(),
+    }
+}
+
+/// Always errors for testing
+fn _parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Tag,
+    )))
+}
+
+
 // #################################################
 // TAG GENERATORS
 // #################################################
@@ -196,7 +223,6 @@ fn parse_identifier(input: TokenSlice) -> IResult<TokenSlice, AST> {
             },
         ))
     } else {
-        println!("ident failed with seq: {:#?}", input);
         Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
@@ -670,111 +696,83 @@ fn parse_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
         Err(e) => Err(e),
     }
 }
-
 fn parse_if(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    let parse_result = ((
-        tag_keyword_gen(Keyword::If), // This returns a tuple, not an AST node
-        tag_punctuation_gen(Punctuation::LeftParen),
-        parse_expr,
-        tag_punctuation_gen(Punctuation::RightParen),
-        parse_block,
-        opt((tag_keyword_gen(Keyword::Else), parse_block).map(|(_, block)| block)),
+    let (input, (_, if_span)) = tag_keyword_gen(Keyword::If)(input)?;
+    let (input, _) = tag_punctuation_gen(Punctuation::LeftParen)(input)?;
+    let (input, condition) = parse_expr(input)?;
+    let (input, _) = tag_punctuation_gen(Punctuation::RightParen)(input)?;
+    let (input, then_block) = parse_block(input)?;
+    let (input, else_block) = opt(preceded(tag_keyword_gen(Keyword::Else), parse_block)).parse(input)?;
+
+    // Merge spans: `if` to the end of the last block (either `else` or `then`)
+    let end_span = else_block.as_ref()
+        .map(|blk| get_span(blk))
+        .unwrap_or_else(|| get_span(&then_block));
+    let full_span = merge_spans(&if_span, &end_span);
+
+    Ok((
+        input,
+        AST::Statement(Statement::If {
+            condition: Box::new(condition),
+            then_block: Box::new(then_block),
+            else_block: else_block.map(Box::new),
+            span: full_span,
+        }),
     ))
-        .parse(input);
-
-    match parse_result {
-        Ok((input, ((_, if_span), _, condition, _, then_block, else_block))) => {
-            let span = match &else_block {
-                Some(else_blk) => merge_spans(&if_span, &get_span(else_blk)),
-                None => merge_spans(&if_span, &get_span(&then_block)),
-            };
-
-            Ok((
-                input,
-                AST::Statement(Statement::If {
-                    condition: Box::new(condition),
-                    then_block: Box::new(then_block),
-                    else_block: else_block.map(Box::new),
-                    span,
-                }),
-            ))
-        }
-        Err(e) => Err(e),
-    }
 }
+
 fn parse_for_loop(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    let parse_result = ((
-        tag_keyword_gen(Keyword::For), // This returns a tuple
-        tag_punctuation_gen(Punctuation::LeftParen),
-        parse_identifier,
-        tag_operator_gen(Operator::Assign),
-        parse_expr,
-        tag_punctuation_gen(Punctuation::Semicolon),
-        parse_expr,
-        tag_punctuation_gen(Punctuation::Semicolon),
-        parse_for_update,
-        tag_punctuation_gen(Punctuation::RightParen),
-        parse_block,
+    let (input, (_, for_span)) = tag_keyword_gen(Keyword::For)(input)?;
+    let (input, _) = tag_punctuation_gen(Punctuation::LeftParen)(input)?;
+    let (input, id) = parse_identifier(input)?;
+    let (input, _) = tag_operator_gen(Operator::Assign)(input)?;
+    let (input, init) = parse_expr(input)?;
+    let (input, _) = tag_punctuation_gen(Punctuation::Semicolon)(input)?;
+    let (input, condition) = parse_expr(input)?;
+    let (input, _) = tag_punctuation_gen(Punctuation::Semicolon)(input)?;
+    let (input, update) = parse_for_update(input)?;
+    let (input, _) = tag_punctuation_gen(Punctuation::RightParen)(input)?;
+    let (input, body) = parse_block(input)?;
+
+    // Merge spans: `for` to `}` of the loop body
+    let full_span = merge_spans(&for_span, &get_span(&body));
+
+    Ok((
+        input,
+        AST::Statement(Statement::For {
+            var: match id {
+                AST::Identifier { id, .. } => id,
+                _ => panic!("Expected identifier"),
+            },
+            init: Box::new(init),
+            condition: Box::new(condition),
+            update: Box::new(update),
+            block: Box::new(body),
+            span: full_span,
+        }),
     ))
-        .parse(input);
-
-    match parse_result {
-        Ok((input, ((_, for_span), _, id, _, init, _, cond, _, update, _, body))) => {
-            if let AST::Identifier {
-                id: loop_var,
-                span: _,
-            } = id
-            {
-                let span = merge_spans(&for_span, &get_span(&body));
-
-                Ok((
-                    input,
-                    AST::Statement(Statement::For {
-                        var: loop_var,
-                        init: Box::new(init),
-                        condition: Box::new(cond),
-                        update: Box::new(update),
-                        block: Box::new(body),
-                        span,
-                    }),
-                ))
-            } else {
-                Err(nom::Err::Error(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Tag,
-                )))
-            }
-        }
-        Err(e) => Err(e),
-    }
 }
 
 fn parse_while_loop(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    let parse_result = ((
-        tag_keyword_gen(Keyword::While),
-        tag_punctuation_gen(Punctuation::LeftParen),
-        parse_expr,
-        tag_punctuation_gen(Punctuation::RightParen),
-        parse_block,
+    let (input, (_, while_span)) = tag_keyword_gen(Keyword::While)(input)?;
+    let (input, _) = tag_punctuation_gen(Punctuation::LeftParen)(input)?;
+    let (input, condition) = parse_expr(input)?;
+    let (input, _) = tag_punctuation_gen(Punctuation::RightParen)(input)?;
+    let (input, body) = parse_block(input)?;
+
+    // Merge spans: `while` to `}` of the loop body
+    let full_span = merge_spans(&while_span, &get_span(&body));
+
+    Ok((
+        input,
+        AST::Statement(Statement::While {
+            condition: Box::new(condition),
+            block: Box::new(body),
+            span: full_span,
+        }),
     ))
-        .parse(input);
-
-    match parse_result {
-        Ok((input, ((_, while_span), _, expr, _, body))) => {
-            let span = merge_spans(&while_span, &get_span(&body));
-
-            Ok((
-                input,
-                AST::Statement(Statement::While {
-                    condition: Box::new(expr),
-                    block: Box::new(body),
-                    span,
-                }),
-            ))
-        }
-        Err(e) => Err(e),
-    }
 }
+
 
 fn parse_break_continue(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let parse_result = ((
@@ -914,55 +912,27 @@ fn parse_assignexpr(input: TokenSlice) -> IResult<TokenSlice, AST> {
     ))
     .parse(input)
 }
-
 fn parse_assign_to_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    let parse_result = (parse_location, parse_assignexpr).parse(input);
+    let (input, location) = parse_location(input)?;
+    let (input, assignment) = parse_assignexpr(input)?;
 
-    match parse_result {
-        Ok((input, (loc, assign))) => {
-            let location = match loc {
-                AST::Identifier { id, span } => AST::Identifier { id, span },
-                AST::Expr(Expr::ArrAccess { id, index, span }) => {
-                    AST::Expr(Expr::ArrAccess { id, index, span })
-                }
-                _ => {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Tag,
-                    )))
-                }
-            };
+    let (expr, op, assign_span) = match assignment {
+        AST::Statement(Statement::Assignment { expr, op, span, .. }) => (expr, op, span),
+        _ => panic!("Expected assignment statement"),
+    };
 
-            let (expr, op, assign_span) = match assign {
-                AST::Statement(Statement::Assignment {
-                    location: _,
-                    expr,
-                    op,
-                    span,
-                }) => (expr, op, span),
-                _ => {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Tag,
-                    )))
-                }
-            };
+    // Ensure span extends from `location` to `assignment`
+    let full_span = merge_spans(&get_span(&location), &assign_span);
 
-            // Merge spans: assignment statement should cover from `location` to `assign_span`
-            let full_span = merge_spans(&get_span(&location), &assign_span);
-
-            Ok((
-                input,
-                AST::Statement(Statement::Assignment {
-                    location: Box::new(location),
-                    expr,
-                    op,
-                    span: full_span, // Ensure the assignment node has a correct span
-                }),
-            ))
-        }
-        Err(e) => Err(e),
-    }
+    Ok((
+        input,
+        AST::Statement(Statement::Assignment {
+            location: Box::new(location),
+            expr,
+            op,
+            span: full_span,
+        }),
+    ))
 }
 
 fn parse_for_update(input: TokenSlice) -> IResult<TokenSlice, AST> {
@@ -972,6 +942,7 @@ fn parse_for_update(input: TokenSlice) -> IResult<TokenSlice, AST> {
 // #################################################
 // TOP-LEVEL STRUCTURES
 // #################################################
+
 fn parse_statement(input: TokenSlice) -> IResult<TokenSlice, AST> {
     alt((
         // location assignment
@@ -1102,44 +1073,33 @@ fn parse_method_call_or_string_literal(input: TokenSlice) -> IResult<TokenSlice,
     alt((parse_expr, parse_string_literal)).parse(input)
 }
 
+
 fn parse_method_call(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, method_name) = parse_identifier(input)?;
-    let (input, _) = tag_punctuation_gen(Punctuation::LeftParen)(input)?;
+    let (input, (_, _)) = tag_punctuation_gen(Punctuation::LeftParen)(input)?;
     let (input, args) = separated_list0(
         tag_punctuation_gen(Punctuation::Comma),
         parse_method_call_or_string_literal,
     )
     .parse(input)?;
-    let (input, _) = tag_punctuation_gen(Punctuation::RightParen)(input)?; // No span, so handle differently
+    let (input, (_, end_span)) = tag_punctuation_gen(Punctuation::RightParen)(input)?;
 
-    if let AST::Identifier {
-        id,
-        span: method_span,
-    } = method_name
-    {
-        // Determine the correct span for the full method call
-        let last_arg_span = args
-            .last()
-            .map(|arg| get_span(arg)) // Use last argument's span if available
-            .unwrap_or(method_span.clone()); // Otherwise, fallback to method name's span
+    // Ensure span extends from method name to `)`
+    let full_span = merge_spans(&get_span(&method_name), &end_span);
 
-        let full_span = merge_spans(&method_span, &last_arg_span);
-
-        return Ok((
-            input,
-            AST::Expr(Expr::MethodCall {
-                method_name: id,
-                args: args.into_iter().map(Box::new).collect(),
-                span: full_span, // Full span of `method(args)`
-            }),
-        ));
-    }
-
-    Err(nom::Err::Error(nom::error::Error::new(
+    Ok((
         input,
-        nom::error::ErrorKind::Tag,
-    )))
+        AST::Expr(Expr::MethodCall {
+            method_name: match method_name {
+                AST::Identifier { id, .. } => id,
+                _ => panic!("Expected identifier for method name"),
+            },
+            args: args.into_iter().map(Box::new).collect(),
+            span: full_span,
+        }),
+    ))
 }
+
 
 fn parse_block(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, (_, left_span)) = tag_punctuation_gen(Punctuation::LeftBrace)(input)?; // `{`
@@ -1147,26 +1107,18 @@ fn parse_block(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, statements) = many0(parse_statement).parse(input)?;
     let (input, (_, right_span)) = tag_punctuation_gen(Punctuation::RightBrace)(input)?; // `}`
 
-    // Determine the last valid span
-    let last_span = statements
-        .last()
-        .map(get_span) // Use last statement's span
-        .or_else(|| field_decls.last().map(get_span)) // Otherwise, use last field's span
-        .unwrap_or(left_span.clone()); // Otherwise, fallback to `{` span
-
-    // Merge left brace and last element (or right brace for empty blocks)
-    let full_span = merge_spans(&left_span, &last_span);
+    // Ensure the span always extends from `{` to `}`
+    let full_span = merge_spans(&left_span, &right_span);
 
     Ok((
         input,
         AST::Block {
             field_decls: field_decls.into_iter().map(Box::new).collect(),
             statements: statements.into_iter().map(Box::new).collect(),
-            span: full_span, // Properly merged span
+            span: full_span, // Ensures span correctly covers `{ ... }`
         },
     ))
 }
-
 fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, return_type) = alt((
         map(tag_keyword_gen(Keyword::Void), |(_, span)| AST::Type {
@@ -1179,7 +1131,6 @@ fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
 
     let (input, method_name) = parse_identifier(input)?;
     let (input, _) = tag_punctuation_gen(Punctuation::LeftParen)(input)?;
-
     let (input, params) = separated_list0(
         tag_punctuation_gen(Punctuation::Comma),
         map(
@@ -1198,11 +1149,10 @@ fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
         ),
     )
     .parse(input)?;
-
     let (input, _) = tag_punctuation_gen(Punctuation::RightParen)(input)?;
     let (input, body) = parse_block(input)?;
 
-    // Determine full span (from `return_type` to closing `}`)
+    // Ensure span extends from method return type to `}` of body
     let full_span = merge_spans(&get_span(&return_type), &get_span(&body));
 
     Ok((
@@ -1214,12 +1164,7 @@ fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
             },
             name: match method_name {
                 AST::Identifier { id, .. } => id,
-                _ => {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Tag,
-                    )))
-                }
+                _ => panic!("Expected identifier for method name"),
             },
             params,
             block: Box::new(body),
@@ -1228,24 +1173,18 @@ fn parse_method_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     ))
 }
 
+
 fn parse_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, field_type) = parse_type(input)?;
-
     let (input, fields) = separated_list1(
         tag_punctuation_gen(Punctuation::Comma),
         parse_id_or_array_field_decl,
     )
     .parse(input)?;
+    let (input, (_, semicolon_span)) = tag_punctuation_gen(Punctuation::Semicolon)(input)?;
 
-    let (input, (_, _)) = tag_punctuation_gen(Punctuation::Semicolon)(input)?; // ✅ Track `;`
-
-    // Use last field's span, otherwise fallback to type's span
-    let last_span = fields
-        .last()
-        .map(|field| get_span(field).clone())
-        .unwrap_or_else(|| get_span(&field_type).clone());
-
-    let full_span = merge_spans(&get_span(&field_type), &last_span);
+    // Ensure span extends from field type to `;`
+    let full_span = merge_spans(&get_span(&field_type), &semicolon_span);
 
     Ok((
         input,
@@ -1260,16 +1199,16 @@ fn parse_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     ))
 }
 
+
 fn parse_id_or_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     alt((parse_array_field_decl, parse_identifier)).parse(input)
 }
-
 fn parse_program(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, import_decls) = many0(parse_import_decl).parse(input)?;
     let (input, field_decls) = many0(parse_field_decl).parse(input)?;
     let (input, method_decls) = many0(parse_method_decl).parse(input)?;
 
-    // Determine the overall span of the program
+    // Determine the overall span from first to last token
     let first_span = import_decls
         .first()
         .map(get_span)
@@ -1303,33 +1242,6 @@ fn parse_program(input: TokenSlice) -> IResult<TokenSlice, AST> {
     ))
 }
 
-/// Always errors for testing
-fn _parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
-    Err(nom::Err::Error(nom::error::Error::new(
-        input,
-        nom::error::ErrorKind::Tag,
-    )))
-}
-
-
-fn extract_span_from_token(token: &Token) -> Span {
-    match token {
-        Token::Keyword { span, .. } 
-        | Token::Identifier { span, .. }
-        | Token::Symbol { span, .. }
-        | Token::Literal { span, .. } => span.clone(),
-    }
-}
-
-
-fn get_token_display(token: &Token) -> String {
-    match token {
-        Token::Keyword { display, .. }
-        | Token::Identifier { display, .. }
-        | Token::Symbol { display, .. }
-        | Token::Literal { display, .. } => display.clone(),
-    }
-}
 
 
 /// Input: a sequence of tokens produced by the scanner.
@@ -1351,7 +1263,7 @@ pub fn parse(
                 // run `dot -Tpng ast.dot -o ast.png` from the CLI to generate a GraphViz of the AST
                 // save_dot_file(&parse_tree, "parse_ast.dot");
                 let template_string = format!(
-                    "===============SUCCESSFUL PARSE!===============\n Parse tree: {:?}",
+                    "===============SUCCESSFUL PARSE!===============\n Parse tree: {:#?}",
                     parse_tree
                 );
                 writeln!(writer, "{}", template_string).expect("Failed to write output!");

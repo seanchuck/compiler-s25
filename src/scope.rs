@@ -3,6 +3,7 @@ The symbol table stores only essential type information
 needed for semantic validation, rather than full AST nodes.
 */
 
+use crate::token::Span;
 use crate::ast::Type;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
@@ -29,17 +30,17 @@ pub enum TableEntry {
         name: String,
         typ: Type,
         is_array: bool,
+        span: Span,
     },
     Method {
         name: String,
         return_type: Type,
         params: Vec<(Type, String)>,
+        span: Span,
     },
 }
 
 /// Functions for creating new scopes
-
-/// Scope Functions
 impl Scope {
     pub fn new() -> Self {
         Scope {
