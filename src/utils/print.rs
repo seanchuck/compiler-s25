@@ -157,7 +157,7 @@ fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
     };
 
     println!("{}**SCOPE** {{", indent_str);
-    
+
     // Print ID first
     println!("{}  id: {:?},", indent_str, scope.id);
 
@@ -189,7 +189,7 @@ fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
                     "{}    \"{}\": Method {{ return_type: {:?}, params: {:?}, span: {:?} }},",
                     indent_str, name, return_type, params, span
                 );
-            },
+            }
             TableEntry::Import { name, span } => {
                 println!(
                     "{}    \"{}\": Import {{ return_type: int,span: {:?} }},",

@@ -133,8 +133,6 @@ fn _parse_always_fail(input: TokenSlice) -> IResult<TokenSlice, AST> {
     )))
 }
 
-
-
 // #################################################
 // TAG GENERATORS
 // #################################################
@@ -1201,6 +1199,7 @@ fn parse_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
 fn parse_id_or_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
     alt((parse_array_field_decl, parse_identifier)).parse(input)
 }
+
 fn parse_program(input: TokenSlice) -> IResult<TokenSlice, AST> {
     let (input, import_decls) = many0(parse_import_decl).parse(input)?;
     let (input, field_decls) = many0(parse_field_decl).parse(input)?;
@@ -1273,35 +1272,36 @@ pub fn parse(
             if let Some((first_token, last_token)) = tokens.first().zip(tokens.last()) {
                 let first_span = extract_span_from_token(first_token);
                 let last_span = extract_span_from_token(last_token);
-        
+
                 let start_line = first_span.sline;
                 let start_col = first_span.scol;
                 let end_line = last_span.eline;
                 let end_col = last_span.ecol;
-        
+
                 // Reconstruct the invalid section from token `display` values
                 let invalid_code = tokens
                     .iter()
                     .map(|token| get_token_display(token)) // Get readable token representation
                     .collect::<Vec<_>>()
                     .join(" ");
-        
+
                 let error_message = format!(
                     "~~~{} parsing error: Invalid syntax from (line {}, column {}) to (line {}, column {}):\n|\t{}\n",
                     filename, start_line, start_col, end_line, end_col,
                     invalid_code,
                 );
-        
+
                 writeln!(writer, "{}", error_message).expect("Failed to write error to stdout!");
                 panic!("Parsing failed.");
             } else {
                 // Case where no tokens are found (completely empty or malformed input)
-                writeln!(writer, "\nPARSING ERROR! No valid tokens found. Unable to determine error location.")
-                    .expect("Failed to write error to stdout!");
+                writeln!(
+                    writer,
+                    "\nPARSING ERROR! No valid tokens found. Unable to determine error location."
+                )
+                .expect("Failed to write error to stdout!");
                 panic!("Parsing failed.");
             }
         }
-        
-
     }
 }

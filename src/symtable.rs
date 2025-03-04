@@ -19,14 +19,12 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-
 /// Used to package the objects that need
 /// to be passed throughout the semantic checks.
 pub struct SemanticContext {
     pub filename: String,
     pub error_found: bool,
 }
-
 
 /// The root for the symbol table AST
 #[allow(dead_code)]
@@ -77,7 +75,7 @@ pub enum SymStatement {
         span: Span,
     },
     Assignment {
-        target: SymExpr,  //Now supports both `Identifier` and `ArrAccess`
+        target: SymExpr, //Now supports both `Identifier` and `ArrAccess`
         expr: SymExpr,
         span: Span,
     },
@@ -117,7 +115,7 @@ pub enum SymStatement {
     },
     Error {
         span: Span,
-    }
+    },
 }
 
 /// IR representation for expressions
@@ -165,6 +163,6 @@ pub enum SymExpr {
         span: Span,
     },
     Error {
-        span: Span
-    }
+        span: Span,
+    },
 }

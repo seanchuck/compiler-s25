@@ -42,7 +42,7 @@ pub enum TableEntry {
     Import {
         name: String,
         span: Span,
-    }
+    },
 }
 
 /// Functions for creating new scopes
@@ -70,7 +70,7 @@ impl Scope {
             table: HashMap::new(),
             parent: Some(parent),
             id: Some(format!("Child of: {}", parent_id)),
-            enclosing_method
+            enclosing_method,
         }
     }
 
