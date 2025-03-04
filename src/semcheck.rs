@@ -14,6 +14,8 @@ Be careful with how you pass Scope:
 
 TODO: AVOID MULTIPLE MESSAGES FOR SAME ERROR
 TODO: DON"T CREATE THE NODE IF THE CHECKS FAIL
+
+TODO: rules 12 - 14
 */
 
 use core::panic;
@@ -488,7 +490,7 @@ pub fn build_statement(
         }
 
         AST::Statement(Statement::Return { expr, span }) => {
-            check_return_value(expr.as_ref(), &scope.borrow(), span, writer, context);
+            // check_return_value(expr.as_ref(), &scope.borrow(), span, writer, context);
             SymStatement::Return {
             expr: expr
                 .as_ref()
