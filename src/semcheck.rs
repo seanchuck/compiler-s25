@@ -40,8 +40,8 @@ use crate::utils::print::*;
 /// Build the symbol-table-augmented version of the AST
 pub fn build_symbol_table(
     ast: &AST,
-    filename: &str,
     writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext
 ) -> SymProgram {
     match ast {
         AST::Program {
@@ -54,8 +54,8 @@ pub fn build_symbol_table(
             let mut method_bodies = HashMap::new();
 
             // RULE 1: No duplicate imports
-            check_duplicate_imports(imports, filename, writer);
-            check_main_exists(methods, filename, writer);
+            check_duplicate_imports(imports, writer, context);
+            check_main_exists(methods, writer, context);
 
             // Process import methods, which are handled slightly diff. from method_decls
             for import in imports {
@@ -103,7 +103,7 @@ pub fn build_symbol_table(
                                     ref size,
                                     ref span,
                                 } => {
-                                    check_array_size(size, span, filename, writer);
+                                    check_array_size(size, span, writer, context);
 
                                     // Insert variable into the global scope
                                     global_scope.borrow_mut().insert(
@@ -134,7 +134,7 @@ pub fn build_symbol_table(
                         ref block,
                         ref span,
                     } => {
-                        println!("serint method{}", name);
+                        // println!("serint method{}", name);
                         // Insert function into table before processing body
                         global_scope.borrow_mut().insert(
                             name.clone(),
@@ -156,10 +156,10 @@ pub fn build_symbol_table(
                                 span: span.clone(),
                             },
                         );
-                        println!("method table is now: {:#?}", global_scope);
+                        // println!("method table is now: {:#?}", global_scope);
                         
                         // Now process the function body
-                        let method = build_method(method, Rc::clone(&global_scope), filename, writer);
+                        let method = build_method(method, Rc::clone(&global_scope), writer, context);
 
                         // Store the method body as well
                         method_bodies.insert(method.name.clone(), Rc::new(method));
@@ -184,8 +184,8 @@ pub fn build_symbol_table(
 pub fn build_method(
     method: &AST,
     parent_scope: Rc<RefCell<Scope>>,
-    filename: &str,
     writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext
 ) -> SymMethod {
     match method {
         AST::MethodDecl {
@@ -217,7 +217,7 @@ pub fn build_method(
 
             // Process method body
             let method_body = match **block {
-                AST::Block { .. } => build_block(block, Rc::clone(&method_scope), filename, writer),
+                AST::Block { .. } => build_block(block, Rc::clone(&method_scope), writer, context),
                 _ => panic!("Expected method body to be a block"),
             };
 
@@ -250,8 +250,8 @@ pub fn build_method(
 pub fn build_block(
     block: &AST,
     parent_scope: Rc<RefCell<Scope>>,
-    filename: &str,
     writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext
 ) -> SymBlock {
     match block {
         AST::Block {
@@ -305,7 +305,7 @@ pub fn build_block(
                                     ref size,
                                     ref span,
                                 } => {
-                                    check_array_size(size, span, filename, writer);
+                                    check_array_size(size, span, writer, context);
 
                                     scope.borrow_mut().insert(
                                         id.clone(),
@@ -334,7 +334,7 @@ pub fn build_block(
 
             // Process statements
             for stmt in statements {
-                let sym_stmt = build_statement(stmt, Rc::clone(&scope), filename, writer);
+                let sym_stmt = build_statement(stmt, Rc::clone(&scope), writer, context);
                 sym_statements.push(Rc::new(sym_stmt));
             }
 
@@ -352,8 +352,8 @@ pub fn build_block(
 pub fn build_statement(
     statement: &AST,
     scope: Rc<RefCell<Scope>>,
-    filename: &str,
     writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext
 ) -> SymStatement {
     match statement {
         AST::Statement(Statement::Assignment {
@@ -365,11 +365,11 @@ pub fn build_statement(
             match location.as_ref() {
                 // Plain variable assignment (x = 3;)
                 AST::Identifier { id, span: id_span } => {
-                    check_used_before_decl(id, scope.clone(), span, filename, writer);
+                    check_used_before_decl(id, scope.clone(), span, writer, context);
 
                     SymStatement::Assignment {
                         target: id.clone(),
-                        expr: build_expr(expr, Rc::clone(&scope), filename, writer),
+                        expr: build_expr(expr, Rc::clone(&scope), writer, context),
                         span: span.clone(),
                     }
                 }
@@ -401,7 +401,7 @@ pub fn build_statement(
 
                     SymStatement::Assignment {
                         target: id.clone(),
-                        expr: build_expr(expr, Rc::clone(&scope), filename, writer),
+                        expr: build_expr(expr, Rc::clone(&scope), writer, context),
                         span: span.clone(),
                     }
                 }
@@ -418,13 +418,13 @@ pub fn build_statement(
             args,
             span,}) => {
 
-            check_methodcall(&method_name, &args, span, scope.clone(), false, filename, writer);
+            check_methodcall(&method_name, &args, span, scope.clone(), false, writer, context);
 
             SymStatement::MethodCall {
             method_name: method_name.clone(),
             args: args
                 .iter()
-                .map(|arg| build_expr(arg, Rc::clone(&scope), filename, writer))
+                .map(|arg| build_expr(arg, Rc::clone(&scope), writer, context))
                 .collect(),
             span: span.clone(),
             }
@@ -436,11 +436,11 @@ pub fn build_statement(
             else_block,
             span,
         }) => SymStatement::If {
-            condition: build_expr(condition, Rc::clone(&scope), filename, writer),
-            then_block: Rc::new(build_block(then_block, Rc::clone(&scope), filename, writer)),
+            condition: build_expr(condition, Rc::clone(&scope), writer, context),
+            then_block: Rc::new(build_block(then_block, Rc::clone(&scope), writer, context)),
             else_block: else_block
                 .as_ref()
-                .map(|blk| Rc::new(build_block(blk, Rc::clone(&scope), filename, writer))),
+                .map(|blk| Rc::new(build_block(blk, Rc::clone(&scope), writer, context))),
             span: span.clone(),
         },
 
@@ -449,8 +449,8 @@ pub fn build_statement(
             block,
             span,
         }) => SymStatement::While {
-            condition: build_expr(condition, Rc::clone(&scope), filename, writer),
-            block: Rc::new(build_block(block, Rc::clone(&scope), filename, writer)),
+            condition: build_expr(condition, Rc::clone(&scope), writer, context),
+            block: Rc::new(build_block(block, Rc::clone(&scope), writer, context)),
             span: span.clone(),
         },
 
@@ -475,7 +475,7 @@ pub fn build_statement(
             let update_expr = match update.as_ref() {
                 AST::Statement(Statement::Assignment { location, expr, .. }) => {
                     if let AST::Identifier { .. } = location.as_ref() {
-                        build_expr(expr, Rc::clone(&scope), filename, writer)
+                        build_expr(expr, Rc::clone(&scope), writer, context)
                     } else {
                         panic!(
                             "For loop update must be an assignment to an identifier, got: {:#?}",
@@ -491,20 +491,20 @@ pub fn build_statement(
 
             SymStatement::For {
                 var: var.clone(),
-                init: build_expr(init, Rc::clone(&scope), filename, writer),
-                condition: build_expr(condition, Rc::clone(&scope), filename, writer),
+                init: build_expr(init, Rc::clone(&scope), writer, context),
+                condition: build_expr(condition, Rc::clone(&scope), writer, context),
                 update: update_expr,
-                block: Rc::new(build_block(block, Rc::clone(&scope), filename, writer)),
+                block: Rc::new(build_block(block, Rc::clone(&scope), writer, context)),
                 span: span.clone(),
             }
         }
 
         AST::Statement(Statement::Return { expr, span }) => {
-            check_return_value(expr.as_ref(), &scope.borrow(), span, filename, writer);
+            check_return_value(expr.as_ref(), &scope.borrow(), span, writer, context);
             SymStatement::Return {
             expr: expr
                 .as_ref()
-                .map(|e| build_expr(e, Rc::clone(&scope), filename, writer)),
+                .map(|e| build_expr(e, Rc::clone(&scope), writer, context)),
             span: span.clone(),
             }
         }
@@ -525,8 +525,8 @@ pub fn build_statement(
 pub fn build_expr(
     expr: &AST,
     scope: Rc<RefCell<Scope>>,
-    filename: &str,
     writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext
 ) -> SymExpr {
     match expr {
         AST::Expr(Expr::BinaryExpr {
@@ -536,15 +536,15 @@ pub fn build_expr(
             span,
         }) => SymExpr::BinaryExpr {
             op: op.clone(),
-            left: Rc::new(build_expr(left, Rc::clone(&scope), filename, writer)),
-            right: Rc::new(build_expr(right, Rc::clone(&scope), filename, writer)),
+            left: Rc::new(build_expr(left, Rc::clone(&scope), writer, context)),
+            right: Rc::new(build_expr(right, Rc::clone(&scope), writer, context)),
             typ: Type::Int, // TODO: Type inference
             span: span.clone(),
         },
 
         AST::Expr(Expr::UnaryExpr { op, expr, span }) => SymExpr::UnaryExpr {
             op: op.clone(),
-            expr: Rc::new(build_expr(expr, Rc::clone(&scope), filename, writer)),
+            expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
             typ: Type::Int,
             span: span.clone(),
         },
@@ -554,12 +554,12 @@ pub fn build_expr(
             args,
             span,
         }) => {
-            check_methodcall(&method_name, args, span, scope.clone(), true, filename, writer);
+            check_methodcall(&method_name, args, span, scope.clone(), true, writer, context);
             SymExpr::MethodCall {
             method_name: method_name.clone(),
             args: args
                 .iter()
-                .map(|arg| Rc::new(build_expr(arg, Rc::clone(&scope), filename, writer)))
+                .map(|arg| Rc::new(build_expr(arg, Rc::clone(&scope), writer, context)))
                 .collect(),
             span: span.clone(),
             }
@@ -567,7 +567,7 @@ pub fn build_expr(
 
         AST::Expr(Expr::ArrAccess { id, index, span }) => SymExpr::ArrayAccess {
             id: id.clone(),
-            index: Rc::new(build_expr(index, Rc::clone(&scope), filename, writer)),
+            index: Rc::new(build_expr(index, Rc::clone(&scope), writer, context)),
             span: span.clone(),
         },
 
@@ -588,7 +588,7 @@ pub fn build_expr(
             span,
         }) => SymExpr::Cast {
             target_type: target_type.clone(),
-            expr: Rc::new(build_expr(expr, Rc::clone(&scope), filename, writer)),
+            expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
             span: span.clone(),
         },
 
@@ -599,7 +599,7 @@ pub fn build_expr(
 
         AST::Identifier { ref id, ref span } => {
             // RULE 2: no identifier is used before being declared
-            check_used_before_decl(id, Rc::clone(&scope), span, filename, writer);
+            check_used_before_decl(id, Rc::clone(&scope), span, writer, context);
 
             let entry = scope.borrow_mut().lookup(id).unwrap();
             SymExpr::Identifier {
@@ -619,15 +619,19 @@ pub fn build_expr(
 // HELPERS
 // #################################################
 
-fn format_error_message(id: &str, span: Option<&Span>, filename: &str, msg: &str) -> String {
+/// Formats an error message for printing to stdout.
+/// Also flags that an error has occurred, so we can
+/// return a non-zero exist code once checking is finished.
+fn format_error_message(id: &str, span: Option<&Span>, msg: &str, context: &mut SemanticContext) -> String {
+    context.error_found = true;
     match span {
         Some(span) => format!(
-            "Semantic error in \"{}\" (line {}, col {}): {} `{}`",
-            filename, span.sline, span.scol, msg, id
+            "~~~{} (line {}, col {}): semantic error: {} `{}`",
+            context.filename, span.sline, span.scol, msg, id
         ),
         None => format!(
-            "Semantic error in \"{}\": {} `{}`",
-            filename, msg, id
+            "~~~{}: semantic error: {} `{}`",
+            context.filename, msg, id
         ),
     }
 }
@@ -757,7 +761,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
 // Others are checked later explicitly.
 
 /// RULE 1
-fn check_duplicate_imports(imports: &[Box<AST>], filename: &str, writer: &mut dyn std::io::Write) {
+fn check_duplicate_imports(imports: &[Box<AST>],writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     let mut seen = HashSet::new();
 
     for import in imports {
@@ -767,7 +771,7 @@ fn check_duplicate_imports(imports: &[Box<AST>], filename: &str, writer: &mut dy
                     writeln!(
                         writer,
                         "{}",
-                        format_error_message(id, Some(span), filename, "duplicate import")
+                        format_error_message(id, Some(span), "duplicate import", context)
                     )
                     .expect("Failed to write output!");
                 }
@@ -782,8 +786,8 @@ fn check_used_before_decl(
     id: &str,
     scope: Rc<RefCell<Scope>>,
     span: &Span,
-    filename: &str,
     writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext
 ) {
     let scope_ref = scope.borrow();
 
@@ -791,14 +795,14 @@ fn check_used_before_decl(
         writeln!(
             writer,
             "{}",
-            format_error_message(id, Some(span), filename, "Use before declaration")
+            format_error_message(id, Some(span), "Use before declaration", context)
         )
         .expect("Failed to write output!");
     }
 }
 
 /// RULE 3
-fn check_main_exists(methods: &Vec<Box<AST>>, filename: &str, writer: &mut dyn std::io::Write) {
+fn check_main_exists(methods: &Vec<Box<AST>>, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     let mut has_main = false;
 
     for method in methods {
@@ -813,7 +817,7 @@ fn check_main_exists(methods: &Vec<Box<AST>>, filename: &str, writer: &mut dyn s
         }
     }
     if !has_main {
-        let error_msg = format_error_message("main", None, filename, "Missing entry point:");
+        let error_msg = format_error_message("main", None, "Missing entry point:", context);
         writeln!(writer, "{}", error_msg).expect("Failed to write error message");
     }
 }
@@ -825,8 +829,8 @@ fn check_methodcall(
     span: &Span,
     scope: Rc<RefCell<Scope>>,
     is_expr: bool,
-    filename: &str,
     writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext
 ) {
     // Lookup the method in the scope
     let scope = scope.borrow(); // Borrow Scope
@@ -840,12 +844,12 @@ fn check_methodcall(
                 let err_msg = format_error_message(
                     method_name,
                     Some(&span),
-                    filename,
                     &format!(
                         "Incorrect number of arguments for method. Expected {}, but got {}.",
                         params.len(),
                         args.len()
                     ),
+                    context
                 );
                 writeln!(writer, "{}", err_msg).unwrap();
             }
@@ -857,11 +861,11 @@ fn check_methodcall(
                     let err_msg = format_error_message(
                         method_name,
                         Some(&span),
-                        filename,
                         &format!(
                             "Type mismatch for parameter `{}`. Expected `{:?}`, but got `{:?}`.",
                             param_name, expected_type, arg_type
                         ),
+                        context
                     );
                     writeln!(writer, "{}", err_msg).unwrap();
                 }
@@ -872,8 +876,8 @@ fn check_methodcall(
                 let err_msg = format_error_message(
                     method_name,
                     Some(&span),
-                    filename,
                     "Method does not return a value but is used in an expression.",
+                    context
                 );
                 writeln!(writer, "{}", err_msg).unwrap();
             }
@@ -890,8 +894,8 @@ fn check_methodcall(
             let err_msg = format_error_message(
                 method_name,
                 Some(&span),
-                filename,
-                "Variable declaration shadows method declaration"
+                "Variable declaration shadows method declaration",
+                context
             );
             writeln!(writer, "{}", err_msg).unwrap();
 
@@ -902,8 +906,8 @@ fn check_methodcall(
             let err_msg = format_error_message(
                 method_name,
                 Some(&span),
-                filename,
                 "Call to undefined method.",
+                context
             );
             writeln!(writer, "{}", err_msg).unwrap();
         }
@@ -916,10 +920,9 @@ fn check_return_value(
     ret: Option<&Box<AST>>, 
     scope: &Scope,
     span: &Span, 
-    filename: &str, 
-    writer: &mut dyn std::io::Write
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
 ) {
-    println!("we checking this retu");
     // Get the method name from scope
     let method_name = match &scope.enclosing_method {
         Some(name) => name.clone(),
@@ -927,7 +930,7 @@ fn check_return_value(
             writeln!(
                 writer,
                 "{}:{}:{}: ERROR: Return statement outside of a function.",
-                filename, span.sline, span.scol
+                context.filename.as_str(), span.sline, span.scol
             ).expect("Failed to write error message");
             return;
         }
@@ -940,7 +943,7 @@ fn check_return_value(
             writeln!(
                 writer,
                 "{}:{}:{}: ERROR: Could not find method '{}' in symbol table.",
-                filename, span.sline, span.scol, method_name
+                context.filename.as_str(), span.sline, span.scol, method_name
             ).expect("Failed to write error message");
             return;
         }
@@ -952,7 +955,7 @@ fn check_return_value(
             writeln!(
                 writer,
                 "{}:{}:{}: ERROR: Return statement with a value in a void function.",
-                filename, span.sline, span.scol
+                context.filename.as_str(), span.sline, span.scol
             ).expect("Failed to write error message");
         }
 
@@ -961,7 +964,7 @@ fn check_return_value(
             writeln!(
                 writer,
                 "{}:{}:{}: ERROR: Missing return value in function returning '{:#?}'.",
-                filename, span.sline, span.scol, return_type
+                context.filename.as_str(), span.sline, span.scol, return_type
             ).expect("Failed to write error message");
         }
 
@@ -972,7 +975,7 @@ fn check_return_value(
                 writeln!(
                     writer,
                     "{}:{}:{}: ERROR: Return type mismatch. Expected '{:#?}', found '{:#?}'.",
-                    filename, span.sline, span.scol, return_type, expr_type
+                    context.filename.as_str(), span.sline, span.scol, return_type, expr_type
                 ).expect("Failed to write error message");
             }
         }
@@ -982,7 +985,7 @@ fn check_return_value(
 }
 
 
-fn check_array_size(size: &str, span: &Span, filename: &str, writer: &mut dyn std::io::Write) {
+fn check_array_size(size: &str, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     let is_valid = if let Some(stripped) = size.strip_prefix("0x") {
         usize::from_str_radix(stripped, 16).is_ok()
     } else {
@@ -993,7 +996,7 @@ fn check_array_size(size: &str, span: &Span, filename: &str, writer: &mut dyn st
         writeln!(
             writer,
             "{}",
-            format_error_message(size, Some(span), filename, "Invalid array size:")
+            format_error_message(size, Some(span), "Invalid array size:", context)
         )
         .expect("Failed to write error message");
     }
@@ -1010,13 +1013,24 @@ pub fn check_semantics(sym_tree: SymProgram, filename: &str, writer: &mut dyn st
 /// turning the AST into a symbol table tree.
 pub fn semcheck(file: &str, filename: &str, writer: &mut dyn std::io::Write, verbose: bool) {
     let parse_tree: AST = parse(file, filename, writer, false).expect("Parsing failed");
-    let sym_tree: SymProgram = build_symbol_table(&parse_tree, filename, writer);
+
+    // Package semantic context
+    let mut context = SemanticContext {
+        filename: filename.to_string(),
+        error_found: false
+    };
+
+    // Build the semantic tree
+    let sym_tree: SymProgram = build_symbol_table(&parse_tree, writer, &mut context);
 
     if verbose {
-        println!("succesffully built symbol table!!!!!");
+        println!("Successfully built symbol table!");
         println!("=================SYMBOL TABLE====================");
         print_symtree(&sym_tree);
     }
 
-    // check_program(&sym_tree);
+    // Panic if any semantic errors were found
+    if context.error_found {
+        panic!("Semantic check failed.");
+    }
 }

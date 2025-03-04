@@ -1287,8 +1287,8 @@ pub fn parse(
                     .join(" ");
         
                 let error_message = format!(
-                    "\nPARSING ERROR! Invalid syntax from line {}, column {} to line {}, column {}:\n  {}\nReason: {}",
-                    start_line, start_col, end_line, end_col,
+                    "~~~{} parsing error: Invalid syntax from (line {}, column {}) to (line {}, column {}):\n  {}\n\tReason: {}",
+                    filename, start_line, start_col, end_line, end_col,
                     invalid_code,
                     "Invalid token sequence or unsupported syntax."
                 );

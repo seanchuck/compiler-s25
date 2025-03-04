@@ -19,6 +19,15 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+
+/// Used to package the objects that need
+/// to be passed throughout the semantic checks.
+pub struct SemanticContext {
+    pub filename: String,
+    pub error_found: bool,
+}
+
+
 /// The root for the symbol table AST
 #[allow(dead_code)]
 #[derive(Debug)]
