@@ -435,7 +435,7 @@ pub fn build_statement(
             else_block,
             span,
         }) => {
-            check_is_bool(condition, span, scope.clone(), writer, context);
+            // check_is_bool(condition, span, scope.clone(), writer, context);
 
             SymStatement::If {
                 condition: build_expr(condition, Rc::clone(&scope), writer, context),
@@ -452,7 +452,7 @@ pub fn build_statement(
             block,
             span,
         }) => {
-            check_is_bool(condition, span, scope.clone(), writer, context);
+            // check_is_bool(condition, span, scope.clone(), writer, context);
 
             SymStatement::While {
                 condition: build_expr(condition, Rc::clone(&scope), writer, context),
@@ -480,7 +480,7 @@ pub fn build_statement(
             );
 
             // Ensure that the condition is of type bool
-            check_is_bool(condition, span, scope.clone(), writer, context);
+            // check_is_bool(condition, span, scope.clone(), writer, context);
 
             let update_expr = match update.as_ref() {
                 AST::Statement(Statement::Assignment { location, expr, .. }) => {
@@ -532,11 +532,11 @@ pub fn build_statement(
 }
 
 /// **Converts an AST expression into a SymExpr**
-pub fn build_expr(
+fn build_expr(
     expr: &AST,
     scope: Rc<RefCell<Scope>>,
     writer: &mut dyn std::io::Write,
-    context: &mut SemanticContext,
+    context: &mut SemanticContext
 ) -> SymExpr {
     match expr {
         AST::Expr(Expr::BinaryExpr {
@@ -545,30 +545,67 @@ pub fn build_expr(
             right,
             span,
         }) => {
-            // Rule 14: Operands must be numeric
-            // match *op {
-            //     // Arithmetic operands must be of the same type
-            //     BinaryOp::Add
-            //     | BinaryOp::Subtract
-            //     | BinaryOp::Multiply
-            //     | BinaryOp::Divide
-            //     | BinaryOp::Modulo => {{check_is_numeric_and_compatible(true, left, Some(right), span, scope.clone(), writer, context);}}
+            let left_expr = Rc::new(build_expr(left, Rc::clone(&scope), writer, context));
+            let right_expr = Rc::new(build_expr(right, Rc::clone(&scope), writer, context));
 
-            //     BinaryOp::Greater
-            //     | BinaryOp::GreaterEqual
-            //     | BinaryOp::Less
-            //     | BinaryOp::LessEqual => {check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);}
+            let left_type = infer_expr_type(left, &scope.borrow());
+            let right_type = infer_expr_type(right, &scope.borrow());
+            let mut result_type = Type::Unknown; // Set result type based on operator
 
-            //     BinaryOp::Equal
-            //     | BinaryOp::NotEqual => {}
-            //     _=> {}
-            // }
-            
+            match *op {
+                // Arithmetic operators return the same type as operands (int or long)
+                BinaryOp::Add
+                | BinaryOp::Subtract
+                | BinaryOp::Multiply
+                | BinaryOp::Divide
+                | BinaryOp::Modulo => {
+                    check_is_numeric_and_compatible(true, left, Some(right), span, scope.clone(), writer, context);
+                    result_type = left_type; // If valid, set type to operand type
+                }
+
+                // Relational operators always return bool
+                BinaryOp::Greater
+                | BinaryOp::GreaterEqual
+                | BinaryOp::Less
+                | BinaryOp::LessEqual => {
+                    check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);
+                    result_type = Type::Bool;
+                }
+
+                // Equality operators always return bool
+                BinaryOp::Equal
+                | BinaryOp::NotEqual => {
+                    check_equality_compatible(left, right, span, scope.clone(), writer, context);
+                    result_type = Type::Bool;
+                }
+
+                // Logical operators (&&, ||) require bool operands and return bool
+                // BinaryOp::And
+                // | BinaryOp::Or => {
+                //     if left_type == Type::Bool && right_type == Type::Bool {
+                //         result_type = Type::Bool;
+                //     } else {
+                //         writeln!(
+                //             writer,
+                //             "{}",
+                //             format_error_message(
+                //                 &format!("Operands `{:#?}` and `{:#?}`", left, right),
+                //                 Some(span),
+                //                 "Logical operators require `bool` operands.",
+                //                 context
+                //             )
+                //         ).expect("Failed to write error message");
+                //     }
+                // }
+
+                _ => {}
+            }
+
             SymExpr::BinaryExpr {
                 op: op.clone(),
-                left: Rc::new(build_expr(left, Rc::clone(&scope), writer, context)),
-                right: Rc::new(build_expr(right, Rc::clone(&scope), writer, context)),
-                typ: Type::Int, // TODO: Type inference
+                left: left_expr,
+                right: right_expr,
+                typ: result_type, // Set the correct type
                 span: span.clone(),
             }
         },
@@ -1229,7 +1266,6 @@ fn check_is_bool(
 }
 
 //// Rule 14
-/// TODO: HANDLE UNARY MINUS
 fn check_is_numeric_and_compatible(
     is_arithmetic: bool,
     left: &AST,
@@ -1239,36 +1275,35 @@ fn check_is_numeric_and_compatible(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    // Infer types of operands
     let left_type = infer_expr_type(left, &scope.borrow());
     let right_type = right.map(|r| infer_expr_type(r, &scope.borrow()));
 
-    // Check if left operand is numeric
+    // Ensure left operand is numeric
     if left_type != Type::Int && left_type != Type::Long {
         writeln!(
             writer,
             "{}",
             format_error_message(
-                format!("left: {:#?}", left).as_str(),
+                &format!("left operand `{:#?}`", left),
                 Some(span),
-                "Operand must be numeric (int or long).",
+                "Left operand must be numeric (int or long).",
                 context
             )
         )
         .expect("Failed to write error message");
-        return; // Stop further checks since it's already invalid
+        return;
     }
 
-    // If there's a right operand, check if it's also numeric
     if let Some(right_type) = right_type {
+        // Ensure right operand is also numeric
         if right_type != Type::Int && right_type != Type::Long {
             writeln!(
                 writer,
                 "{}",
                 format_error_message(
-                    format!("right: {:#?}", right).as_str(),
+                    &format!("right operand `{:#?}`", right),
                     Some(span),
-                    "Operand must be numeric (int or long).",
+                    "Right operand must be numeric (int or long).",
                     context
                 )
             )
@@ -1276,15 +1311,15 @@ fn check_is_numeric_and_compatible(
             return;
         }
 
-        // If it's an arithmetic operation, ensure both operands have the same type
+        // Arithmetic operators (`+`, `-`, etc.) require both operands to have the SAME type
         if is_arithmetic && left_type != right_type {
             writeln!(
                 writer,
                 "{}",
                 format_error_message(
-                    format!("left: {:#?}, right: {:#?}", left, right).as_str(),
+                    &format!("left `{:#?}`, right `{:#?}`", left, right),
                     Some(span),
-                    "Operands of binary expression must have the same type.",
+                    "Operands of arithmetic expressions must have the same type.",
                     context
                 )
             )
@@ -1292,6 +1327,50 @@ fn check_is_numeric_and_compatible(
         }
     }
 }
+
+// Rule 15: Ensure equality operators (`==`, `!=`) have compatible types
+fn check_equality_compatible(
+    left: &AST,
+    right: &AST,
+    span: &Span,
+    scope: Rc<RefCell<Scope>>,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    let left_type = infer_expr_type(left, &scope.borrow());
+    let right_type = infer_expr_type(right, &scope.borrow());
+
+    // Allowable types: `int`, `long`, `bool`
+    if left_type != right_type {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("left `{:#?}`, right `{:#?}`", left, right),
+                Some(span),
+                "Equality operator requires both operands to have the same type.",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+        return;
+    }
+
+    if left_type != Type::Int && left_type != Type::Long && left_type != Type::Bool {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("left `{:#?}`, right `{:#?}`", left, right),
+                Some(span),
+                "Equality operator can only be applied to int, long, or bool.",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+    }
+}
+
 
 fn check_array_size(
     size: &str,
