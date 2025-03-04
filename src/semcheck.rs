@@ -612,10 +612,10 @@ fn build_expr(
 
         AST::Expr(Expr::UnaryExpr { op, expr, span }) => {
             // Rule 14: Unary minus must have numeric type
-            match *op {
-                UnaryOp::Neg => {check_is_numeric_and_compatible(false, expr, None, span, scope.clone(), writer, context);}
-                _=>{}
-            }
+            // match *op {
+            //     UnaryOp::Neg => {check_is_numeric_and_compatible(false, expr, None, span, scope.clone(), writer, context);}
+            //     _=>{}
+            // }
     
             SymExpr::UnaryExpr {
                 op: op.clone(),
@@ -1328,7 +1328,7 @@ fn check_is_numeric_and_compatible(
     }
 }
 
-// Rule 15: Ensure equality operators (`==`, `!=`) have compatible types
+// Rule 15, 16: Ensure equality operators (`==`, `!=`) have compatible types
 fn check_equality_compatible(
     left: &AST,
     right: &AST,
