@@ -559,7 +559,7 @@ fn build_expr(
                 | BinaryOp::Multiply
                 | BinaryOp::Divide
                 | BinaryOp::Modulo => {
-                    check_is_numeric_and_compatible(true, left, Some(right), span, scope.clone(), writer, context);
+                    // check_is_numeric_and_compatible(true, left, Some(right), span, scope.clone(), writer, context);
                     result_type = left_type; // If valid, set type to operand type
                 }
 
@@ -568,14 +568,14 @@ fn build_expr(
                 | BinaryOp::GreaterEqual
                 | BinaryOp::Less
                 | BinaryOp::LessEqual => {
-                    check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);
+                    // check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);
                     result_type = Type::Bool;
                 }
 
                 // Equality operators always return bool
                 BinaryOp::Equal
                 | BinaryOp::NotEqual => {
-                    check_equality_compatible(left, right, span, scope.clone(), writer, context);
+                    // check_equality_compatible(left, right, span, scope.clone(), writer, context);
                     result_type = Type::Bool;
                 }
 
@@ -652,7 +652,6 @@ fn build_expr(
 
         AST::Expr(Expr::ArrAccess { id, index, span }) => {
             if let Some(entry) = scope.borrow().lookup(id).map(|e| e.clone()) {
-                // ✅ Manually cloning the entry
                 if let TableEntry::Variable { is_array, .. } = entry {
                     check_arraccess(is_array, index, &scope, span, writer, context);
                 }
@@ -667,20 +666,19 @@ fn build_expr(
         }
 
         AST::Expr(Expr::Len { id, span }) => {
-            if check_len_argument(id, span, &scope.borrow(), writer, context) {
-                if let AST::Identifier { id, .. } = id.as_ref() {
-                    SymExpr::Len {
-                        id: id.clone(),
-                        span: span.clone(),
-                    }
-                } else {
-                    SymExpr::Error { span: span.clone() }
-                }
+            check_len_argument(id, span, &scope.borrow(), writer, context);
+        
+            let extracted_id = if let AST::Identifier { id, .. } = id.as_ref() {
+                id.clone()
             } else {
-                // ❌ If invalid, return an error node
-                SymExpr::Error { span: span.clone() }
+                String::new() // placeholder for invalid
+            };
+        
+            SymExpr::Len {
+                id: extracted_id,
+                span: span.clone(),
             }
-        }
+        },
 
         AST::Expr(Expr::Cast {
             target_type,
@@ -1185,16 +1183,14 @@ fn check_len_argument(
     scope: &Scope,
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
-) -> bool {
+) {
     if let AST::Identifier { id, .. } = id {
         if let Some(entry) = scope.lookup(id) {
             match entry {
                 TableEntry::Variable { is_array: true, .. } => {
-                    return true;
-                    // ✅ Valid: `len` is used on an array
                 }
                 _ => {
-                    // ❌ Error: `len` called on a non-array variable
+                    // Error: `len` called on a non-array variable
                     writeln!(
                         writer,
                         "{}",
@@ -1209,7 +1205,7 @@ fn check_len_argument(
                 }
             }
         } else {
-            // ❌ Error: `len` called on an undefined variable
+            // Error: `len` called on an undefined variable
             writeln!(
                 writer,
                 "{}",
@@ -1236,7 +1232,6 @@ fn check_len_argument(
         )
         .expect("Failed to write error message");
     }
-    false
 }
 
 /// Rule 13

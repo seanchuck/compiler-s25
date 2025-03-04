@@ -148,7 +148,7 @@ pub enum Expr {
         span: Span,
     },
     Len {
-        id: Box<AST>,
+        id: Box<AST>, // AST::Identifier
         span: Span,
     },
     Literal {
