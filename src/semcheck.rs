@@ -22,6 +22,7 @@ use core::panic;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fmt::Binary;
 use std::rc::Rc;
 
 use crate::ast::*;
@@ -545,20 +546,23 @@ pub fn build_expr(
             span,
         }) => {
             // Rule 14: Operands must be numeric
-            match *op {
-                // Arithmetic operands must be of the same type
-                BinaryOp::Add
-                | BinaryOp::Subtract
-                | BinaryOp::Multiply
-                | BinaryOp::Divide
-                | BinaryOp::Modulo => {{check_is_numeric_and_compatible(true, left, Some(right), span, scope.clone(), writer, context);}}
+            // match *op {
+            //     // Arithmetic operands must be of the same type
+            //     BinaryOp::Add
+            //     | BinaryOp::Subtract
+            //     | BinaryOp::Multiply
+            //     | BinaryOp::Divide
+            //     | BinaryOp::Modulo => {{check_is_numeric_and_compatible(true, left, Some(right), span, scope.clone(), writer, context);}}
 
-                | BinaryOp::Greater
-                | BinaryOp::GreaterEqual
-                | BinaryOp::Less
-                | BinaryOp::LessEqual => {check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);}
-                _=> {}
-            }
+            //     BinaryOp::Greater
+            //     | BinaryOp::GreaterEqual
+            //     | BinaryOp::Less
+            //     | BinaryOp::LessEqual => {check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);}
+
+            //     BinaryOp::Equal
+            //     | BinaryOp::NotEqual => {}
+            //     _=> {}
+            // }
             
             SymExpr::BinaryExpr {
                 op: op.clone(),
