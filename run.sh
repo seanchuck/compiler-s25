@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-target/debug/decaf-skeleton-rust "$@"
+target/debug/phase6-rust-compiler "$@"

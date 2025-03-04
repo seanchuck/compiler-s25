@@ -1,0 +1,607 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index d4ec86d..20fdd9c 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [package]
+-name = "decaf-skeleton-rust"
++name = "phase6-rust-compiler"
+ version = "0.1.0"
+ edition = "2021"
+ 
+diff --git a/output.log b/output.log
+deleted file mode 100644
+index 2eeb061..0000000
+--- a/output.log
++++ /dev/null
+@@ -1,97 +0,0 @@
+-Running test: tests/semantics/rule1-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule2-illegal.dcf
+-~~~tests/semantics/rule2-illegal.dcf parsing error: Invalid syntax from (line 4, column 1) to (line 7, column 2):
+-  void main ( ) { x = 5 ; int x ; }
+-	Reason: Invalid token sequence or unsupported syntax.
+-thread 'main' panicked at src/parse.rs:1297:17:
+-Parsing failed.
+-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+----------------------------------
+-Running test: tests/semantics/rule3-illegal.dcf
+-~~~tests/semantics/rule3-illegal.dcf: semantic error: Missing entry point: `main`
+-thread 'main' panicked at src/semcheck.rs:1034:9:
+-Semantic check failed.
+-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+----------------------------------
+-Running test: tests/semantics/rule4-illegal.dcf
+-~~~tests/semantics/rule4-illegal.dcf (line 1, col 1): semantic error: Incorrect number of arguments for method. Expected 1, but got 0. `foo`
+-thread 'main' panicked at src/semcheck.rs:1034:9:
+-Semantic check failed.
+-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+----------------------------------
+-Running test: tests/semantics/rule5-illegal.dcf
+-~~~tests/semantics/rule5-illegal.dcf (line 1, col 1): semantic error: Method does not return a value but is used in an expression. `foo`
+-thread 'main' panicked at src/semcheck.rs:1034:9:
+-Semantic check failed.
+-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+----------------------------------
+-Running test: tests/semantics/rule6-illegal.dcf
+-~~~tests/semantics/rule6-illegal.dcf parsing error: Invalid syntax from (line 1, column 1) to (line 5, column 2):
+-  void bar ( int [ ] a ) { } void foo ( ) void main ( ) { }
+-	Reason: Invalid token sequence or unsupported syntax.
+-thread 'main' panicked at src/parse.rs:1297:17:
+-Parsing failed.
+-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+----------------------------------
+-Running test: tests/semantics/rule6-legal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule7-illegal.dcf
+-tests/semantics/rule7-illegal.dcf:2:5: ERROR: Return statement with a value in a void function.
+----------------------------------
+-Running test: tests/semantics/rule8-illegal.dcf
+-tests/semantics/rule8-illegal.dcf:2:5: ERROR: Return type mismatch. Expected 'Int', found 'Bool'.
+----------------------------------
+-Running test: tests/semantics/rule9-illegal.dcf
+-~~~tests/semantics/rule9-illegal.dcf (line 2, col 5): semantic error: Use before declaration `x`
+-thread 'main' panicked at src/semcheck.rs:1034:9:
+-Semantic check failed.
+-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+----------------------------------
+-Running test: tests/semantics/rule10-illegal.dcf
+-~~~tests/semantics/rule10-illegal.dcf (line 2, col 5): semantic error: Call to undefined method. `foo`
+-thread 'main' panicked at src/semcheck.rs:1034:9:
+-Semantic check failed.
+-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+----------------------------------
+-Running test: tests/semantics/rule11-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule12-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule13-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule14-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule15-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule16-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule17-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule18-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule19-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule20-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule21-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule22-illegal.dcf
+-
+----------------------------------
+-Running test: tests/semantics/rule23-illegal.dcf
+-
+----------------------------------
+diff --git a/run.sh b/run.sh
+index 709d891..110a3c2 100755
+--- a/run.sh
++++ b/run.sh
+@@ -1,3 +1,3 @@
+ #!/usr/bin/env bash
+ 
+-target/debug/decaf-skeleton-rust "$@"
+\ No newline at end of file
++target/debug/phase6-rust-compiler "$@"
+\ No newline at end of file
+diff --git a/src/parse.rs b/src/parse.rs
+index c51c09d..f515847 100644
+--- a/src/parse.rs
++++ b/src/parse.rs
+@@ -1287,10 +1287,9 @@ pub fn parse(
+                     .join(" ");
+         
+                 let error_message = format!(
+-                    "~~~{} parsing error: Invalid syntax from (line {}, column {}) to (line {}, column {}):\n  {}\n\tReason: {}",
++                    "~~~{} parsing error: Invalid syntax from (line {}, column {}) to (line {}, column {}):\n|\t{}\n",
+                     filename, start_line, start_col, end_line, end_col,
+                     invalid_code,
+-                    "Invalid token sequence or unsupported syntax."
+                 );
+         
+                 writeln!(writer, "{}", error_message).expect("Failed to write error to stdout!");
+diff --git a/src/semcheck.rs b/src/semcheck.rs
+index 47ac681..1269936 100644
+--- a/src/semcheck.rs
++++ b/src/semcheck.rs
+@@ -12,9 +12,8 @@ Be careful with how you pass Scope:
+     - Use Rc<Refcell<Scope>> for shared, mutable references.
+     - Use &Scope for read-only references.
+ 
+-
+-
+ TODO: AVOID MULTIPLE MESSAGES FOR SAME ERROR
++TODO: DON"T CREATE THE NODE IF THE CHECKS FAIL
+ */
+ 
+ use core::panic;
+@@ -23,6 +22,7 @@ use std::collections::HashMap;
+ use std::collections::HashSet;
+ use std::rc::Rc;
+ 
++
+ use crate::ast::*;
+ use crate::parse::parse;
+ use crate::scope::*;
+@@ -103,6 +103,8 @@ pub fn build_symbol_table(
+                                     ref size,
+                                     ref span,
+                                 } => {
++
++                                    // must have static, legal size
+                                     check_array_size(size, span, writer, context);
+ 
+                                     // Insert variable into the global scope
+@@ -355,6 +357,7 @@ pub fn build_statement(
+     writer: &mut dyn std::io::Write,
+     context: &mut SemanticContext
+ ) -> SymStatement {
++    // println!("building statement: {:#?}", statement);
+     match statement {
+         AST::Statement(Statement::Assignment {
+             location,
+@@ -366,52 +369,36 @@ pub fn build_statement(
+                 // Plain variable assignment (x = 3;)
+                 AST::Identifier { id, span: id_span } => {
+                     check_used_before_decl(id, scope.clone(), span, writer, context);
+-
++                    let entry = scope.borrow().lookup(id).expect("Variable should be declared");
++                
+                     SymStatement::Assignment {
+-                        target: id.clone(),
++                        target: SymExpr::Identifier {
++                            entry: entry.clone(),  // ✅ Store full TableEntry info instead of just `id`
++                            span: id_span.clone(),
++                        },
+                         expr: build_expr(expr, Rc::clone(&scope), writer, context),
+                         span: span.clone(),
+                     }
+-                }
++                },
+ 
++                // Array access assignment (x[2] = 5;)
+                 AST::Expr(Expr::ArrAccess {
+                     id,
+                     index,
+                     span: arr_span,
+                 }) => {
+-                    if let Some(TableEntry::Variable {
+-                        typ,
+-                        is_array,
+-                        span: decl_span,
+-                        ..
+-                    }) = scope.borrow_mut().lookup(id)
+-                    {
+-                        if !is_array {
+-                            panic!(
+-                                "Variable `{}` used as an array but declared as a non-array at line {}, column {}",
+-                                id, decl_span.sline, decl_span.scol
+-                            );
+-                        }
+-                    } else {
+-                        panic!(
+-                            "Array `{}` used before declaration at line {}, column {}",
+-                            id, arr_span.sline, arr_span.scol
+-                        );
+-                    }
+-
+                     SymStatement::Assignment {
+-                        target: id.clone(),
++                        target: build_expr(location, Rc::clone(&scope), writer, context),
+                         expr: build_expr(expr, Rc::clone(&scope), writer, context),
+                         span: span.clone(),
+                     }
+                 }
+-
+                 _ => panic!(
+                     "Unsupported assignment target in AST at line {}, column {}: {:#?}",
+                     span.sline, span.scol, statement
+                 ),
+             }
+-        }
++        },
+ 
+         AST::Statement(Statement::MethodCall {
+             method_name,
+@@ -474,6 +461,7 @@ pub fn build_statement(
+ 
+             let update_expr = match update.as_ref() {
+                 AST::Statement(Statement::Assignment { location, expr, .. }) => {
++
+                     if let AST::Identifier { .. } = location.as_ref() {
+                         build_expr(expr, Rc::clone(&scope), writer, context)
+                     } else {
+@@ -555,6 +543,7 @@ pub fn build_expr(
+             span,
+         }) => {
+             check_methodcall(&method_name, args, span, scope.clone(), true, writer, context);
++
+             SymExpr::MethodCall {
+             method_name: method_name.clone(),
+             args: args
+@@ -565,23 +554,37 @@ pub fn build_expr(
+             }
+         },
+ 
+-        AST::Expr(Expr::ArrAccess { id, index, span }) => SymExpr::ArrayAccess {
+-            id: id.clone(),
+-            index: Rc::new(build_expr(index, Rc::clone(&scope), writer, context)),
+-            span: span.clone(),
++        AST::Expr(Expr::ArrAccess { id, index, span }) => {
++            if let Some(entry) = scope.borrow().lookup(id).map(|e| e.clone()) {  // ✅ Manually cloning the entry
++                if let TableEntry::Variable { is_array, .. } = entry {
++                    check_arraccess(is_array, index, &scope, span, writer, context);
++                }
++            }
++            
++            // Still build this on failure?
++            SymExpr::ArrAccess {
++                id: id.clone(),
++                index: Rc::new(build_expr(index, Rc::clone(&scope), writer, context)),
++                span: span.clone(),
++            }
+         },
+ 
+         AST::Expr(Expr::Len { id, span }) => {
+-            if let AST::Identifier { id, .. } = id.as_ref() {
+-                SymExpr::Len {
+-                    id: id.clone(),
+-                    span: span.clone(),
+-                }
++            if check_len_argument(id, span, &scope.borrow(), writer, context) {
++                if let AST::Identifier { id, .. } = id.as_ref() {
++                    SymExpr::Len {
++                        id: id.clone(),
++                        span: span.clone(),
++                    } 
++                } else {
++                        SymExpr::Error { span: span.clone() }
++                    }
+             } else {
+-                panic!("Expected an identifier in Len expression, found: {:#?}", id);
++                // ❌ If invalid, return an error node
++                SymExpr::Error { span: span.clone() }
+             }
+         }
+-
++        
+         AST::Expr(Expr::Cast {
+             target_type,
+             expr,
+@@ -614,7 +617,6 @@ pub fn build_expr(
+ }
+ 
+ 
+-
+ // #################################################
+ // HELPERS
+ // #################################################
+@@ -622,16 +624,18 @@ pub fn build_expr(
+ /// Formats an error message for printing to stdout.
+ /// Also flags that an error has occurred, so we can
+ /// return a non-zero exist code once checking is finished.
+-fn format_error_message(id: &str, span: Option<&Span>, msg: &str, context: &mut SemanticContext) -> String {
++fn format_error_message(invalid_token: &str, span: Option<&Span>, msg: &str, context: &mut SemanticContext) -> String {
++    // direct checker to panic after completing semantic checks
+     context.error_found = true;
++
+     match span {
+         Some(span) => format!(
+-            "~~~{} (line {}, col {}): semantic error: {} `{}`",
+-            context.filename, span.sline, span.scol, msg, id
++            "~~~{} (line {}, col {}): semantic error:\n|\t{} `{}`",
++            context.filename, span.sline, span.scol, msg, invalid_token
+         ),
+         None => format!(
+-            "~~~{}: semantic error: {} `{}`",
+-            context.filename, msg, id
++            "~~~{}: semantic error: \n|\t{} `{}`",
++            context.filename, msg, invalid_token
+         ),
+     }
+ }
+@@ -781,7 +785,7 @@ fn check_duplicate_imports(imports: &[Box<AST>],writer: &mut dyn std::io::Write,
+     }
+ }
+ 
+-/// RULE 2
++/// RULE 2, 9
+ fn check_used_before_decl(
+     id: &str,
+     scope: Rc<RefCell<Scope>>,
+@@ -822,7 +826,7 @@ fn check_main_exists(methods: &Vec<Box<AST>>, writer: &mut dyn std::io::Write, c
+     }
+ }
+ 
+-/// Rules 4-6
++/// Rules 4-6, 10
+ fn check_methodcall(
+     method_name: &String,
+     args: &Vec<Box<AST>>, // Now considering actual arguments
+@@ -915,6 +919,7 @@ fn check_methodcall(
+ }
+ 
+ 
++
+ // Rules 7-8
+ fn check_return_value(
+     ret: Option<&Box<AST>>, 
+@@ -923,15 +928,14 @@ fn check_return_value(
+     writer: &mut dyn std::io::Write,
+     context: &mut SemanticContext,
+ ) {
++    let mut msg = String::new();
++    
+     // Get the method name from scope
+     let method_name = match &scope.enclosing_method {
+         Some(name) => name.clone(),
+         None => {
+-            writeln!(
+-                writer,
+-                "{}:{}:{}: ERROR: Return statement outside of a function.",
+-                context.filename.as_str(), span.sline, span.scol
+-            ).expect("Failed to write error message");
++            let error_msg = format_error_message("Return statement outside of a function.", Some(span), "ERROR:", context);
++            writer.write_all(error_msg.as_bytes()).expect("Failed to write error message");
+             return;
+         }
+     };
+@@ -940,50 +944,142 @@ fn check_return_value(
+     let method_entry = match scope.lookup(&method_name) {
+         Some(TableEntry::Method { return_type, .. }) => return_type.clone(),
+         _ => {
+-            writeln!(
+-                writer,
+-                "{}:{}:{}: ERROR: Could not find method '{}' in symbol table.",
+-                context.filename.as_str(), span.sline, span.scol, method_name
+-            ).expect("Failed to write error message");
++            let error_msg = format_error_message(&format!("Could not find method '{}' in symbol table.", method_name), Some(span), "ERROR:", context);
++            writer.write_all(error_msg.as_bytes()).expect("Failed to write error message");
+             return;
+         }
+     };
+ 
+     match (&ret, method_entry) {
+         // Case 1: Return value in a void function (Illegal)
+-        (Some(_), Type::Void) => {
+-            writeln!(
+-                writer,
+-                "{}:{}:{}: ERROR: Return statement with a value in a void function.",
+-                context.filename.as_str(), span.sline, span.scol
+-            ).expect("Failed to write error message");
++        (Some(expr), Type::Void) => {
++            let expr_str = format!("{:?}", expr);  // ✅ Convert return statement to a string
++            let error_msg = format_error_message(
++                &expr_str,  // ✅ First arg is the actual return statement!
++                Some(span),
++                "Return statement with a value in a void function.",
++                context
++            );
++            writeln!(writer, "{}", error_msg).expect("Failed to write output!");
+         }
+-
++    
+         // Case 2: No return value in a function that requires one (Illegal)
+         (None, return_type) if return_type != Type::Void => {
+-            writeln!(
+-                writer,
+-                "{}:{}:{}: ERROR: Missing return value in function returning '{:#?}'.",
+-                context.filename.as_str(), span.sline, span.scol, return_type
+-            ).expect("Failed to write error message");
++            let error_msg = format_error_message(
++                "return",  // ✅ This case has no expression, so just "return"
++                Some(span),
++                &format!("Missing return value in function returning '{:#?}'.", return_type),
++                context
++            );
++            writeln!(writer, "{}", error_msg).expect("Failed to write output!");
+         }
+-
++    
+         // Case 3: Return type mismatch (Illegal)
+         (Some(expr), return_type) => {
+             let expr_type = infer_expr_type(expr, scope);
+             if expr_type != return_type {
+-                writeln!(
+-                    writer,
+-                    "{}:{}:{}: ERROR: Return type mismatch. Expected '{:#?}', found '{:#?}'.",
+-                    context.filename.as_str(), span.sline, span.scol, return_type, expr_type
+-                ).expect("Failed to write error message");
++                let expr_str = format!("{:?}", expr);  // ✅ Convert return statement to string
++                let error_msg = format_error_message(
++                    &expr_str,  // ✅ Now first argument is the actual return statement!
++                    Some(span),
++                    &format!("Return type mismatch. Expected '{:#?}', found '{:#?}'.", return_type, expr_type),
++                    context
++                );
++                writeln!(writer, "{}", error_msg).expect("Failed to write output!");
+             }
+         }
++        _ => {}, // Valid return statement
++    }
++    
++}
++
++
++/// Rule 11
++fn check_arraccess(
++    is_array: bool,
++    array_index: &Box<AST>,
++    scope: &Rc<RefCell<Scope>>,
++    span: &Span,
++    writer: &mut dyn std::io::Write,
++    context: &mut SemanticContext,
++) {
++    // Rule 11(a): Ensure that the identifier is an array
++    if !is_array {
++        let error_msg = format_error_message(
++            format!("{:#?}", array_index).as_str(),
++            Some(span),
++            "Identifier must be an array variable.",
++            context,
++        );
++        writeln!(writer, "{}", error_msg).unwrap();
++        return;
++    }
+ 
+-        _ => {println!("this ret ok");} // Valid return statement
++    // Rule 11(b): Ensure that the index expression evaluates to an int
++    let index_type = infer_expr_type(array_index, &scope.borrow());
++    if index_type != Type::Int {
++        let error_msg = format_error_message(
++            format!("{:#?}", array_index).as_str(),
++            Some(span),
++            "Array index must be of type int.",
++            context,
++        );
++        writeln!(writer, "{}", error_msg).unwrap();
+     }
+ }
+ 
++fn check_len_argument(id: &AST, span: &Span, scope: &Scope, writer: &mut dyn std::io::Write, context: &mut SemanticContext)-> bool{
++    if let AST::Identifier { id, .. } = id {
++        if let Some(entry) = scope.lookup(id) {
++            match entry {
++                TableEntry::Variable { is_array: true, .. } => {
++                    return true
++                    // ✅ Valid: `len` is used on an array
++                }
++                _ => {
++                    // ❌ Error: `len` called on a non-array variable
++                    writeln!(
++                        writer,
++                        "{}",
++                        format_error_message(
++                            id,
++                            Some(span),
++                            "Invalid use of `len`: argument must be an array variable.",
++                            context
++                        )
++                    ).expect("Failed to write error message");
++                }
++            }
++        } else {
++            // ❌ Error: `len` called on an undefined variable
++            writeln!(
++                writer,
++                "{}",
++                format_error_message(
++                    id,
++                    Some(span),
++                    "Undefined variable used in `len` expression.",
++                    context
++                )
++            ).expect("Failed to write error message");
++        }
++    } else {
++        // len` called with an invalid argument (must be an identifier)
++        writeln!(
++            writer,
++            "{}",
++            format_error_message(
++                &format!("{:?}", id),
++                Some(span),
++                "Invalid argument to `len`: expected an array identifier.",
++                context
++            )
++        ).expect("Failed to write error message");
++    }
++    false
++}
++
++
+ 
+ fn check_array_size(size: &str, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+     let is_valid = if let Some(stripped) = size.strip_prefix("0x") {
+diff --git a/src/symtable.rs b/src/symtable.rs
+index 8a371c1..805ef09 100644
+--- a/src/symtable.rs
++++ b/src/symtable.rs
+@@ -77,7 +77,7 @@ pub enum SymStatement {
+         span: Span,
+     },
+     Assignment {
+-        target: String,
++        target: SymExpr,  //Now supports both `Identifier` and `ArrAccess`
+         expr: SymExpr,
+         span: Span,
+     },
+@@ -115,6 +115,9 @@ pub enum SymStatement {
+     Continue {
+         span: Span,
+     },
++    Error {
++        span: Span,
++    }
+ }
+ 
+ /// IR representation for expressions
+@@ -129,7 +132,7 @@ pub enum SymExpr {
+         entry: TableEntry,
+         span: Span,
+     },
+-    ArrayAccess {
++    ArrAccess {
+         id: String,
+         index: Rc<SymExpr>,
+         span: Span,
+@@ -161,4 +164,7 @@ pub enum SymExpr {
+         id: String,
+         span: Span,
+     },
++    Error {
++        span: Span
++    }
+ }
+diff --git a/tests/semantics/rule11-illegal.dcf b/tests/semantics/rule11-illegal.dcf
+index 026f817..3fdaa3d 100644
+--- a/tests/semantics/rule11-illegal.dcf
++++ b/tests/semantics/rule11-illegal.dcf
+@@ -3,6 +3,6 @@ void main() {
+     int index;
+     int x;
+     
+-    index = true; // ❌ Index must be an `int`
+-    x = arr[index];
++    // index = true; // ❌ Index must be an `int`
++    x = arr[true];
+ }

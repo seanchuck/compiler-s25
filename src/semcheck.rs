@@ -12,9 +12,8 @@ Be careful with how you pass Scope:
     - Use Rc<Refcell<Scope>> for shared, mutable references.
     - Use &Scope for read-only references.
 
-
-
 TODO: AVOID MULTIPLE MESSAGES FOR SAME ERROR
+TODO: DON"T CREATE THE NODE IF THE CHECKS FAIL
 */
 
 use core::panic;
@@ -22,6 +21,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
+
 
 use crate::ast::*;
 use crate::parse::parse;
@@ -103,6 +103,8 @@ pub fn build_symbol_table(
                                     ref size,
                                     ref span,
                                 } => {
+
+                                    // must have static, legal size
                                     check_array_size(size, span, writer, context);
 
                                     // Insert variable into the global scope
@@ -355,6 +357,7 @@ pub fn build_statement(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext
 ) -> SymStatement {
+    // println!("building statement: {:#?}", statement);
     match statement {
         AST::Statement(Statement::Assignment {
             location,
@@ -366,52 +369,36 @@ pub fn build_statement(
                 // Plain variable assignment (x = 3;)
                 AST::Identifier { id, span: id_span } => {
                     check_used_before_decl(id, scope.clone(), span, writer, context);
-
+                    let entry = scope.borrow().lookup(id).expect("Variable should be declared");
+                
                     SymStatement::Assignment {
-                        target: id.clone(),
+                        target: SymExpr::Identifier {
+                            entry: entry.clone(),  // ✅ Store full TableEntry info instead of just `id`
+                            span: id_span.clone(),
+                        },
                         expr: build_expr(expr, Rc::clone(&scope), writer, context),
                         span: span.clone(),
                     }
-                }
+                },
 
+                // Array access assignment (x[2] = 5;)
                 AST::Expr(Expr::ArrAccess {
                     id,
                     index,
                     span: arr_span,
                 }) => {
-                    if let Some(TableEntry::Variable {
-                        typ,
-                        is_array,
-                        span: decl_span,
-                        ..
-                    }) = scope.borrow_mut().lookup(id)
-                    {
-                        if !is_array {
-                            panic!(
-                                "Variable `{}` used as an array but declared as a non-array at line {}, column {}",
-                                id, decl_span.sline, decl_span.scol
-                            );
-                        }
-                    } else {
-                        panic!(
-                            "Array `{}` used before declaration at line {}, column {}",
-                            id, arr_span.sline, arr_span.scol
-                        );
-                    }
-
                     SymStatement::Assignment {
-                        target: id.clone(),
+                        target: build_expr(location, Rc::clone(&scope), writer, context),
                         expr: build_expr(expr, Rc::clone(&scope), writer, context),
                         span: span.clone(),
                     }
                 }
-
                 _ => panic!(
                     "Unsupported assignment target in AST at line {}, column {}: {:#?}",
                     span.sline, span.scol, statement
                 ),
             }
-        }
+        },
 
         AST::Statement(Statement::MethodCall {
             method_name,
@@ -474,6 +461,7 @@ pub fn build_statement(
 
             let update_expr = match update.as_ref() {
                 AST::Statement(Statement::Assignment { location, expr, .. }) => {
+
                     if let AST::Identifier { .. } = location.as_ref() {
                         build_expr(expr, Rc::clone(&scope), writer, context)
                     } else {
@@ -555,6 +543,7 @@ pub fn build_expr(
             span,
         }) => {
             check_methodcall(&method_name, args, span, scope.clone(), true, writer, context);
+
             SymExpr::MethodCall {
             method_name: method_name.clone(),
             args: args
@@ -565,23 +554,37 @@ pub fn build_expr(
             }
         },
 
-        AST::Expr(Expr::ArrAccess { id, index, span }) => SymExpr::ArrayAccess {
-            id: id.clone(),
-            index: Rc::new(build_expr(index, Rc::clone(&scope), writer, context)),
-            span: span.clone(),
+        AST::Expr(Expr::ArrAccess { id, index, span }) => {
+            if let Some(entry) = scope.borrow().lookup(id).map(|e| e.clone()) {  // ✅ Manually cloning the entry
+                if let TableEntry::Variable { is_array, .. } = entry {
+                    check_arraccess(is_array, index, &scope, span, writer, context);
+                }
+            }
+            
+            // Still build this on failure?
+            SymExpr::ArrAccess {
+                id: id.clone(),
+                index: Rc::new(build_expr(index, Rc::clone(&scope), writer, context)),
+                span: span.clone(),
+            }
         },
 
         AST::Expr(Expr::Len { id, span }) => {
-            if let AST::Identifier { id, .. } = id.as_ref() {
-                SymExpr::Len {
-                    id: id.clone(),
-                    span: span.clone(),
-                }
+            if check_len_argument(id, span, &scope.borrow(), writer, context) {
+                if let AST::Identifier { id, .. } = id.as_ref() {
+                    SymExpr::Len {
+                        id: id.clone(),
+                        span: span.clone(),
+                    } 
+                } else {
+                        SymExpr::Error { span: span.clone() }
+                    }
             } else {
-                panic!("Expected an identifier in Len expression, found: {:#?}", id);
+                // ❌ If invalid, return an error node
+                SymExpr::Error { span: span.clone() }
             }
         }
-
+        
         AST::Expr(Expr::Cast {
             target_type,
             expr,
@@ -614,7 +617,6 @@ pub fn build_expr(
 }
 
 
-
 // #################################################
 // HELPERS
 // #################################################
@@ -622,16 +624,18 @@ pub fn build_expr(
 /// Formats an error message for printing to stdout.
 /// Also flags that an error has occurred, so we can
 /// return a non-zero exist code once checking is finished.
-fn format_error_message(id: &str, span: Option<&Span>, msg: &str, context: &mut SemanticContext) -> String {
+fn format_error_message(invalid_token: &str, span: Option<&Span>, msg: &str, context: &mut SemanticContext) -> String {
+    // direct checker to panic after completing semantic checks
     context.error_found = true;
+
     match span {
         Some(span) => format!(
-            "~~~{} (line {}, col {}): semantic error: {} `{}`",
-            context.filename, span.sline, span.scol, msg, id
+            "~~~{} (line {}, col {}): semantic error:\n|\t{} `{}`",
+            context.filename, span.sline, span.scol, msg, invalid_token
         ),
         None => format!(
-            "~~~{}: semantic error: {} `{}`",
-            context.filename, msg, id
+            "~~~{}: semantic error: \n|\t{} `{}`",
+            context.filename, msg, invalid_token
         ),
     }
 }
@@ -781,7 +785,7 @@ fn check_duplicate_imports(imports: &[Box<AST>],writer: &mut dyn std::io::Write,
     }
 }
 
-/// RULE 2
+/// RULE 2, 9
 fn check_used_before_decl(
     id: &str,
     scope: Rc<RefCell<Scope>>,
@@ -822,7 +826,7 @@ fn check_main_exists(methods: &Vec<Box<AST>>, writer: &mut dyn std::io::Write, c
     }
 }
 
-/// Rules 4-6
+/// Rules 4-6, 10
 fn check_methodcall(
     method_name: &String,
     args: &Vec<Box<AST>>, // Now considering actual arguments
@@ -915,6 +919,7 @@ fn check_methodcall(
 }
 
 
+
 // Rules 7-8
 fn check_return_value(
     ret: Option<&Box<AST>>, 
@@ -923,15 +928,14 @@ fn check_return_value(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
+    let mut msg = String::new();
+    
     // Get the method name from scope
     let method_name = match &scope.enclosing_method {
         Some(name) => name.clone(),
         None => {
-            writeln!(
-                writer,
-                "{}:{}:{}: ERROR: Return statement outside of a function.",
-                context.filename.as_str(), span.sline, span.scol
-            ).expect("Failed to write error message");
+            let error_msg = format_error_message("Return statement outside of a function.", Some(span), "ERROR:", context);
+            writer.write_all(error_msg.as_bytes()).expect("Failed to write error message");
             return;
         }
     };
@@ -940,49 +944,141 @@ fn check_return_value(
     let method_entry = match scope.lookup(&method_name) {
         Some(TableEntry::Method { return_type, .. }) => return_type.clone(),
         _ => {
-            writeln!(
-                writer,
-                "{}:{}:{}: ERROR: Could not find method '{}' in symbol table.",
-                context.filename.as_str(), span.sline, span.scol, method_name
-            ).expect("Failed to write error message");
+            let error_msg = format_error_message(&format!("Could not find method '{}' in symbol table.", method_name), Some(span), "ERROR:", context);
+            writer.write_all(error_msg.as_bytes()).expect("Failed to write error message");
             return;
         }
     };
 
     match (&ret, method_entry) {
         // Case 1: Return value in a void function (Illegal)
-        (Some(_), Type::Void) => {
-            writeln!(
-                writer,
-                "{}:{}:{}: ERROR: Return statement with a value in a void function.",
-                context.filename.as_str(), span.sline, span.scol
-            ).expect("Failed to write error message");
+        (Some(expr), Type::Void) => {
+            let expr_str = format!("{:?}", expr);  // ✅ Convert return statement to a string
+            let error_msg = format_error_message(
+                &expr_str,  // ✅ First arg is the actual return statement!
+                Some(span),
+                "Return statement with a value in a void function.",
+                context
+            );
+            writeln!(writer, "{}", error_msg).expect("Failed to write output!");
         }
-
+    
         // Case 2: No return value in a function that requires one (Illegal)
         (None, return_type) if return_type != Type::Void => {
-            writeln!(
-                writer,
-                "{}:{}:{}: ERROR: Missing return value in function returning '{:#?}'.",
-                context.filename.as_str(), span.sline, span.scol, return_type
-            ).expect("Failed to write error message");
+            let error_msg = format_error_message(
+                "return",  // ✅ This case has no expression, so just "return"
+                Some(span),
+                &format!("Missing return value in function returning '{:#?}'.", return_type),
+                context
+            );
+            writeln!(writer, "{}", error_msg).expect("Failed to write output!");
         }
-
+    
         // Case 3: Return type mismatch (Illegal)
         (Some(expr), return_type) => {
             let expr_type = infer_expr_type(expr, scope);
             if expr_type != return_type {
-                writeln!(
-                    writer,
-                    "{}:{}:{}: ERROR: Return type mismatch. Expected '{:#?}', found '{:#?}'.",
-                    context.filename.as_str(), span.sline, span.scol, return_type, expr_type
-                ).expect("Failed to write error message");
+                let expr_str = format!("{:?}", expr);  // ✅ Convert return statement to string
+                let error_msg = format_error_message(
+                    &expr_str,  // ✅ Now first argument is the actual return statement!
+                    Some(span),
+                    &format!("Return type mismatch. Expected '{:#?}', found '{:#?}'.", return_type, expr_type),
+                    context
+                );
+                writeln!(writer, "{}", error_msg).expect("Failed to write output!");
             }
         }
+        _ => {}, // Valid return statement
+    }
+    
+}
 
-        _ => {println!("this ret ok");} // Valid return statement
+
+/// Rule 11
+fn check_arraccess(
+    is_array: bool,
+    array_index: &Box<AST>,
+    scope: &Rc<RefCell<Scope>>,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    // Rule 11(a): Ensure that the identifier is an array
+    if !is_array {
+        let error_msg = format_error_message(
+            format!("{:#?}", array_index).as_str(),
+            Some(span),
+            "Identifier must be an array variable.",
+            context,
+        );
+        writeln!(writer, "{}", error_msg).unwrap();
+        return;
+    }
+
+    // Rule 11(b): Ensure that the index expression evaluates to an int
+    let index_type = infer_expr_type(array_index, &scope.borrow());
+    if index_type != Type::Int {
+        let error_msg = format_error_message(
+            format!("{:#?}", array_index).as_str(),
+            Some(span),
+            "Array index must be of type int.",
+            context,
+        );
+        writeln!(writer, "{}", error_msg).unwrap();
     }
 }
+
+fn check_len_argument(id: &AST, span: &Span, scope: &Scope, writer: &mut dyn std::io::Write, context: &mut SemanticContext)-> bool{
+    if let AST::Identifier { id, .. } = id {
+        if let Some(entry) = scope.lookup(id) {
+            match entry {
+                TableEntry::Variable { is_array: true, .. } => {
+                    return true
+                    // ✅ Valid: `len` is used on an array
+                }
+                _ => {
+                    // ❌ Error: `len` called on a non-array variable
+                    writeln!(
+                        writer,
+                        "{}",
+                        format_error_message(
+                            id,
+                            Some(span),
+                            "Invalid use of `len`: argument must be an array variable.",
+                            context
+                        )
+                    ).expect("Failed to write error message");
+                }
+            }
+        } else {
+            // ❌ Error: `len` called on an undefined variable
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    id,
+                    Some(span),
+                    "Undefined variable used in `len` expression.",
+                    context
+                )
+            ).expect("Failed to write error message");
+        }
+    } else {
+        // len` called with an invalid argument (must be an identifier)
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("{:?}", id),
+                Some(span),
+                "Invalid argument to `len`: expected an array identifier.",
+                context
+            )
+        ).expect("Failed to write error message");
+    }
+    false
+}
+
 
 
 fn check_array_size(size: &str, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {

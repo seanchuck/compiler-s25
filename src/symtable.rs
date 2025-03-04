@@ -77,7 +77,7 @@ pub enum SymStatement {
         span: Span,
     },
     Assignment {
-        target: String,
+        target: SymExpr,  //Now supports both `Identifier` and `ArrAccess`
         expr: SymExpr,
         span: Span,
     },
@@ -115,6 +115,9 @@ pub enum SymStatement {
     Continue {
         span: Span,
     },
+    Error {
+        span: Span,
+    }
 }
 
 /// IR representation for expressions
@@ -129,7 +132,7 @@ pub enum SymExpr {
         entry: TableEntry,
         span: Span,
     },
-    ArrayAccess {
+    ArrAccess {
         id: String,
         index: Rc<SymExpr>,
         span: Span,
@@ -161,4 +164,7 @@ pub enum SymExpr {
         id: String,
         span: Span,
     },
+    Error {
+        span: Span
+    }
 }

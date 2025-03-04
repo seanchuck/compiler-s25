@@ -3,6 +3,6 @@ void main() {
     int index;
     int x;
     
-    index = true; // ❌ Index must be an `int`
-    x = arr[index];
+    // index = true; // ❌ Index must be an `int`
+    x = arr[true];
 }
