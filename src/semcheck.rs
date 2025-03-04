@@ -8,6 +8,12 @@ symbol table, and others are performed explicitly after.
 Use-before-declaration is caught by the grammar/parser.
 
 
+Be careful with how you pass Scope:
+    - Use Rc<Refcell<Scope>> for shared, mutable references.
+    - Use &Scope for read-only references.
+
+
+
 TODO: AVOID MULTIPLE MESSAGES FOR SAME ERROR
 */
 
@@ -28,6 +34,8 @@ use crate::utils::print::*;
 // #################################################
 // AST --> SYMBOL TABLE AST CONSTRUCTION
 // #################################################
+// Some of the semantic checks are also performed 
+// During this phase
 
 /// Build the symbol-table-augmented version of the AST
 pub fn build_symbol_table(
@@ -126,10 +134,8 @@ pub fn build_symbol_table(
                         ref block,
                         ref span,
                     } => {
-                        let method =
-                            build_method(method, Rc::clone(&global_scope), filename, writer);
-
-                        // Insert into scope table
+                        println!("serint method{}", name);
+                        // Insert function into table before processing body
                         global_scope.borrow_mut().insert(
                             name.clone(),
                             TableEntry::Method {
@@ -150,9 +156,14 @@ pub fn build_symbol_table(
                                 span: span.clone(),
                             },
                         );
+                        println!("method table is now: {:#?}", global_scope);
+                        
+                        // Now process the function body
+                        let method = build_method(method, Rc::clone(&global_scope), filename, writer);
 
                         // Store the method body as well
                         method_bodies.insert(method.name.clone(), Rc::new(method));
+
                     }
                     _ => unreachable!(),
                 }
@@ -184,7 +195,7 @@ pub fn build_method(
             block,
             span,
         } => {
-            let method_scope = Rc::new(RefCell::new(Scope::add_child(parent_scope)));
+            let method_scope = Rc::new(RefCell::new(Scope::add_child(parent_scope, Some(name.clone()))));
 
             // Process method params, and add into method's outer-most scope
             for param in params {
@@ -253,7 +264,7 @@ pub fn build_block(
             let scope = if is_function_body {
                 Rc::clone(&parent_scope)
             } else {
-                Rc::new(RefCell::new(Scope::add_child(parent_scope)))
+                Rc::new(RefCell::new(Scope::add_child(parent_scope, None)))
             };
 
             let mut sym_statements = Vec::new();
@@ -407,7 +418,7 @@ pub fn build_statement(
             args,
             span,}) => {
 
-            check_methodcall(&method_name, &args, scope.clone(), false, filename, writer);
+            check_methodcall(&method_name, &args, span, scope.clone(), false, filename, writer);
 
             SymStatement::MethodCall {
             method_name: method_name.clone(),
@@ -488,12 +499,15 @@ pub fn build_statement(
             }
         }
 
-        AST::Statement(Statement::Return { expr, span }) => SymStatement::Return {
+        AST::Statement(Statement::Return { expr, span }) => {
+            check_return_value(expr.as_ref(), &scope.borrow(), span, filename, writer);
+            SymStatement::Return {
             expr: expr
                 .as_ref()
                 .map(|e| build_expr(e, Rc::clone(&scope), filename, writer)),
             span: span.clone(),
-        },
+            }
+        }
 
         AST::Statement(Statement::Break { span }) => SymStatement::Break { span: span.clone() },
         AST::Statement(Statement::Continue { span }) => {
@@ -540,7 +554,7 @@ pub fn build_expr(
             args,
             span,
         }) => {
-            check_methodcall(&method_name, args, scope.clone(), true, filename, writer);
+            check_methodcall(&method_name, args, span, scope.clone(), true, filename, writer);
             SymExpr::MethodCall {
             method_name: method_name.clone(),
             args: args
@@ -608,7 +622,7 @@ pub fn build_expr(
 fn format_error_message(id: &str, span: Option<&Span>, filename: &str, msg: &str) -> String {
     match span {
         Some(span) => format!(
-            "Semantic error in \"{}\" (line {}, column {}): {} `{}`",
+            "Semantic error in \"{}\" (line {}, col {}): {} `{}`",
             filename, span.sline, span.scol, msg, id
         ),
         None => format!(
@@ -777,7 +791,7 @@ fn check_used_before_decl(
         writeln!(
             writer,
             "{}",
-            format_error_message(id, Some(span), filename, "use before declaration")
+            format_error_message(id, Some(span), filename, "Use before declaration")
         )
         .expect("Failed to write output!");
     }
@@ -808,6 +822,7 @@ fn check_main_exists(methods: &Vec<Box<AST>>, filename: &str, writer: &mut dyn s
 fn check_methodcall(
     method_name: &String,
     args: &Vec<Box<AST>>, // Now considering actual arguments
+    span: &Span,
     scope: Rc<RefCell<Scope>>,
     is_expr: bool,
     filename: &str,
@@ -886,15 +901,85 @@ fn check_methodcall(
         None => {
             let err_msg = format_error_message(
                 method_name,
-                None,
+                Some(&span),
                 filename,
-                "Undefined method.",
+                "Call to undefined method.",
             );
             writeln!(writer, "{}", err_msg).unwrap();
         }
     }
 }
 
+
+// Rules 7-8
+fn check_return_value(
+    ret: Option<&Box<AST>>, 
+    scope: &Scope,
+    span: &Span, 
+    filename: &str, 
+    writer: &mut dyn std::io::Write
+) {
+    println!("we checking this retu");
+    // Get the method name from scope
+    let method_name = match &scope.enclosing_method {
+        Some(name) => name.clone(),
+        None => {
+            writeln!(
+                writer,
+                "{}:{}:{}: ERROR: Return statement outside of a function.",
+                filename, span.sline, span.scol
+            ).expect("Failed to write error message");
+            return;
+        }
+    };
+
+    // Lookup method details in the symbol table
+    let method_entry = match scope.lookup(&method_name) {
+        Some(TableEntry::Method { return_type, .. }) => return_type.clone(),
+        _ => {
+            writeln!(
+                writer,
+                "{}:{}:{}: ERROR: Could not find method '{}' in symbol table.",
+                filename, span.sline, span.scol, method_name
+            ).expect("Failed to write error message");
+            return;
+        }
+    };
+
+    match (&ret, method_entry) {
+        // Case 1: Return value in a void function (Illegal)
+        (Some(_), Type::Void) => {
+            writeln!(
+                writer,
+                "{}:{}:{}: ERROR: Return statement with a value in a void function.",
+                filename, span.sline, span.scol
+            ).expect("Failed to write error message");
+        }
+
+        // Case 2: No return value in a function that requires one (Illegal)
+        (None, return_type) if return_type != Type::Void => {
+            writeln!(
+                writer,
+                "{}:{}:{}: ERROR: Missing return value in function returning '{:#?}'.",
+                filename, span.sline, span.scol, return_type
+            ).expect("Failed to write error message");
+        }
+
+        // Case 3: Return type mismatch (Illegal)
+        (Some(expr), return_type) => {
+            let expr_type = infer_expr_type(expr, scope);
+            if expr_type != return_type {
+                writeln!(
+                    writer,
+                    "{}:{}:{}: ERROR: Return type mismatch. Expected '{:#?}', found '{:#?}'.",
+                    filename, span.sline, span.scol, return_type, expr_type
+                ).expect("Failed to write error message");
+            }
+        }
+
+        _ => {println!("this ret ok");} // Valid return statement
+    }
+}
 
 
 fn check_array_size(size: &str, span: &Span, filename: &str, writer: &mut dyn std::io::Write) {

@@ -17,6 +17,7 @@ pub struct Scope {
     pub parent: Option<Rc<RefCell<Scope>>>,
     pub table: HashMap<String, TableEntry>,
     pub id: Option<String>, // for debugging purposes
+    pub enclosing_method: Option<String>,
 }
 
 /// Symbol table entry type, representing locally-
@@ -46,15 +47,19 @@ pub enum TableEntry {
 
 /// Functions for creating new scopes
 impl Scope {
+    /// Create a new global scope
     pub fn new() -> Self {
         Scope {
             table: HashMap::new(),
             parent: None,
             id: Some("Global scope".to_string()),
+            enclosing_method: None,
         }
     }
 
-    pub fn add_child(parent: Rc<RefCell<Scope>>) -> Self {
+    /// Add a child scope with a pointer back to the parent.
+    /// Optionally, define the method this scope represents.
+    pub fn add_child(parent: Rc<RefCell<Scope>>, enclosing_method: Option<String>) -> Self {
         let parent_id = parent
             .borrow_mut()
             .id
@@ -65,6 +70,7 @@ impl Scope {
             table: HashMap::new(),
             parent: Some(parent),
             id: Some(format!("Child of: {}", parent_id)),
+            enclosing_method
         }
     }
 

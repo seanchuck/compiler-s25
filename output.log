@@ -1,0 +1,754 @@
+Running test: tests/semantics/rule1-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "x": Variable {
+                name: "x",
+                typ: Int,
+                is_array: false,
+                span: Span {
+                    sline: 2,
+                    scol: 5,
+                    eline: 2,
+                    ecol: 6,
+                },
+            },
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 3,
+                    scol: 1,
+                    eline: 3,
+                    ecol: 15,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule2-illegal.dcf
+
+PARSING ERROR! Invalid syntax from line 4, column 1 to line 7, column 2:
+  void main ( ) { x = 5 ; int x ; }
+Reason: Invalid token sequence or unsupported syntax.
+thread 'main' panicked at src/parse.rs:1297:17:
+Parsing failed.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+---------------------------------
+Running test: tests/semantics/rule3-illegal.dcf
+Semantic error in "tests/semantics/rule3-illegal.dcf": Missing entry point: `main`
+serint methodfoo
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "x": Variable {
+                name: "x",
+                typ: Int,
+                is_array: false,
+                span: Span {
+                    sline: 1,
+                    scol: 5,
+                    eline: 1,
+                    ecol: 6,
+                },
+            },
+            "foo": Method {
+                name: "foo",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 2,
+                    scol: 1,
+                    eline: 2,
+                    ecol: 14,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule4-illegal.dcf
+serint methodfoo
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "foo": Method {
+                name: "foo",
+                return_type: Void,
+                params: [
+                    (
+                        Int,
+                        "x",
+                    ),
+                ],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 1,
+                    ecol: 19,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 2,
+                    scol: 1,
+                    eline: 4,
+                    ecol: 2,
+                },
+            },
+            "foo": Method {
+                name: "foo",
+                return_type: Void,
+                params: [
+                    (
+                        Int,
+                        "x",
+                    ),
+                ],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 1,
+                    ecol: 19,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+Semantic error in "tests/semantics/rule4-illegal.dcf" (line 1, col 1): Incorrect number of arguments for method. Expected 1, but got 0. `foo`
+---------------------------------
+Running test: tests/semantics/rule5-illegal.dcf
+serint methodfoo
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "foo": Method {
+                name: "foo",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 1,
+                    ecol: 14,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 2,
+                    scol: 1,
+                    eline: 5,
+                    ecol: 2,
+                },
+            },
+            "foo": Method {
+                name: "foo",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 1,
+                    ecol: 14,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+Semantic error in "tests/semantics/rule5-illegal.dcf" (line 1, col 1): Method does not return a value but is used in an expression. `foo`
+---------------------------------
+Running test: tests/semantics/rule6-illegal.dcf
+
+PARSING ERROR! Invalid syntax from line 1, column 1 to line 5, column 2:
+  void bar ( int [ ] a ) { } void foo ( ) void main ( ) { }
+Reason: Invalid token sequence or unsupported syntax.
+thread 'main' panicked at src/parse.rs:1297:17:
+Parsing failed.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+---------------------------------
+Running test: tests/semantics/rule6-legal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "foo": Import {
+                name: "foo",
+                span: Span {
+                    sline: 1,
+                    scol: 8,
+                    eline: 1,
+                    ecol: 11,
+                },
+            },
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 3,
+                    scol: 1,
+                    eline: 9,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule7-illegal.dcf
+serint methodfoo
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "foo": Method {
+                name: "foo",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 3,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+we checking this retu
+tests/semantics/rule7-illegal.dcf:2:5: ERROR: Return statement with a value in a void function.
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 4,
+                    scol: 1,
+                    eline: 4,
+                    ecol: 15,
+                },
+            },
+            "foo": Method {
+                name: "foo",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 3,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule8-illegal.dcf
+serint methodfoo
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "foo": Method {
+                name: "foo",
+                return_type: Int,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 3,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+we checking this retu
+tests/semantics/rule8-illegal.dcf:2:5: ERROR: Return type mismatch. Expected 'Int', found 'Bool'.
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 4,
+                    scol: 1,
+                    eline: 4,
+                    ecol: 15,
+                },
+            },
+            "foo": Method {
+                name: "foo",
+                return_type: Int,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 3,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule9-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 3,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+Semantic error in "tests/semantics/rule9-illegal.dcf" (line 2, col 5): Use before declaration `x`
+---------------------------------
+Running test: tests/semantics/rule10-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 3,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+Semantic error in "tests/semantics/rule10-illegal.dcf" (line 2, col 5): Call to undefined method. `foo`
+---------------------------------
+Running test: tests/semantics/rule11-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 8,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule12-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 7,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule13-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 8,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule14-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 4,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule15-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 4,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule16-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 7,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule17-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 4,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule18-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 5,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule19-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 3,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule20-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 4,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule21-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 4,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule22-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 4,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
+Running test: tests/semantics/rule23-illegal.dcf
+serint methodmain
+method table is now: RefCell {
+    value: Scope {
+        parent: None,
+        table: {
+            "main": Method {
+                name: "main",
+                return_type: Void,
+                params: [],
+                span: Span {
+                    sline: 1,
+                    scol: 1,
+                    eline: 4,
+                    ecol: 2,
+                },
+            },
+        },
+        id: Some(
+            "Global scope",
+        ),
+        enclosing_method: None,
+    },
+}
+---------------------------------
