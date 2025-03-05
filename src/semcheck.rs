@@ -546,13 +546,71 @@ pub fn build_expr(
             left,
             right,
             span,
-        }) => SymExpr::BinaryExpr {
-            op: op.clone(),
-            left: Rc::new(build_expr(left, Rc::clone(&scope), writer, context)),
-            right: Rc::new(build_expr(right, Rc::clone(&scope), writer, context)),
-            typ: Type::Int, // TODO: Type inference
-            span: span.clone(),
-        },
+        }) => {
+            let left_expr = Rc::new(build_expr(left, Rc::clone(&scope), writer, context));
+            let right_expr = Rc::new(build_expr(right, Rc::clone(&scope), writer, context));
+
+            let left_type = infer_expr_type(left, &scope.borrow());
+            let right_type = infer_expr_type(right, &scope.borrow());
+            let mut result_type = Type::Unknown; // Set result type based on operator
+
+            match *op {
+                // Arithmetic operators return the same type as operands (int or long)
+                BinaryOp::Add
+                | BinaryOp::Subtract
+                | BinaryOp::Multiply
+                | BinaryOp::Divide
+                | BinaryOp::Modulo => {
+                    check_is_numeric_and_compatible(true, left, Some(right), span, scope.clone(), writer, context);
+                    result_type = left_type; // If valid, set type to operand type
+                }
+
+                // Relational operators always return bool
+                BinaryOp::Greater
+                | BinaryOp::GreaterEqual
+                | BinaryOp::Less
+                | BinaryOp::LessEqual => {
+                    check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);
+                    result_type = Type::Bool;
+                }
+
+                // Equality operators always return bool
+                BinaryOp::Equal
+                | BinaryOp::NotEqual => {
+                    // check_equality_compatible(left, right, span, scope.clone(), writer, context);
+                    result_type = Type::Bool;
+                }
+
+                // Logical operators (&&, ||) require bool operands and return bool
+                // BinaryOp::And
+                // | BinaryOp::Or => {
+                //     if left_type == Type::Bool && right_type == Type::Bool {
+                //         result_type = Type::Bool;
+                //     } else {
+                //         writeln!(
+                //             writer,
+                //             "{}",
+                //             format_error_message(
+                //                 &format!("Operands `{:#?}` and `{:#?}`", left, right),
+                //                 Some(span),
+                //                 "Logical operators require `bool` operands.",
+                //                 context
+                //             )
+                //         ).expect("Failed to write error message");
+                //     }
+                // }
+
+                _ => {}
+            }
+            SymExpr::BinaryExpr {
+                op: op.clone(),
+                left: left_expr,
+                right: right_expr,
+                typ: result_type, // Set the correct type
+                span: span.clone(),
+            }
+        }
+
 
         AST::Expr(Expr::UnaryExpr { op, expr, span }) => SymExpr::UnaryExpr {
             op: op.clone(),
@@ -1161,6 +1219,77 @@ fn check_array_size(size: &str, span: &Span, writer: &mut dyn std::io::Write, co
         .expect("Failed to write error message");
     }
 }
+
+//// Rule 14
+fn check_is_numeric_and_compatible(
+    is_arithmetic: bool,
+    left: &AST,
+    right: Option<&AST>,
+    span: &Span,
+    scope: Rc<RefCell<Scope>>,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    let left_type = infer_expr_type(left, &scope.borrow());
+    let right_type = right.map(|r| infer_expr_type(r, &scope.borrow()));
+
+    // Ensure left operand is numeric
+    if left_type != Type::Int && left_type != Type::Long {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("left operand `{:#?}`", left),
+                Some(span),
+                "Left operand must be numeric (int or long).",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+        return;
+    }
+
+    if let Some(right_type) = right_type {
+        // Ensure right operand is also numeric
+        if right_type != Type::Int && right_type != Type::Long {
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("right operand `{:#?}`", right),
+                    Some(span),
+                    "Right operand must be numeric (int or long).",
+                    context
+                )
+            )
+            .expect("Failed to write error message");
+            return;
+        }
+
+        // Arithmetic operators (`+`, `-`, etc.) require both operands to have the SAME type
+        if is_arithmetic && left_type != right_type {
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("left `{:#?}`, right `{:#?}`", left, right),
+                    Some(span),
+                    "Operands of arithmetic expressions must have the same type.",
+                    context
+                )
+            )
+            .expect("Failed to write error message");
+        }
+    }
+}
+
+
+
+
+
+// #################################################
+// ENTRY POINT
+// #################################################
 
 
 /// Perform all semantic checks not already performed
