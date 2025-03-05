@@ -19,7 +19,10 @@ TODO:
             legal cases still pass
     - Clean up error messages
         - Don't create multiple messages for same error
-        - Test that we can output multiple error messages for single pas
+        - Test that we can output multiple error messages for single pass
+
+    - For range checking
+        - must check for literals: array declaration sizes, etc.
 
 
 */
@@ -770,27 +773,88 @@ pub fn build_expr(
         }
 
         AST::Expr(Expr::UnaryExpr { op, expr, span }) => {
-            // Rule 14: Unary minus must have numeric type
             let expr_type = infer_expr_type(expr, &scope.borrow(), writer, context);
-            match *op {
-                // operand of unary minus must be numeric!
-                UnaryOp::Neg => {// check_is_numeric_and_compatible(false, expr, None, span, scope.clone(), writer, context);
+        
+            // Rule 21-22. Some range checking done here!
+            match (op, &**expr) {
+                // Fold `-` applied to an integer literal
+                (UnaryOp::Neg, AST::Expr(Expr::Literal { lit: Literal::Int(value), span })) => {
+                    if let Ok(num) = value.parse::<i64>() {
+                        let negated_value = -num;
+        
+                        if (-2147483648..=2147483647).contains(&negated_value) {
+                            return SymExpr::Literal {
+                                value: Literal::Int(negated_value.to_string()),
+                                span: span.clone(),
+                            };
+                        } else {
+                            writeln!(
+                                writer,
+                                "{}",
+                                format_error_message(
+                                    &format!("Integer out of range: `-{}`", value),
+                                    Some(span),
+                                    "Integer out of range",
+                                    context
+                                )
+                            ).expect("Failed to write output");
+        
+                            return SymExpr::Error { span: span.clone() };
+                        }
+                    }
                 }
-                
-                // expression of unary not must be type bool!
-                UnaryOp::Not => {
-                    check_evaluates_to_bool(expr, span, scope.clone(), writer, context);
-                },
-                _=>{}
+        
+                // Fold `-` applied to a long literal
+                (UnaryOp::Neg, AST::Expr(Expr::Literal { lit: Literal::Long(value), span })) => {
+                    if let Ok(num) = value.parse::<i128>() {
+                        let negated_value = -num;
+        
+                        if (-9223372036854775808..=9223372036854775807).contains(&negated_value) {
+                            return SymExpr::Literal {
+                                value: Literal::Long(negated_value.to_string()),
+                                span: span.clone(),
+                            };
+                        } else {
+                            writeln!(
+                                writer,
+                                "{}",
+                                format_error_message(
+                                    &format!("Long integer out of range: `-{}`", value),
+                                    Some(span),
+                                    "Long integer out of range",
+                                    context
+                                )
+                            ).expect("Failed to write output");
+        
+                            return SymExpr::Error { span: span.clone() };
+                        }
+                    }
+                }
+        
+                // Normal unary minus handling
+                (UnaryOp::Neg, _) => {
+                    return SymExpr::UnaryExpr {
+                        op: op.clone(),
+                        expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
+                        typ: expr_type,
+                        span: span.clone(),
+                    };
+                }
+        
+                // Logical NOT (`!`)
+                (UnaryOp::Not, _) => {
+                    return SymExpr::UnaryExpr {
+                        op: op.clone(),
+                        expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
+                        typ: Type::Bool,
+                        span: span.clone(),
+                    };
+                }
             }
-    
-            SymExpr::UnaryExpr {
-                op: op.clone(),
-                expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
-                typ: Type::Int,
-                span: span.clone(),
-            }
-        }
+        
+            SymExpr::Error { span: span.clone() }
+        },
+        
 
         AST::Expr(Expr::MethodCall {
             method_name,
@@ -857,7 +921,7 @@ pub fn build_expr(
         AST::Expr(Expr::Literal { lit, span }) => {
             match lit {
                 Literal::Int(value) => {
-                    check_int_range(false, value.clone(), span, writer, context);
+                    // check_int_range(false, value.clone(), span, writer, context);
                 }
                 Literal::Long(value) => {
                     // check_long_range(value.clone(), span, writer, context); // ✅ Enforce explicit range check
@@ -1433,7 +1497,7 @@ fn check_cast(
     }
 }
 
-/// Rule 21
+/// Rule 21 - - this doesn't work!
 fn check_int_range(
     is_hex: bool,
     value: String,
@@ -1441,26 +1505,48 @@ fn check_int_range(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    match value.parse::<i32>() {
-        Ok(_) => {},
-        Err(_) => {
-            // fails if out of range or not a valid number
+    // Parse as a larger type (`i64`) to safely check the bounds
+    let parse_result = if is_hex {
+        i64::from_str_radix(&value, 16)
+    } else {
+        value.parse::<i64>()
+    };
+
+    match parse_result {
+        Ok(num) if -2147483648 <= num && num <= 2147483647 => {
+            // ✅ Valid int, do nothing
+        }
+        Ok(_) => {
+            // ❌ Out of range
             writeln!(
                 writer,
                 "{}",
                 format_error_message(
-                    &format!("`{}`", value),
+                    &format!("Invalid int literal `{}`", value),
                     Some(span),
-                    "Invalid int literal",
+                    "Integer out of range",
                     context
                 )
             )
             .expect("Failed to write output");
-
+        }
+        Err(_) => {
+            // ❌ Not a valid number
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("Invalid int literal `{}`", value),
+                    Some(span),
+                    "Invalid integer format",
+                    context
+                )
+            )
+            .expect("Failed to write output");
         }
     }
-
 }
+
 
 
 

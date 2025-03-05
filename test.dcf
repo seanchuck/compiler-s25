@@ -1,5 +1,5 @@
 void main(){
     int a;
     // Obviously too big, and needs to be illegal
-    a = 0x30033333333333333333322222;
+    a = 2147483647;
 }
