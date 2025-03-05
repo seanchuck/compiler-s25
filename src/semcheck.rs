@@ -424,37 +424,21 @@ pub fn build_block(
             statements,
             span,
         } => {
-            // Determine if this block is inside a function
             let is_function_body = matches!(
                 parent_scope.borrow().enclosing_block,
                 Some(EnclosingBlock::Method(_))
             );
 
-            // Determine if this block is inside a loop
-            let is_loop_body = matches!(
-                parent_scope.borrow().enclosing_block,
-                Some(EnclosingBlock::Loop)
-            );
-
-            // Assign enclosing block type (method, loop, or none)
             let enclosing_block = if is_function_body {
                 parent_scope.borrow().enclosing_block.clone()
-            } else if is_loop_body {
-                Some(EnclosingBlock::Loop)
             } else {
-                None // No enclosing loop/method
+                None
             };
 
-            // Define `scope` correctly before using it
-            let scope: Rc<RefCell<Scope>> = if is_function_body {
-                Rc::clone(&parent_scope) // Reuse existing scope for function body
-            } else {
-                // Create a new scope for nested blocks
-                Rc::new(RefCell::new(Scope::add_child(
-                    Rc::clone(&parent_scope),
-                    enclosing_block, // Tracks loop OR method
-                )))
-            };
+            let scope = Rc::new(RefCell::new(Scope::add_child(
+                Rc::clone(&parent_scope),
+                enclosing_block, // 🔥 Ensures we track methods properly
+            )));
 
             let mut sym_statements = Vec::new();
 

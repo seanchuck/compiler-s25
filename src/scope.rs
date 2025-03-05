@@ -111,22 +111,25 @@ impl Scope {
     }
 
 
+
     /// ✅ Recursively finds the closest enclosing method scope, if it exists
     pub fn find_enclosing_method(&self) -> Option<String> {
-        let mut current_scope: Option<Rc<RefCell<Scope>>> = self.parent.clone(); // ✅ Start at parent
-    
+        let mut current_scope: Option<Rc<RefCell<Scope>>> = self.parent.clone(); // ✅ Start from parent
+
         while let Some(scope_rc) = current_scope {
-            let scope_ref = scope_rc.borrow(); // ✅ Borrow the scope
-            
+            let scope_ref = scope_rc.borrow();
+
             if let Some(EnclosingBlock::Method(name)) = &scope_ref.enclosing_block {
-                return Some(name.clone()); // ✅ Clone method name to avoid lifetime issues
+                return Some(name.clone()); // ✅ Return method name if found
             }
-    
-            current_scope = scope_ref.parent.clone(); // ✅ Move up scope tree safely
+
+            current_scope = scope_ref.parent.clone(); // ✅ Move up the scope tree
         }
-    
+
         None // ❌ No enclosing method found
     }
+
+
     
 
 
