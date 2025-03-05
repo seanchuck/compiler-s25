@@ -72,8 +72,8 @@ fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
         // Integer, Boolean, and Long Literals
         AST::Expr(Expr::Literal { lit, .. }) => match lit {
             Literal::Int(_) => Type::Int,
-            Literal::Bool(_) => Type::Bool,
             Literal::Long(_) => Type::Long,
+            Literal::Bool(_) => Type::Bool,
             _=> Type::Unknown
         },
 
@@ -851,10 +851,23 @@ pub fn build_expr(
             }
         }
 
-        AST::Expr(Expr::Literal { lit, span }) => SymExpr::Literal {
-            value: lit.clone(),
-            span: span.clone(),
-        },
+        AST::Expr(Expr::Literal { lit, span }) => {
+            match lit {
+                Literal::Int(value) => {
+                    check_int_range(value.clone(), span, writer, context); // ✅ Enforce explicit range check
+                }
+                Literal::Long(value) => {
+                    check_long_range(value.clone(), span, writer, context); // ✅ Enforce explicit range check
+                }
+                _ => {}
+            }
+        
+            SymExpr::Literal {
+                value: lit.clone(),
+                span: span.clone(),
+            }
+        }
+        
 
         AST::Identifier { ref id, ref span } => {
             // RULE 2: no identifier is used before being declared
@@ -1410,52 +1423,149 @@ fn check_cast(
         .expect("Failed to write error message");
     }
 }
-
 /// Rule 21
 fn check_int_range(
-    value: i64,
+    value: String,
     span: &Span,
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    if !(i32::MIN as i64..=i32::MAX as i64).contains(&value) {
-        writeln!(
-            writer,
-            "{}",
-            format_error_message(
-                &format!("integer literal `{}`", value),
-                Some(span),
-                "Int literal out of range: must be between -2147483648 and 2147483647.",
-                context
+    // ✅ Attempt to parse the string as a 64-bit integer
+    match value.parse::<i64>() {
+        Ok(num) => {
+            if !(i32::MIN as i64..=i32::MAX as i64).contains(&num) {
+                writeln!(
+                    writer,
+                    "{}",
+                    format_error_message(
+                        &format!("integer literal `{}`", value),
+                        Some(span),
+                        "Int literal out of range: must be between -2147483648 and 2147483647.",
+                        context
+                    )
+                )
+                .expect("Failed to write error message");
+            }
+        }
+        Err(_) => {
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("integer literal `{}`", value),
+                    Some(span),
+                    "Invalid integer format: must be a valid signed 32-bit integer.",
+                    context
+                )
             )
-        )
-        .expect("Failed to write error message");
+            .expect("Failed to write error message");
+        }
     }
 }
-
 
 /// Rule 22
 fn check_long_range(
-    value: i128,
+    value: String,
     span: &Span,
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    if !(i64::MIN as i128..=i64::MAX as i128).contains(&value) {
-        writeln!(
-            writer,
-            "{}",
-            format_error_message(
-                &format!("long literal `{}`", value),
-                Some(span),
-                "Long literal out of range: must be between -9223372036854775808 and 9223372036854775807.",
-                context
+    // ✅ Attempt to parse the string as a 128-bit integer
+    match value.parse::<i128>() {
+        Ok(num) => {
+            if !(i64::MIN as i128..=i64::MAX as i128).contains(&num) {
+                writeln!(
+                    writer,
+                    "{}",
+                    format_error_message(
+                        &format!("long literal `{}`", value),
+                        Some(span),
+                        "Long literal out of range: must be between -9223372036854775808 and 9223372036854775807.",
+                        context
+                    )
+                )
+                .expect("Failed to write error message");
+            }
+        }
+        Err(_) => {
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("long literal `{}`", value),
+                    Some(span),
+                    "Invalid long format: must be a valid signed 64-bit integer.",
+                    context
+                )
             )
-        )
-        .expect("Failed to write error message");
+            .expect("Failed to write error message");
+        }
     }
 }
 
+
+/// Rule 23
+/// ✅ Ensures that assignment targets are scalars (not arrays)
+fn check_scalar_assignment(
+    location: &AST,
+    span: &Span,
+    scope: Rc<RefCell<Scope>>,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    match location {
+        // ✅ Look up identifier in scope
+        AST::Identifier { id, .. } => {
+            if let Some(TableEntry::Variable { is_array, .. }) = scope.borrow().lookup(id) {
+                if is_array {
+                    writeln!(
+                        writer,
+                        "{}",
+                        format_error_message(
+                            &format!("variable `{}`", id),
+                            Some(span),
+                            "Assignment target must be a scalar (non-array) variable.",
+                            context
+                        )
+                    )
+                    .expect("Failed to write error message");
+                }
+            } else {
+                writeln!(
+                    writer,
+                    "{}",
+                    format_error_message(
+                        &format!("variable `{}`", id),
+                        Some(span),
+                        "Assignment target is not declared.",
+                        context
+                    )
+                )
+                .expect("Failed to write error message");
+            }
+        }
+
+        // ✅ Array element access (e.g., a[0]) is allowed since it is scalar
+        AST::Expr(Expr::ArrAccess { .. }) => {
+            // No error; array elements are scalar
+        }
+
+        // ❌ Any other expression is invalid as an assignment target
+        _ => {
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("{:?}", location),
+                    Some(span),
+                    "Invalid assignment target: must be a scalar variable or array element.",
+                    context
+                )
+            )
+            .expect("Failed to write error message");
+        }
+    }
+}
 
 
 
