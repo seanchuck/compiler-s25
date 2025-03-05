@@ -555,17 +555,17 @@ pub fn build_expr(
             let mut result_type = Type::Unknown; // Set result type based on operator
 
             match *op {
-                // Arithmetic operators return the same type as operands (int or long)
                 BinaryOp::Add
                 | BinaryOp::Subtract
                 | BinaryOp::Multiply
                 | BinaryOp::Divide
                 | BinaryOp::Modulo => {
+                    // Rule 14: Must be (1) numeric, (2) left and right have same type
                     check_is_numeric_and_compatible(true, left, Some(right), span, scope.clone(), writer, context);
                     result_type = left_type; // If valid, set type to operand type
                 }
 
-                // Relational operators always return bool
+                // Operands must have numeric
                 BinaryOp::Greater
                 | BinaryOp::GreaterEqual
                 | BinaryOp::Less
@@ -1232,9 +1232,11 @@ fn check_is_numeric_and_compatible(
 ) {
     let left_type = infer_expr_type(left, &scope.borrow());
     let right_type = right.map(|r| infer_expr_type(r, &scope.borrow()));
+    // let mut valid = true; // ✅ Track validity instead of early return
 
     // Ensure left operand is numeric
     if left_type != Type::Int && left_type != Type::Long {
+        // valid = false;
         writeln!(
             writer,
             "{}",
@@ -1244,14 +1246,13 @@ fn check_is_numeric_and_compatible(
                 "Left operand must be numeric (int or long).",
                 context
             )
-        )
-        .expect("Failed to write error message");
-        return;
+        ).expect("Failed to write error message");
     }
 
     if let Some(right_type) = right_type {
         // Ensure right operand is also numeric
         if right_type != Type::Int && right_type != Type::Long {
+            // valid = false;
             writeln!(
                 writer,
                 "{}",
@@ -1261,13 +1262,12 @@ fn check_is_numeric_and_compatible(
                     "Right operand must be numeric (int or long).",
                     context
                 )
-            )
-            .expect("Failed to write error message");
-            return;
+            ).expect("Failed to write error message");
         }
 
         // Arithmetic operators (`+`, `-`, etc.) require both operands to have the SAME type
         if is_arithmetic && left_type != right_type {
+            // valid = false;
             writeln!(
                 writer,
                 "{}",
@@ -1277,11 +1277,12 @@ fn check_is_numeric_and_compatible(
                     "Operands of arithmetic expressions must have the same type.",
                     context
                 )
-            )
-            .expect("Failed to write error message");
+            ).expect("Failed to write error message");
         }
     }
+
 }
+
 
 
 
