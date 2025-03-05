@@ -72,7 +72,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope, writer: &mut dyn std::io::Write, c
         // Integer, Boolean, and Long Literals
         AST::Expr(Expr::Literal { lit, span }) => match lit {
             Literal::Int(value) => {
-                // check_int_range(false, value.clone(), span, writer, context);
+                check_int_range(false, value.clone(), span, writer, context);
                 Type::Int
             },
             Literal::Long(value) => {
@@ -80,7 +80,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope, writer: &mut dyn std::io::Write, c
                 Type::Long
             },
             Literal::HexInt(value) => {
-                // check_int_range(true, value.clone(), span, writer, context);
+                check_int_range(true, value.clone(), span, writer, context);
                 Type::Int
             },
             Literal::HexLong(value) => {
@@ -950,13 +950,13 @@ pub fn build_expr(
         AST::Expr(Expr::Literal { lit, span }) => {
             match lit {
                 Literal::Int(value) => {
-                    // check_int_range(false, value.clone(), span, writer, context);
+                    check_int_range(false, value.clone(), span, writer, context);
                 }
                 Literal::Long(value) => {
                     check_long_range(false, value.clone(), span, writer, context);
                 }
                 Literal::HexInt(value) => {
-                    // check_int_range(true, value.clone(), span, writer, context);
+                    check_int_range(true, value.clone(), span, writer, context);
                 }
                 Literal::HexLong(value) => {
                     check_long_range(true, value.clone(), span, writer, context);
@@ -1545,20 +1545,21 @@ fn check_int_range(
     };
 
     match parse_result {
-        Ok(num) if -2147483648 <= num && num <= 2147483647 => {
-        }
-        Ok(_) => {
-            writeln!(
-                writer,
-                "{}",
-                format_error_message(
-                    &format!("Invalid int literal `{}`", value),
-                    Some(span),
-                    "Integer out of range",
-                    context
+        Ok(num) => {
+            if !(i32::MIN as i64..=i32::MAX as i64).contains(&num)
+            {
+                writeln!(
+                    writer,
+                    "{}",
+                    format_error_message(
+                        &format!("Invalid int literal `{}`", value),
+                        Some(span),
+                        "Integer out of range",
+                        context
+                    )
                 )
-            )
-            .expect("Failed to write output");
+                .expect("Failed to write output");
+            }
         }
         Err(_) => {
             // Not a valid number
