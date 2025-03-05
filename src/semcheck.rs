@@ -577,7 +577,7 @@ pub fn build_expr(
                 // Equality operators always return bool
                 BinaryOp::Equal
                 | BinaryOp::NotEqual => {
-                    // check_equality_compatible(left, right, span, scope.clone(), writer, context);
+                    check_equality_compatible(left, right, span, scope.clone(), writer, context);
                     result_type = Type::Bool;
                 }
 
@@ -612,12 +612,20 @@ pub fn build_expr(
         }
 
 
-        AST::Expr(Expr::UnaryExpr { op, expr, span }) => SymExpr::UnaryExpr {
-            op: op.clone(),
-            expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
-            typ: Type::Int,
-            span: span.clone(),
-        },
+        AST::Expr(Expr::UnaryExpr { op, expr, span }) => {
+            // Rule 14: Unary minus must have numeric type
+            match *op {
+                UnaryOp::Neg => {check_is_numeric_and_compatible(false, expr, None, span, scope.clone(), writer, context);}
+                _=>{}
+            }
+    
+            SymExpr::UnaryExpr {
+                op: op.clone(),
+                expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
+                typ: Type::Int,
+                span: span.clone(),
+            }
+        }
 
         AST::Expr(Expr::MethodCall {
             method_name,
@@ -1283,6 +1291,48 @@ fn check_is_numeric_and_compatible(
     }
 }
 
+// Rule 15, 16: Ensure equality operators (`==`, `!=`) have compatible types
+fn check_equality_compatible(
+    left: &AST,
+    right: &AST,
+    span: &Span,
+    scope: Rc<RefCell<Scope>>,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    let left_type = infer_expr_type(left, &scope.borrow());
+    let right_type = infer_expr_type(right, &scope.borrow());
+
+    // Allowable types: `int`, `long`, `bool`
+    if left_type != right_type {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("left `{:#?}`, right `{:#?}`", left, right),
+                Some(span),
+                "Equality operator requires both operands to have the same type.",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+        return;
+    }
+
+    if left_type != Type::Int && left_type != Type::Long && left_type != Type::Bool {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("left `{:#?}`, right `{:#?}`", left, right),
+                Some(span),
+                "Equality operator can only be applied to int, long, or bool.",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+    }
+}
 
 
 
