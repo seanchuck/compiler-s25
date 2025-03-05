@@ -38,6 +38,153 @@ use crate::token::Literal;
 use crate::token::Span;
 use crate::utils::print::*;
 
+
+// #################################################
+// HELPERS -- These are super important!
+// #################################################
+
+/// Formats an error message for printing to stdout.
+/// Also flags that an error has occurred, so we can
+/// return a non-zero exist code once checking is finished.
+fn format_error_message(invalid_token: &str, span: Option<&Span>, msg: &str, context: &mut SemanticContext) -> String {
+    // direct checker to panic after completing semantic checks
+    context.error_found = true;
+
+    match span {
+        Some(span) => format!(
+            "~~~{} (line {}, col {}): semantic error:\n|\t{} `{}`",
+            context.filename, span.sline, span.scol, msg, invalid_token
+        ),
+        None => format!(
+            "~~~{}: semantic error: \n|\t{} `{}`",
+            context.filename, msg, invalid_token
+        ),
+    }
+}
+
+/// Infer the type of an expression from the given scope
+/// The legal types are: Int, Long, Bool, Void, Unknown.
+fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
+    match expr {
+        // Integer, Boolean, and Long Literals
+        AST::Expr(Expr::Literal { lit, .. }) => match lit {
+            Literal::Int(_) => Type::Int,
+            Literal::Bool(_) => Type::Bool,
+            Literal::Long(_) => Type::Long,
+            _=> Type::Unknown
+        },
+
+        // Variable Reference (Check scope table)
+        AST::Identifier { id, .. } => {
+            let entry = scope.lookup(id);
+            match entry {
+                Some(TableEntry::Variable { typ, .. }) => typ.clone(),
+                Some(_) => Type::Unknown, // Should never happen, but defensive
+                None => {
+                    println!("DEBUG: Variable `{}` not found in scope!", id);
+                    Type::Unknown
+                }
+            }
+        }        
+
+        // Binary Expressions (`+`, `-`, `*`, `/`, `%`, etc.): evaluate recursively
+        AST::Expr(Expr::BinaryExpr { left, right, op, .. }) => {
+            let left_type = infer_expr_type(left, scope);
+            let right_type = infer_expr_type(right, scope);
+        
+            match op {
+                BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply |
+                BinaryOp::Divide | BinaryOp::Modulo => {
+                    if left_type == Type::Int && right_type == Type::Int {
+                        Type::Int
+                    } else if left_type == Type::Long && right_type == Type::Long {
+                        Type::Long
+                    } else {
+                        Type::Unknown // Type mismatch
+                    }
+                }
+                BinaryOp::And | BinaryOp::Or => {
+                    if left_type == Type::Bool && right_type == Type::Bool {
+                        Type::Bool
+                    } else {
+                        Type::Unknown
+                    }
+                }
+                BinaryOp::Equal | BinaryOp::NotEqual | BinaryOp::Less |
+                BinaryOp::Greater | BinaryOp::LessEqual | BinaryOp::GreaterEqual => Type::Bool,
+            }
+        }
+        
+
+        // Unary Expressions (`-`, `!`)
+        AST::Expr(Expr::UnaryExpr { op, expr, .. }) => {
+            let expr_type = infer_expr_type(expr, scope);
+            match op {
+                UnaryOp::Neg => {
+                    if expr_type == Type::Int || expr_type == Type::Long {
+                        expr_type
+                    } else {
+                        Type::Unknown
+                    }
+                }
+                UnaryOp::Not => {
+                    if expr_type == Type::Bool {
+                        Type::Bool
+                    } else {
+                        Type::Unknown
+                    }
+                }
+            }
+        },
+
+        // Array Access (`arr[i]`)
+        AST::Expr(Expr::ArrAccess { id, index, .. }) => {
+            let index_type = infer_expr_type(index, scope);
+            if index_type != Type::Int {
+                return Type::Unknown; // Array indices must be `int`
+            }
+
+            match scope.lookup(id) {
+                // CHECK: array access must be type array
+                Some(TableEntry::Variable { typ, is_array, .. }) if is_array => typ.clone(),
+                Some(_) => Type::Unknown, // Non-array variable used incorrectly
+                None => Type::Unknown, // Variable not declared
+            }
+        
+        },
+
+        // Method Call (`foo(5, true)`)
+        AST::Expr(Expr::MethodCall { method_name, args, .. }) => {
+            match scope.lookup(method_name) {
+                Some(TableEntry::Method { return_type, params, .. }) => {
+                    return_type.clone()
+                },
+                // Imports always return `int`
+                Some(TableEntry::Import { name, span }) => Type::Int,
+                _ => Type::Unknown, // Undefined method
+            }
+        },
+
+        // Casting (`(int) x`)
+        AST::Expr(Expr::Cast { target_type, expr, .. }) => {
+            let expr_type = infer_expr_type(expr, scope);
+            if expr_type == Type::Int || expr_type == Type::Long {
+                target_type.clone()
+            } else {
+                Type::Unknown // Invalid cast
+            }
+        },
+
+        // `len(arr)`
+        AST::Expr(Expr::Len { id, span }) => {
+            Type::Int
+        },
+
+        // Unknown return type
+        _ => Type::Unknown,
+    }
+}
+
 // #################################################
 // AST --> SYMBOL TABLE AST CONSTRUCTION
 // #################################################
@@ -711,152 +858,6 @@ pub fn build_expr(
 }
 
 
-// #################################################
-// HELPERS
-// #################################################
-
-/// Formats an error message for printing to stdout.
-/// Also flags that an error has occurred, so we can
-/// return a non-zero exist code once checking is finished.
-fn format_error_message(invalid_token: &str, span: Option<&Span>, msg: &str, context: &mut SemanticContext) -> String {
-    // direct checker to panic after completing semantic checks
-    context.error_found = true;
-
-    match span {
-        Some(span) => format!(
-            "~~~{} (line {}, col {}): semantic error:\n|\t{} `{}`",
-            context.filename, span.sline, span.scol, msg, invalid_token
-        ),
-        None => format!(
-            "~~~{}: semantic error: \n|\t{} `{}`",
-            context.filename, msg, invalid_token
-        ),
-    }
-}
-
-/// Infer the type of an expression from the given scope
-/// The legal types are: Int, Long, Bool, Void, Unknown.
-fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
-    match expr {
-        // Integer, Boolean, and Long Literals
-        AST::Expr(Expr::Literal { lit, .. }) => match lit {
-            Literal::Int(_) => Type::Int,
-            Literal::Bool(_) => Type::Bool,
-            Literal::Long(_) => Type::Long,
-            _=> Type::Unknown
-        },
-
-        // Variable Reference (Check scope table)
-        AST::Identifier { id, .. } => {
-            let entry = scope.lookup(id);
-            match entry {
-                Some(TableEntry::Variable { typ, .. }) => typ.clone(),
-                Some(_) => Type::Unknown, // Should never happen, but defensive
-                None => {
-                    println!("DEBUG: Variable `{}` not found in scope!", id);
-                    Type::Unknown
-                }
-            }
-        }        
-
-        // Binary Expressions (`+`, `-`, `*`, `/`, `%`, etc.): evaluate recursively
-        AST::Expr(Expr::BinaryExpr { left, right, op, .. }) => {
-            let left_type = infer_expr_type(left, scope);
-            let right_type = infer_expr_type(right, scope);
-        
-            match op {
-                BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply |
-                BinaryOp::Divide | BinaryOp::Modulo => {
-                    if left_type == Type::Int && right_type == Type::Int {
-                        Type::Int
-                    } else if left_type == Type::Long && right_type == Type::Long {
-                        Type::Long
-                    } else {
-                        Type::Unknown // Type mismatch
-                    }
-                }
-                BinaryOp::And | BinaryOp::Or => {
-                    if left_type == Type::Bool && right_type == Type::Bool {
-                        Type::Bool
-                    } else {
-                        Type::Unknown
-                    }
-                }
-                BinaryOp::Equal | BinaryOp::NotEqual | BinaryOp::Less |
-                BinaryOp::Greater | BinaryOp::LessEqual | BinaryOp::GreaterEqual => Type::Bool,
-            }
-        }
-        
-
-        // Unary Expressions (`-`, `!`)
-        AST::Expr(Expr::UnaryExpr { op, expr, .. }) => {
-            let expr_type = infer_expr_type(expr, scope);
-            match op {
-                UnaryOp::Neg => {
-                    if expr_type == Type::Int || expr_type == Type::Long {
-                        expr_type
-                    } else {
-                        Type::Unknown
-                    }
-                }
-                UnaryOp::Not => {
-                    if expr_type == Type::Bool {
-                        Type::Bool
-                    } else {
-                        Type::Unknown
-                    }
-                }
-            }
-        },
-
-        // Array Access (`arr[i]`)
-        AST::Expr(Expr::ArrAccess { id, index, .. }) => {
-            let index_type = infer_expr_type(index, scope);
-            if index_type != Type::Int {
-                return Type::Unknown; // Array indices must be `int`
-            }
-
-            match scope.lookup(id) {
-                // CHECK: array access must be type array
-                Some(TableEntry::Variable { typ, is_array, .. }) if is_array => typ.clone(),
-                Some(_) => Type::Unknown, // Non-array variable used incorrectly
-                None => Type::Unknown, // Variable not declared
-            }
-        
-        },
-
-        // Method Call (`foo(5, true)`)
-        AST::Expr(Expr::MethodCall { method_name, args, .. }) => {
-            match scope.lookup(method_name) {
-                Some(TableEntry::Method { return_type, params, .. }) => {
-                    return_type.clone()
-                },
-                // Imports always return `int`
-                Some(TableEntry::Import { name, span }) => Type::Int,
-                _ => Type::Unknown, // Undefined method
-            }
-        },
-
-        // Casting (`(int) x`)
-        AST::Expr(Expr::Cast { target_type, expr, .. }) => {
-            let expr_type = infer_expr_type(expr, scope);
-            if expr_type == Type::Int || expr_type == Type::Long {
-                target_type.clone()
-            } else {
-                Type::Unknown // Invalid cast
-            }
-        },
-
-        // `len(arr)`
-        AST::Expr(Expr::Len { id, span }) => {
-            Type::Int
-        },
-
-        // Unknown return type
-        _ => Type::Unknown,
-    }
-}
-
 
 // #################################################
 // SEMANTIC CHECKING
@@ -1243,49 +1244,38 @@ fn check_array_size(size: &str, span: &Span, writer: &mut dyn std::io::Write, co
 fn check_is_numeric_and_compatible(
     is_arithmetic: bool,
     left: &AST,
-    right: Option<&AST>,
+    right: Option<&AST>,  // Right is `None` for unary `Neg`
     span: &Span,
     scope: Rc<RefCell<Scope>>,
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
     let left_type = infer_expr_type(left, &scope.borrow());
-    let right_type = right.map(|r| infer_expr_type(r, &scope.borrow()));
 
-    // Ensure left operand is numeric
-    if left_type != Type::Int && left_type != Type::Long {
-        writeln!(
-            writer,
-            "{}",
-            format_error_message(
-                &format!("left operand `{:#?}`", left),
-                Some(span),
-                "Left operand must be numeric (int or long).",
-                context
-            )
-        )
-        .expect("Failed to write error message");
-        return;
-    }
-
-    if let Some(right_type) = right_type {
-        // Ensure right operand is also numeric
-        if right_type != Type::Int && right_type != Type::Long {
+    // 🔥 **CHANGE 1: Special Handling for Unary Expressions**
+    if right.is_none() { 
+        if left_type == Type::Int || left_type == Type::Long {
+            return; // ✅ Valid unary `Neg`
+        } else {
             writeln!(
                 writer,
                 "{}",
                 format_error_message(
-                    &format!("right operand `{:#?}`", right),
+                    &format!("Unary operand `{:#?}`", left),
                     Some(span),
-                    "Right operand must be numeric (int or long).",
+                    "Unary `-` must be applied to `int` or `long`.",
                     context
                 )
-            )
-            .expect("Failed to write error message");
+            ).expect("Failed to write error message");
             return;
         }
+    }
 
-        // Arithmetic operators (`+`, `-`, etc.) require both operands to have the SAME type
+    // ✅ Original check remains for binary expressions:
+    let right_type = right.map(|r| infer_expr_type(r, &scope.borrow()));
+
+    // 🔥 **CHANGE 2: Allowing `None` for Unary Cases**
+    if let Some(right_type) = right_type {
         if is_arithmetic && left_type != right_type {
             writeln!(
                 writer,
@@ -1296,11 +1286,13 @@ fn check_is_numeric_and_compatible(
                     "Operands of arithmetic expressions must have the same type.",
                     context
                 )
-            )
-            .expect("Failed to write error message");
+            ).expect("Failed to write error message");
         }
     }
 }
+
+
+
 
 // Rule 15, 16: Ensure equality operators (`==`, `!=`) have compatible types
 fn check_equality_compatible(
