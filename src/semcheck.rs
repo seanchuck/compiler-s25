@@ -13,16 +13,16 @@ This semantic chcecker was written by :
         them into the construction of the modified AST.
 
 
-Be careful with how you pass Scope:
-    - Use Rc<Refcell<Scope>> for shared, mutable references.
-- Use &Scope for read-only references.
+TODO: 
+    - Debug / implement rules: 14, 17, 18, 19, 21, 22, 23
+        - After implementing, be sure to run on gradescope to ensure all 
+            legal cases still pass
+    - Clean up error messages
+        - Don't create multiple messages for same error
+        - Test that we can output multiple error messages for single pas
 
-TODO: AVOID MULTIPLE MESSAGES FOR SAME ERROR
-TODO: DON"T CREATE THE NODE IF THE CHECKS FAIL
 
-TODO: rules 12 - 14
 */
-
 
 use core::panic;
 use std::cell::RefCell;
@@ -30,12 +30,9 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-
 use crate::ast::*;
 use crate::parse::parse;
-use crate::scope::EnclosingBlock;
-use crate::scope::TableEntry;
-use crate::scope::{Scope, };
+use crate::scope::{Scope, EnclosingBlock, TableEntry};
 use crate::symtable::*;
 use crate::token::Literal;
 use crate::token::Span;
@@ -860,13 +857,13 @@ pub fn build_expr(
         AST::Expr(Expr::Literal { lit, span }) => {
             match lit {
                 Literal::Int(value) => {
-                    check_int_range(false, value.clone(), span, writer, context);
+                    // check_int_range(false, value.clone(), span, writer, context);
                 }
                 Literal::Long(value) => {
                                 // check_long_range(value.clone(), span, writer, context); // ✅ Enforce explicit range check
                 }
                 Literal::HexInt(value) => {
-                    check_int_range(true, value.clone(), span, writer, context);
+                    // check_int_range(true, value.clone(), span, writer, context);
 
                 }
                 Literal::HexLong(_) => {}
@@ -1477,7 +1474,6 @@ fn check_int_range(
     )
     .expect("Failed to write output");
 }
-
 
 
 

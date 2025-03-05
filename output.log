@@ -99,7 +99,7 @@ Running test: tests/semantics/rule9-illegal.dcf
 ~~~tests/semantics/rule9-illegal.dcf (line 2, col 5): semantic error:
 |	Use before declaration `x`
 
-thread 'main' panicked at src/semcheck.rs:551:59:
+thread 'main' panicked at src/semcheck.rs:550:59:
 Variable should be declared
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
