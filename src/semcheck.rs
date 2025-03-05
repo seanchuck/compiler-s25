@@ -10,7 +10,7 @@ Use-before-declaration is caught by the grammar/parser.
 
 Be careful with how you pass Scope:
     - Use Rc<Refcell<Scope>> for shared, mutable references.
-    - Use &Scope for read-only references.
+- Use &Scope for read-only references.
 
 TODO: AVOID MULTIPLE MESSAGES FOR SAME ERROR
 TODO: DON"T CREATE THE NODE IF THE CHECKS FAIL
@@ -52,6 +52,8 @@ pub fn build_symbol_table(
             methods,
             span,
         } => {
+
+            // Create the global scope for the program, with no parent or enclosing methods
             let global_scope = Rc::new(RefCell::new(Scope::new()));
             let mut method_bodies = HashMap::new();
 
@@ -199,6 +201,8 @@ pub fn build_method(
             block,
             span,
         } => {
+
+            // Create a new scope for this method, with the appropriate parent scope and enclosing method
             let method_scope = Rc::new(RefCell::new(Scope::add_child(parent_scope, Some(name.clone()))));
 
             // Process method params, and add into method's outer-most scope
@@ -263,12 +267,16 @@ pub fn build_block(
             statements,
             span,
         } => {
-            // Don't create a new scope if this is just a function body
-            let is_function_body = Rc::strong_count(&parent_scope) == 2;
+            // Don't create a new scope if this is just a method body
+            let is_function_body = parent_scope.borrow().enclosing_method.is_some();
+
             let scope = if is_function_body {
-                Rc::clone(&parent_scope)
+                Rc::clone(&parent_scope) // get a reference to the same scope
             } else {
-                Rc::new(RefCell::new(Scope::add_child(parent_scope, None)))
+                Rc::new(RefCell::new(Scope::add_child(
+                    Rc::clone(&parent_scope),
+                    parent_scope.borrow().enclosing_method.clone(), 
+                )))
             };
 
             let mut sym_statements = Vec::new();
@@ -933,6 +941,7 @@ fn check_return_value(
     let method_name = match &scope.enclosing_method {
         Some(name) => name.clone(),
         None => {
+            println!("no enclosing scope");
             let error_msg = format_error_message(
                 &format!("{:#?}", ret), 
                 Some(span),
