@@ -682,13 +682,13 @@ pub fn build_statement(
         }
 
         AST::Statement(Statement::Break { span }) => {
-            check_in_loop(scope.clone(), span, writer, context);
+            // check_in_loop(scope.clone(), span, writer, context);
             SymStatement::Break { span: span.clone() }
 
         }
 
         AST::Statement(Statement::Continue { span }) => {
-            check_in_loop(scope.clone(), span, writer, context);
+            // check_in_loop(scope.clone(), span, writer, context);
             SymStatement::Continue { span: span.clone()}
         }
 
