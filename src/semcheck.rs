@@ -7,15 +7,24 @@ symbol table, and others are performed explicitly after.
 
 Use-before-declaration is caught by the grammar/parser.
 
+This semantic chcecker was written by :
+    1. Constructing a modified AST with symbol tables and scopes
+    2. Writing functions to check each rule and "injecting"
+        them into the construction of the modified AST.
 
-Be careful with how you pass Scope:
-    - Use Rc<Refcell<Scope>> for shared, mutable references.
-    - Use &Scope for read-only references.
 
-TODO: AVOID MULTIPLE MESSAGES FOR SAME ERROR
-TODO: DON"T CREATE THE NODE IF THE CHECKS FAIL
+TODO: 
+    - Debug / implement rules: 1b, 14, 17, 18, 19, 21, 22, 23
+        - After implementing, be sure to run on gradescope to ensure all 
+            legal cases still pass
+    - Clean up error messages
+        - Don't create multiple messages for same error
+        - Test that we can output multiple error messages for single pass
 
-TODO: rules 12 - 14
+    - For range checking (int, long)
+        - must check for literals: array declaration sizes, etc.
+        - need to fold unary minus (see https://6110-sp25.github.io/phase-2)
+
 */
 
 use core::panic;
@@ -27,11 +36,192 @@ use std::rc::Rc;
 
 use crate::ast::*;
 use crate::parse::parse;
-use crate::scope::*;
+use crate::scope::{Scope, EnclosingBlock, TableEntry};
 use crate::symtable::*;
 use crate::token::Literal;
 use crate::token::Span;
 use crate::utils::print::*;
+
+
+// #################################################
+// HELPERS (these are vital, since so many rules are typechecking)
+// #################################################
+
+/// Formats an error message for printing to stdout.
+/// Also flags that an error has occurred, so we can
+/// return a non-zero exist code once checking is finished.
+fn format_error_message(invalid_token: &str, span: Option<&Span>, msg: &str, context: &mut SemanticContext) -> String {
+    // direct checker to panic after completing semantic checks
+    context.error_found = true;
+
+    match span {
+        Some(span) => format!(
+            "~~~{} (line {}, col {}): semantic error:\n|\t{} `{}`",
+            context.filename, span.sline, span.scol, msg, invalid_token
+        ),
+        None => format!(
+            "~~~{}: semantic error: \n|\t{} `{}`",
+            context.filename, msg, invalid_token
+        ),
+    }
+}
+
+/// Infer the type of an expression from the given scope
+/// The legal types are: Int, Long, Bool, Void, Unknown.
+fn infer_expr_type(expr: &AST, scope: &Scope, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Type {
+    match expr {
+        // Integer, Boolean, and Long Literals
+        AST::Expr(Expr::Literal { lit, span }) => match lit {
+            Literal::Int(value) => {
+                check_int_range(false, value.clone(), span, writer, context);
+                Type::Int
+            },
+            Literal::Long(value) => {
+                check_long_range(false, value.clone(), span, writer, context);
+                Type::Long
+            },
+            Literal::HexInt(value) => {
+                check_int_range(true, value.clone(), span, writer, context);
+                Type::Int
+            },
+            Literal::HexLong(value) => {
+                check_long_range(true, value.clone(), span, writer, context);
+                Type::Long
+            },
+            Literal::Bool(_) => Type::Bool,
+            _=> {
+                format_error_message(&format!("{:?}", lit), Some(span), "unknown type", context);
+                Type::Unknown
+            }
+        },
+
+        // Variable Reference (Check scope table)
+        AST::Identifier { id, span } => {
+            let entry = scope.lookup(id);
+            match entry {
+                Some(TableEntry::Variable { typ, .. }) => typ.clone(),
+                Some(_) => Type::Unknown, // Should never happen, but defensive
+                None => {
+                    format_error_message(&format!("DEBUG: Variable `{}` not found in scope!", id), Some(span), "unknown type", context);
+                    Type::Unknown
+                }
+            }
+        }        
+
+        // Binary Expressions (`+`, `-`, `*`, `/`, `%`, etc.): evaluate recursively
+        AST::Expr(Expr::BinaryExpr { left, right, op, span }) => {
+            let left_type = infer_expr_type(left, scope, writer, context);
+            let right_type = infer_expr_type(right, scope, writer, context);
+        
+            match op {
+                BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply |
+                BinaryOp::Divide | BinaryOp::Modulo => {
+                    if left_type == Type::Int && right_type == Type::Int {
+                        Type::Int
+                    } else if left_type == Type::Long && right_type == Type::Long {
+                        Type::Long
+                    } else {
+                        format_error_message(&format!("mismatching types for operator {:?}", op), Some(span), "incompatible type", context);
+                        Type::Unknown // Type mismatch
+                    }
+                }
+                BinaryOp::And | BinaryOp::Or => {
+                    if left_type == Type::Bool && right_type == Type::Bool {
+                        Type::Bool
+                    } else {
+                        format_error_message(&format!("mismatching types for operator {:?}", op), Some(span), "incompatible type", context);
+                        Type::Unknown
+                    }
+                }
+                BinaryOp::Equal | BinaryOp::NotEqual | BinaryOp::Less |
+                BinaryOp::Greater | BinaryOp::LessEqual | BinaryOp::GreaterEqual => {
+                    if left_type == right_type && (left_type == Type::Int || left_type == Type::Long || left_type == Type::Bool) {
+                        Type::Bool
+                    } else {
+                        format_error_message(&format!("mismatching types for operator {:?}", op), Some(span), "incompatible type", context);
+                        Type::Unknown // Type mismatch
+                    }
+                },
+            }
+        }
+        
+        // Unary Expressions (`-`, `!`)
+        AST::Expr(Expr::UnaryExpr { op, expr, span }) => {
+            let expr_type = infer_expr_type(expr, scope, writer, context);
+            match op {
+                UnaryOp::Neg => {
+                    if expr_type == Type::Int || expr_type == Type::Long {
+                        expr_type
+                    } else {
+                        format_error_message(&format!("mismatching types for operator {:?}", op), Some(span), "incompatible type", context);
+                        Type::Unknown
+                    }
+                }
+                UnaryOp::Not => {
+                    if expr_type == Type::Bool {
+                        Type::Bool
+                    } else {
+                        format_error_message(&format!("mismatching types for operator {:?}", op), Some(span), "incompatible type", context);
+                        Type::Unknown
+                    }
+                }
+            }
+        },
+
+        // Array Access (`arr[i]`)
+        AST::Expr(Expr::ArrAccess { id, index, span }) => {
+            let index_type = infer_expr_type(index, scope, writer, context);
+            if index_type != Type::Int {
+                format_error_message(&format!("array requires int"), Some(span), "incompatible type", context);
+                return Type::Unknown; // Array indices must be `int`
+            }
+
+            match scope.lookup(id) {
+                // CHECK: array access must be type array
+                Some(TableEntry::Variable { typ, is_array, .. }) if is_array => typ.clone(),
+                _ => {
+                    format_error_message(&format!("is not array type"), Some(span), "incompatible type", context);
+                    return Type::Unknown;
+                }
+            }
+        
+        },
+
+        // Method Call (`foo(5, true)`)
+        AST::Expr(Expr::MethodCall { method_name, args, span }) => {
+            match scope.lookup(method_name) {
+                Some(TableEntry::Method { return_type, params, .. }) => {
+                    return_type.clone()
+                },
+                // Imports always return `int`
+                Some(TableEntry::Import { name, .. }) => Type::Int,
+                _ => {
+                    format_error_message(&format!("method not found"), Some(span), "incompatible type", context);
+                    Type::Unknown
+                }, // Undefined method
+            }
+        },
+
+        // Casting (`(int) x`)
+        AST::Expr(Expr::Cast { target_type, expr, span }) => {
+            let expr_type = infer_expr_type(expr, scope, writer, context);
+            if expr_type == Type::Int || expr_type == Type::Long {
+                target_type.clone()
+            } else {
+                format_error_message(&format!("bad cast attempt"), Some(span), "incompatible type", context);
+                Type::Unknown // Invalid cast
+            }
+        },
+
+        // `len(arr)`
+        AST::Expr(Expr::Len { id, span }) => {
+            Type::Int
+        },
+
+        // Unknown return type
+        _ => panic!("what in the world"),
+    }
+}
 
 // #################################################
 // AST --> SYMBOL TABLE AST CONSTRUCTION
@@ -52,6 +242,8 @@ pub fn build_symbol_table(
             methods,
             span,
         } => {
+
+            // Create the global scope for the program, with no parent or enclosing methods
             let global_scope = Rc::new(RefCell::new(Scope::new()));
             let mut method_bodies = HashMap::new();
 
@@ -160,7 +352,6 @@ pub fn build_symbol_table(
                                 span: span.clone(),
                             },
                         );
-                        // println!("method table is now: {:#?}", global_scope);
                         
                         // Now process the function body
                         let method = build_method(method, Rc::clone(&global_scope), writer, context);
@@ -184,6 +375,7 @@ pub fn build_symbol_table(
     }
 }
 
+
 /// Builds an IR representation of a method
 pub fn build_method(
     method: &AST,
@@ -199,8 +391,12 @@ pub fn build_method(
             block,
             span,
         } => {
-            let method_scope = Rc::new(RefCell::new(Scope::add_child(parent_scope, Some(name.clone()))));
-
+            // ✅ Create a new scope for this method, with `enclosing_block` set to Method
+            let method_scope = Rc::new(RefCell::new(Scope::add_child(
+                Rc::clone(&parent_scope),
+                Some(EnclosingBlock::Method(name.clone())),
+            )));
+            
             // Process method params, and add into method's outer-most scope
             for param in params {
                 match param.name.as_ref() {
@@ -250,6 +446,7 @@ pub fn build_method(
     }
 }
 
+
 /// Builds an IR representation of a block
 pub fn build_block(
     block: &AST,
@@ -263,13 +460,22 @@ pub fn build_block(
             statements,
             span,
         } => {
-            // Don't create a new scope if this is just a function body
-            let is_function_body = Rc::strong_count(&parent_scope) == 2;
-            let scope = if is_function_body {
-                Rc::clone(&parent_scope)
+            // ✅ Detect if this block is inside a `for` or `while`
+            let is_loop_body = matches!(
+                parent_scope.borrow().enclosing_block,
+                Some(EnclosingBlock::Loop)
+            );
+
+            let enclosing_block = if is_loop_body {
+                Some(EnclosingBlock::Loop) // ✅ Explicitly mark this block as a loop
             } else {
-                Rc::new(RefCell::new(Scope::add_child(parent_scope, None)))
+                parent_scope.borrow().enclosing_block.clone() // ✅ Inherit from parent
             };
+
+            let scope = Rc::new(RefCell::new(Scope::add_child(
+                Rc::clone(&parent_scope),
+                enclosing_block,
+            )));
 
             let mut sym_statements = Vec::new();
 
@@ -424,23 +630,33 @@ pub fn build_statement(
             then_block,
             else_block,
             span,
-        }) => SymStatement::If {
-            condition: build_expr(condition, Rc::clone(&scope), writer, context),
-            then_block: Rc::new(build_block(then_block, Rc::clone(&scope), writer, context)),
-            else_block: else_block
-                .as_ref()
-                .map(|blk| Rc::new(build_block(blk, Rc::clone(&scope), writer, context))),
-            span: span.clone(),
-        },
+        }) => {
+            check_evaluates_to_bool(condition, span, scope.clone(), writer, context);
+
+
+            SymStatement::If {
+                condition: build_expr(condition, Rc::clone(&scope), writer, context),
+                then_block: Rc::new(build_block(then_block, Rc::clone(&scope), writer, context)),
+                else_block: else_block
+                    .as_ref()
+                    .map(|blk| Rc::new(build_block(blk, Rc::clone(&scope), writer, context))),
+                span: span.clone(),
+        }
+    }
+    
 
         AST::Statement(Statement::While {
             condition,
             block,
             span,
-        }) => SymStatement::While {
-            condition: build_expr(condition, Rc::clone(&scope), writer, context),
-            block: Rc::new(build_block(block, Rc::clone(&scope), writer, context)),
-            span: span.clone(),
+        }) => {
+            check_evaluates_to_bool(condition, span, scope.clone(), writer, context);
+
+            SymStatement::While {
+                condition: build_expr(condition, Rc::clone(&scope), writer, context),
+                block: Rc::new(build_block(block, Rc::clone(&scope), writer, context)),
+                span: span.clone(),
+            }
         },
 
         AST::Statement(Statement::For {
@@ -460,6 +676,8 @@ pub fn build_statement(
                     span: span.clone(),
                 },
             );
+
+            check_evaluates_to_bool(condition, span, scope.clone(), writer, context);
 
             let update_expr = match update.as_ref() {
                 AST::Statement(Statement::Assignment { location, expr, .. }) => {
@@ -490,7 +708,7 @@ pub fn build_statement(
         }
 
         AST::Statement(Statement::Return { expr, span }) => {
-            // check_return_value(expr.as_ref(), &scope.borrow(), span, writer, context);
+            check_return_value(expr.as_ref(), &scope.borrow(), span, writer, context);
             SymStatement::Return {
             expr: expr
                 .as_ref()
@@ -499,9 +717,15 @@ pub fn build_statement(
             }
         }
 
-        AST::Statement(Statement::Break { span }) => SymStatement::Break { span: span.clone() },
+        AST::Statement(Statement::Break { span }) => {
+            // check_in_loop(scope.clone(), span, writer, context);
+            SymStatement::Break { span: span.clone() }
+
+        }
+
         AST::Statement(Statement::Continue { span }) => {
-            SymStatement::Continue { span: span.clone() }
+            // check_in_loop(scope.clone(), span, writer, context);
+            SymStatement::Continue { span: span.clone()}
         }
 
         _ => panic!(
@@ -524,20 +748,143 @@ pub fn build_expr(
             left,
             right,
             span,
-        }) => SymExpr::BinaryExpr {
-            op: op.clone(),
-            left: Rc::new(build_expr(left, Rc::clone(&scope), writer, context)),
-            right: Rc::new(build_expr(right, Rc::clone(&scope), writer, context)),
-            typ: Type::Int, // TODO: Type inference
-            span: span.clone(),
-        },
+        }) => {
+            let left_expr = Rc::new(build_expr(left, Rc::clone(&scope), writer, context));
+            let right_expr = Rc::new(build_expr(right, Rc::clone(&scope), writer, context));
 
-        AST::Expr(Expr::UnaryExpr { op, expr, span }) => SymExpr::UnaryExpr {
-            op: op.clone(),
-            expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
-            typ: Type::Int,
-            span: span.clone(),
+            let left_type = infer_expr_type(left, &scope.borrow(), writer, context);
+            let right_type = infer_expr_type(right, &scope.borrow(), writer, context);
+            let mut result_type = Type::Unknown; // Set result type based on operator
+
+            match *op {
+                BinaryOp::Add
+                | BinaryOp::Subtract
+                | BinaryOp::Multiply
+                | BinaryOp::Divide
+                | BinaryOp::Modulo => {
+                    // Rule 14: Must be (1) numeric, (2) left and right have same type
+                    check_is_numeric_and_compatible(true, left, Some(right), span, scope.clone(), writer, context);
+                    result_type = left_type; // If valid, set type to operand type
+                }
+
+                // Operands must have numeric
+                BinaryOp::Greater
+                | BinaryOp::GreaterEqual
+                | BinaryOp::Less
+                | BinaryOp::LessEqual => {
+                    check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);
+                    result_type = Type::Bool;
+                }
+
+                // Equality operators always return bool
+                BinaryOp::Equal
+                | BinaryOp::NotEqual => {
+                    check_equality_compatible(left, right, span, scope.clone(), writer, context);
+                    result_type = Type::Bool;
+                }
+
+                // Rule 16: Logical operators (&&, ||) require bool operands 
+                BinaryOp::And
+                | BinaryOp::Or => {
+                    check_evaluates_to_bool(left, span, scope.clone(), writer, context);
+                    check_evaluates_to_bool(right, span, scope.clone(), writer, context);
+                    result_type = Type::Bool;
+                },
+
+                _ => {}
+            }
+            SymExpr::BinaryExpr {
+                op: op.clone(),
+                left: left_expr,
+                right: right_expr,
+                typ: result_type, // Set the correct type
+                span: span.clone(),
+            }
+        }
+
+        AST::Expr(Expr::UnaryExpr { op, expr, span }) => {
+            let expr_type = infer_expr_type(expr, &scope.borrow(), writer, context);
+        
+            // Rule 21-22. Some range checking done here!
+            match (op, &**expr) {
+                // Fold `-` applied to an integer literal
+                (UnaryOp::Neg, AST::Expr(Expr::Literal { lit: Literal::Int(value), span })) => {
+                    if let Ok(num) = value.parse::<i64>() {
+                        let negated_value = -num;
+        
+                        if (-2147483648..=2147483647).contains(&negated_value) {
+                            return SymExpr::Literal {
+                                value: Literal::Int(negated_value.to_string()),
+                                span: span.clone(),
+                            };
+                        } else {
+                            writeln!(
+                                writer,
+                                "{}",
+                                format_error_message(
+                                    &format!("Integer out of range: `-{}`", value),
+                                    Some(span),
+                                    "Integer out of range",
+                                    context
+                                )
+                            ).expect("Failed to write output");
+        
+                            return SymExpr::Error { span: span.clone() };
+                        }
+                    }
+                }
+        
+                // Fold `-` applied to a long literal
+                (UnaryOp::Neg, AST::Expr(Expr::Literal { lit: Literal::Long(value), span })) => {
+                    if let Ok(num) = value.parse::<i128>() {
+                        let negated_value = -num;
+        
+                        if (-9223372036854775808..=9223372036854775807).contains(&negated_value) {
+                            return SymExpr::Literal {
+                                value: Literal::Long(negated_value.to_string()),
+                                span: span.clone(),
+                            };
+                        } else {
+                            writeln!(
+                                writer,
+                                "{}",
+                                format_error_message(
+                                    &format!("Long integer out of range: `-{}`", value),
+                                    Some(span),
+                                    "Long integer out of range",
+                                    context
+                                )
+                            ).expect("Failed to write output");
+        
+                            return SymExpr::Error { span: span.clone() };
+                        }
+                    }
+                }
+        
+                // Normal unary minus handling
+                (UnaryOp::Neg, _) => {
+                    return SymExpr::UnaryExpr {
+                        op: op.clone(),
+                        expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
+                        typ: expr_type,
+                        span: span.clone(),
+                    };
+                }
+        
+                // Logical NOT (`!`)
+                (UnaryOp::Not, _) => {
+                    return SymExpr::UnaryExpr {
+                        op: op.clone(),
+                        expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
+                        typ: Type::Bool,
+                        span: span.clone(),
+                    };
+                }
+            }
+        
+            SymExpr::Error { span: span.clone() }
         },
+        
 
         AST::Expr(Expr::MethodCall {
             method_name,
@@ -591,16 +938,41 @@ pub fn build_expr(
             target_type,
             expr,
             span,
-        }) => SymExpr::Cast {
-            target_type: target_type.clone(),
-            expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
-            span: span.clone(),
-        },
+        }) => {
+            check_cast(target_type, expr, span, scope.clone(), writer, context);
+        
+            SymExpr::Cast {
+                target_type: target_type.clone(),
+                expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
+                span: span.clone(),
+            }
+        }
 
-        AST::Expr(Expr::Literal { lit, span }) => SymExpr::Literal {
-            value: lit.clone(),
-            span: span.clone(),
-        },
+        AST::Expr(Expr::Literal { lit, span }) => {
+            match lit {
+                Literal::Int(value) => {
+                    check_int_range(false, value.clone(), span, writer, context);
+                }
+                Literal::Long(value) => {
+                    check_long_range(false, value.clone(), span, writer, context);
+                }
+                Literal::HexInt(value) => {
+                    check_int_range(true, value.clone(), span, writer, context);
+                }
+                Literal::HexLong(value) => {
+                    check_long_range(true, value.clone(), span, writer, context);
+
+                }
+                Literal::HexLong(_) => {}
+                _=> {}
+            }
+            
+            SymExpr::Literal {
+                value: lit.clone(),
+                span: span.clone(),
+            }
+        }
+        
 
         AST::Identifier { ref id, ref span } => {
             // RULE 2: no identifier is used before being declared
@@ -611,152 +983,13 @@ pub fn build_expr(
                 entry: entry.clone(),
                 span: span.clone(),
             }
-        }
+        },
 
         _ => panic!(
             "Error in build_expr: unexpected AST node:\n {:#?}",expr),
     }
 }
 
-
-// #################################################
-// HELPERS
-// #################################################
-
-/// Formats an error message for printing to stdout.
-/// Also flags that an error has occurred, so we can
-/// return a non-zero exist code once checking is finished.
-fn format_error_message(invalid_token: &str, span: Option<&Span>, msg: &str, context: &mut SemanticContext) -> String {
-    // direct checker to panic after completing semantic checks
-    context.error_found = true;
-
-    match span {
-        Some(span) => format!(
-            "~~~{} (line {}, col {}): semantic error:\n|\t{} `{}`",
-            context.filename, span.sline, span.scol, msg, invalid_token
-        ),
-        None => format!(
-            "~~~{}: semantic error: \n|\t{} `{}`",
-            context.filename, msg, invalid_token
-        ),
-    }
-}
-
-/// Infer the type of an expression from the given scope
-fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
-    match expr {
-        // Integer, Boolean, and Long Literals
-        AST::Expr(Expr::Literal { lit, .. }) => match lit {
-            Literal::Int(_) => Type::Int,
-            Literal::Bool(_) => Type::Bool,
-            Literal::Long(_) => Type::Long,
-            _=> Type::Unknown
-        },
-
-        // Variable Reference (Check Scope)
-        AST::Identifier { id, .. } => match scope.lookup(id) {
-            Some(TableEntry::Variable { typ, .. }) => typ.clone(),
-            _ => Type::Unknown,
-        },
-
-        // Binary Expressions (`+`, `-`, `*`, `/`, `%`, etc.)
-        AST::Expr(Expr::BinaryExpr { left, right, op, .. }) => {
-            let left_type = infer_expr_type(left, scope);
-            let right_type = infer_expr_type(right, scope);
-
-            match op {
-                BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply |
-                BinaryOp::Divide | BinaryOp::Modulo => {
-                    if left_type == Type::Int && right_type == Type::Int {
-                        Type::Int
-                    } else if left_type == Type::Long && right_type == Type::Long {
-                        Type::Long
-                    } else {
-                        Type::Unknown // Type mismatch
-                    }
-                }
-                BinaryOp::And | BinaryOp::Or => {
-                    if left_type == Type::Bool && right_type == Type::Bool {
-                        Type::Bool
-                    } else {
-                        Type::Unknown
-                    }
-                }
-                BinaryOp::Equal | BinaryOp::NotEqual | BinaryOp::Less |
-                BinaryOp::Greater | BinaryOp::LessEqual | BinaryOp::GreaterEqual => Type::Bool,
-            }
-        },
-
-        // Unary Expressions (`-`, `!`)
-        AST::Expr(Expr::UnaryExpr { op, expr, .. }) => {
-            let expr_type = infer_expr_type(expr, scope);
-            match op {
-                UnaryOp::Neg => {
-                    if expr_type == Type::Int || expr_type == Type::Long {
-                        expr_type
-                    } else {
-                        Type::Unknown
-                    }
-                }
-                UnaryOp::Not => {
-                    if expr_type == Type::Bool {
-                        Type::Bool
-                    } else {
-                        Type::Unknown
-                    }
-                }
-            }
-        },
-
-        // Array Access (`arr[i]`)
-        AST::Expr(Expr::ArrAccess { id, index, .. }) => {
-            let index_type = infer_expr_type(index, scope);
-            if index_type != Type::Int {
-                return Type::Unknown; // Array indices must be `int`
-            }
-
-            match scope.lookup(id) {
-                Some(TableEntry::Variable { typ, .. }) => match typ {
-                    Type::Int => Type::Int,
-                    Type::Long => Type::Long,
-                    Type::Bool => Type::Bool,
-                    _ => Type::Unknown,
-                },
-                _ => Type::Unknown, // Array not found in scope
-            }
-        },
-
-        // Method Call (`foo(5, true)`)
-        AST::Expr(Expr::MethodCall { method_name, args, .. }) => {
-            match scope.lookup(method_name) {
-                Some(TableEntry::Method { return_type, params, .. }) => {
-                    return_type.clone()
-                },
-                // Imports always return `int`
-                Some(TableEntry::Import { name, span }) => Type::Int,
-                _ => Type::Unknown, // Undefined method
-            }
-        },
-
-        // Casting (`(int) x`)
-        AST::Expr(Expr::Cast { target_type, expr, .. }) => {
-            let expr_type = infer_expr_type(expr, scope);
-            if expr_type == Type::Int || expr_type == Type::Long {
-                target_type.clone()
-            } else {
-                Type::Unknown // Invalid cast
-            }
-        },
-
-        // `len(arr)`
-        AST::Expr(Expr::Len { id, span }) => {
-            Type::Int
-        },
-
-        // Unknown return type
-        _ => Type::Unknown,
-    }
-}
 
 
 // #################################################
@@ -767,6 +1000,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
 // Others are checked later explicitly.
 
 /// RULE 1
+/// // TODO: UPDATE to check 
 fn check_duplicate_imports(imports: &[Box<AST>],writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     let mut seen = HashSet::new();
 
@@ -862,7 +1096,7 @@ fn check_methodcall(
 
             // Validate argument types; string and char not allowed for non-imports
             for ((expected_type, param_name), arg) in params.iter().zip(args.iter()) {
-                let arg_type = infer_expr_type(arg, &scope); // Assuming `infer_expr_type()` exists
+                let arg_type = infer_expr_type(arg, &scope, writer, context); // Assuming `infer_expr_type()` exists
                 if arg_type != *expected_type {
                     let err_msg = format_error_message(
                         method_name,
@@ -921,7 +1155,6 @@ fn check_methodcall(
 }
 
 
-
 // Rules 7-8
 fn check_return_value(
     ret: Option<&Box<AST>>, 
@@ -930,70 +1163,74 @@ fn check_return_value(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    let mut msg = String::new();
-    
-    // Get the method name from scope
-    let method_name = match &scope.enclosing_method {
-        Some(name) => name.clone(),
+
+    // 🔥 Minimal change: replace direct field access with `find_enclosing_method()`
+    let method_name = match Scope::find_enclosing_method(scope) {
+        Some(name) => name,  
         None => {
-            let error_msg = format_error_message("Return statement outside of a function.", Some(span), "ERROR:", context);
+            println!("no enclosing scope"); // ✅ Keep this message exactly as is
+            let error_msg = format_error_message(
+                &format!("{:#?}", ret), 
+                Some(span),
+                "Return statement outside of a function.", // ✅ Keep message unchanged
+                context
+            );
             writer.write_all(error_msg.as_bytes()).expect("Failed to write error message");
             return;
         }
     };
 
-    // Lookup method details in the symbol table
     let method_entry = match scope.lookup(&method_name) {
         Some(TableEntry::Method { return_type, .. }) => return_type.clone(),
         _ => {
-            let error_msg = format_error_message(&format!("Could not find method '{}' in symbol table.", method_name), Some(span), "ERROR:", context);
+            let error_msg = format_error_message(
+                &format!("Could not find method '{}' in symbol table.", method_name), // ✅ Keep format exactly the same
+                Some(span),
+                "ERROR:",  // ✅ Keep "ERROR:" unchanged
+                context
+            );
             writer.write_all(error_msg.as_bytes()).expect("Failed to write error message");
             return;
         }
     };
 
     match (&ret, method_entry) {
-        // Case 1: Return value in a void function (Illegal)
         (Some(expr), Type::Void) => {
-            let expr_str = format!("{:?}", expr);  // ✅ Convert return statement to a string
             let error_msg = format_error_message(
-                &expr_str,  // ✅ First arg is the actual return statement!
+                &format!("{:#?}", expr),  // ✅ Keep format exactly the same
                 Some(span),
-                "Return statement with a value in a void function.",
+                "Return statement with a value in a void function.", // ✅ No changes
                 context
             );
             writeln!(writer, "{}", error_msg).expect("Failed to write output!");
         }
-    
-        // Case 2: No return value in a function that requires one (Illegal)
         (None, return_type) if return_type != Type::Void => {
             let error_msg = format_error_message(
-                "return",  // ✅ This case has no expression, so just "return"
+                "return",  // ✅ Keep "return" message as is
                 Some(span),
-                &format!("Missing return value in function returning '{:#?}'.", return_type),
+                &format!("Missing return value in function returning '{:#?}'.", return_type), // ✅ Keep format unchanged
                 context
             );
             writeln!(writer, "{}", error_msg).expect("Failed to write output!");
         }
-    
-        // Case 3: Return type mismatch (Illegal)
         (Some(expr), return_type) => {
-            let expr_type = infer_expr_type(expr, scope);
+            let expr_type = infer_expr_type(expr, scope, writer, context);
             if expr_type != return_type {
-                let expr_str = format!("{:?}", expr);  // ✅ Convert return statement to string
                 let error_msg = format_error_message(
-                    &expr_str,  // ✅ Now first argument is the actual return statement!
+                    &format!("{:#?}", expr),  // Keep format exactly the same
                     Some(span),
-                    &format!("Return type mismatch. Expected '{:#?}', found '{:#?}'.", return_type, expr_type),
+                    &format!("Return type mismatch. Expected '{:#?}', found '{:#?}'.", return_type, expr_type), // ✅ Keep format unchanged
                     context
                 );
                 writeln!(writer, "{}", error_msg).expect("Failed to write output!");
             }
         }
-        _ => {}, // Valid return statement
+        _ => {} // No changes to valid case
     }
     
 }
+
+
 
 
 /// Rule 11
@@ -1018,7 +1255,7 @@ fn check_arraccess(
     }
 
     // Rule 11(b): Ensure that the index expression evaluates to an int
-    let index_type = infer_expr_type(array_index, &scope.borrow());
+    let index_type = infer_expr_type(array_index, &scope.borrow(), writer, context);
     if index_type != Type::Int {
         let error_msg = format_error_message(
             format!("{:#?}", array_index).as_str(),
@@ -1030,16 +1267,17 @@ fn check_arraccess(
     }
 }
 
+/// Rule 12
 fn check_len_argument(id: &AST, span: &Span, scope: &Scope, writer: &mut dyn std::io::Write, context: &mut SemanticContext)-> bool{
     if let AST::Identifier { id, .. } = id {
         if let Some(entry) = scope.lookup(id) {
             match entry {
                 TableEntry::Variable { is_array: true, .. } => {
                     return true
-                    // ✅ Valid: `len` is used on an array
+                    // Valid: `len` is used on an array
                 }
                 _ => {
-                    // ❌ Error: `len` called on a non-array variable
+                    // Error: `len` called on a non-array variable
                     writeln!(
                         writer,
                         "{}",
@@ -1053,7 +1291,7 @@ fn check_len_argument(id: &AST, span: &Span, scope: &Scope, writer: &mut dyn std
                 }
             }
         } else {
-            // ❌ Error: `len` called on an undefined variable
+            // Error: `len` called on an undefined variable
             writeln!(
                 writer,
                 "{}",
@@ -1082,6 +1320,35 @@ fn check_len_argument(id: &AST, span: &Span, scope: &Scope, writer: &mut dyn std
 }
 
 
+/// Rule 13, 16
+fn check_evaluates_to_bool(
+    expression: &AST,
+    span: &Span,
+    scope: Rc<RefCell<Scope>>,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    // Note: evalutes to bool as same as just being bool!
+    // if, while, bool expressions must evaluate to type bool
+    let inferred_type = infer_expr_type(expression, &scope.borrow(), writer, context);
+
+    if inferred_type != Type::Bool {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                format!("{:#?}", expression).as_str(),
+                Some(span),
+                "Expression must have type bool",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+    }
+}
+
+
+
 
 fn check_array_size(size: &str, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     let is_valid = if let Some(stripped) = size.strip_prefix("0x") {
@@ -1100,12 +1367,343 @@ fn check_array_size(size: &str, span: &Span, writer: &mut dyn std::io::Write, co
     }
 }
 
+//// Rule 14
+fn check_is_numeric_and_compatible(
+    is_arithmetic: bool,
+    left: &AST,
+    right: Option<&AST>,
+    span: &Span,
+    scope: Rc<RefCell<Scope>>,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    let left_type = infer_expr_type(left, &scope.borrow(), writer, context);
+    let right_type = right.map(|r| infer_expr_type(r, &scope.borrow(), writer, context));
 
-/// Perform all semantic checks not already performed
-/// during SymTree construction.
-pub fn check_semantics(sym_tree: SymProgram, filename: &str, writer: &mut dyn std::io::Write) {
+    // Ensure left operand is numeric
+    if left_type != Type::Int && left_type != Type::Long {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("left operand `{:#?}`", left),
+                Some(span),
+                "Left operand must be numeric (int or long).",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+        return;
+    }
 
+    if let Some(right_type) = right_type {
+        // Ensure right operand is also numeric
+        if right_type != Type::Int && right_type != Type::Long {
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("right operand `{:#?}`", right),
+                    Some(span),
+                    "Right operand must be numeric (int or long).",
+                    context
+                )
+            )
+            .expect("Failed to write error message");
+            return;
+        }
+
+        // Arithmetic operators (`+`, `-`, etc.) require both operands to have the SAME type
+        if is_arithmetic && left_type != right_type {
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("left `{:#?}`, right `{:#?}`", left, right),
+                    Some(span),
+                    "Operands of arithmetic expressions must have the same type.",
+                    context
+                )
+            )
+            .expect("Failed to write error message");
+        }
+    }
 }
+
+// Rule 15, 16: Ensure equality operators (`==`, `!=`) have compatible types
+fn check_equality_compatible(
+    left: &AST,
+    right: &AST,
+    span: &Span,
+    scope: Rc<RefCell<Scope>>,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    let left_type = infer_expr_type(left, &scope.borrow(), writer, context);
+    let right_type = infer_expr_type(right, &scope.borrow(), writer, context);
+
+    // Allowable types: `int`, `long`, `bool`
+    if left_type != right_type {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("left `{:#?}` {:?}, right `{:#?}` {:?}", left, left_type, right, right_type),
+                Some(span),
+                "Equality operator requires both operands to have the same type.",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+        return;
+    }
+
+    if left_type != Type::Int && left_type != Type::Long && left_type != Type::Bool {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("left `{:#?}`, right `{:#?}`", left, right),
+                Some(span),
+                "Equality operator can only be applied to int, long, or bool.",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+    }
+}
+
+/// Rule 19
+fn check_in_loop(
+    scope: Rc<RefCell<Scope>>, // Keep `Rc<RefCell<Scope>>` instead of `&Scope`
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    if !Scope::is_inside_loop(scope.clone()) { // Correct call
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                "loop control statement",
+                Some(span),
+                "Break and continue statements must be inside a loop.",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+    }
+}
+
+
+// Rule 20
+/// Ensures that `int(expr)` and `long(expr)` casts only take `int` or `long` as input
+fn check_cast(
+    target_type: &Type,
+    expr: &AST,
+    span: &Span,
+    scope: Rc<RefCell<Scope>>,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    let expr_type = infer_expr_type(expr, &scope.borrow(), writer, context);
+
+    // Casts are only valid if `expr` is already `int` or `long`
+    if expr_type != Type::Int && expr_type != Type::Long {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("cast to `{:#?}` from `{:#?}`", target_type, expr_type),
+                Some(span),
+                &format!(
+                    "Invalid cast: `{}` can only be applied to `int` or `long` types.",
+                    match target_type {
+                        Type::Int => "int()",
+                        Type::Long => "long()",
+                        _ => "unknown()",
+                    }
+                ),
+                context
+            )
+        )
+        .expect("Failed to write error message");
+    }
+}
+
+/// Rule 21 - - this doesn't work!
+fn check_int_range(
+    is_hex: bool,
+    value: String,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    // Parse as a larger type (`i64`) to safely check the bounds
+    let parse_result = if is_hex {
+        i64::from_str_radix(&value, 16)
+    } else {
+        value.parse::<i64>()
+    };
+
+    match parse_result {
+        Ok(num) => {
+            if !(i32::MIN as i64..=i32::MAX as i64).contains(&num)
+            {
+                writeln!(
+                    writer,
+                    "{}",
+                    format_error_message(
+                        &format!("Invalid int literal `{}`", value),
+                        Some(span),
+                        "Integer out of range",
+                        context
+                    )
+                )
+                .expect("Failed to write output");
+            }
+        }
+        Err(_) => {
+            // Not a valid number
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("Invalid int literal `{}`", value),
+                    Some(span),
+                    "Invalid integer format",
+                    context
+                )
+            )
+            .expect("Failed to write output");
+        }
+    }
+}
+
+
+
+
+/// Rule 22
+fn check_long_range(
+    is_hex: bool,
+    value: String,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    let parse_result = if is_hex {
+        i128::from_str_radix(&value, 16)
+    } else {
+        value.parse::<i128>()
+    };
+    // ✅ Attempt to parse the string as a 128-bit integer
+    match parse_result {
+        Ok(num) => {
+            if !(i64::MIN as i128..=i64::MAX as i128).contains(&num) {
+                writeln!(
+                    writer,
+                    "{}",
+                    format_error_message(
+                        &format!("long literal `{}`", value),
+                        Some(span),
+                        "Long literal out of range: must be between -9223372036854775808 and 9223372036854775807.",
+                        context
+                    )
+                )
+                .expect("Failed to write error message");
+            }
+        }
+        Err(_) => {
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("long literal `{}`", value),
+                    Some(span),
+                    "Invalid long format: must be a valid signed 64-bit integer.",
+                    context
+                )
+            )
+            .expect("Failed to write error message");
+        }
+    }
+}
+
+
+/// Rule 23
+/// ✅ Ensures that assignment targets are scalars (not arrays)
+fn check_scalar_assignment(
+    location: &AST,
+    span: &Span,
+    scope: Rc<RefCell<Scope>>,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    match location {
+        // ✅ Look up identifier in scope
+        AST::Identifier { id, .. } => {
+            if let Some(TableEntry::Variable { is_array, .. }) = scope.borrow().lookup(id) {
+                if is_array {
+                    writeln!(
+                        writer,
+                        "{}",
+                        format_error_message(
+                            &format!("variable `{}`", id),
+                            Some(span),
+                            "Assignment target must be a scalar (non-array) variable.",
+                            context
+                        )
+                    )
+                    .expect("Failed to write error message");
+                }
+            } else {
+                writeln!(
+                    writer,
+                    "{}",
+                    format_error_message(
+                        &format!("variable `{}`", id),
+                        Some(span),
+                        "Assignment target is not declared.",
+                        context
+                    )
+                )
+                .expect("Failed to write error message");
+            }
+        }
+
+        // ✅ Array element access (e.g., a[0]) is allowed since it is scalar
+        AST::Expr(Expr::ArrAccess { .. }) => {
+            // No error; array elements are scalar
+        }
+
+        // ❌ Any other expression is invalid as an assignment target
+        _ => {
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("{:?}", location),
+                    Some(span),
+                    "Invalid assignment target: must be a scalar variable or array element.",
+                    context
+                )
+            )
+            .expect("Failed to write error message");
+        }
+    }
+}
+
+
+
+// #################################################
+// ENTRY POINT
+// #################################################
+
+// /// Perform all semantic checks not already performed
+// /// during SymTree construction.
+// pub fn check_semantics(sym_tree: SymProgram, filename: &str, writer: &mut dyn std::io::Write) {
+
+// }
 
 /// Semantically check the given file by parsing it and 
 /// turning the AST into a symbol table tree.
