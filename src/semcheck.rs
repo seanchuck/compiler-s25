@@ -841,11 +841,15 @@ pub fn build_expr(
             target_type,
             expr,
             span,
-        }) => SymExpr::Cast {
-            target_type: target_type.clone(),
-            expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
-            span: span.clone(),
-        },
+        }) => {
+            check_cast(target_type, expr, span, scope.clone(), writer, context);
+        
+            SymExpr::Cast {
+                target_type: target_type.clone(),
+                expr: Rc::new(build_expr(expr, Rc::clone(&scope), writer, context)),
+                span: span.clone(),
+            }
+        }
 
         AST::Expr(Expr::Literal { lit, span }) => SymExpr::Literal {
             value: lit.clone(),
@@ -1370,6 +1374,89 @@ fn check_in_loop(
         .expect("Failed to write error message");
     }
 }
+
+
+// Rule 20
+/// ✅ Ensures that `int(expr)` and `long(expr)` casts only take `int` or `long` as input
+fn check_cast(
+    target_type: &Type,
+    expr: &AST,
+    span: &Span,
+    scope: Rc<RefCell<Scope>>,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    let expr_type = infer_expr_type(expr, &scope.borrow());
+
+    // ✅ Casts are only valid if `expr` is already `int` or `long`
+    if expr_type != Type::Int && expr_type != Type::Long {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("cast to `{:#?}` from `{:#?}`", target_type, expr_type),
+                Some(span),
+                &format!(
+                    "Invalid cast: `{}` can only be applied to `int` or `long` types.",
+                    match target_type {
+                        Type::Int => "int()",
+                        Type::Long => "long()",
+                        _ => "unknown()",
+                    }
+                ),
+                context
+            )
+        )
+        .expect("Failed to write error message");
+    }
+}
+
+/// Rule 21
+fn check_int_range(
+    value: i64,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    if !(i32::MIN as i64..=i32::MAX as i64).contains(&value) {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("integer literal `{}`", value),
+                Some(span),
+                "Int literal out of range: must be between -2147483648 and 2147483647.",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+    }
+}
+
+
+/// Rule 22
+fn check_long_range(
+    value: i128,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    if !(i64::MIN as i128..=i64::MAX as i128).contains(&value) {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                &format!("long literal `{}`", value),
+                Some(span),
+                "Long literal out of range: must be between -9223372036854775808 and 9223372036854775807.",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+    }
+}
+
+
 
 
 
