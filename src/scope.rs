@@ -107,10 +107,8 @@ impl Scope {
             current_scope = scope_ref.parent.clone(); // ✅ Move up scope tree safely
         }
 
-        false // ❌ No loop found
+        false 
     }
-
-
 
     /// ✅ Recursively finds the closest enclosing method scope, if it exists
     pub fn find_enclosing_method(&self) -> Option<String> {
@@ -126,11 +124,8 @@ impl Scope {
             current_scope = scope_ref.parent.clone(); // ✅ Move up the scope tree
         }
 
-        None // ❌ No enclosing method found
+        None 
     }
-
-
-    
 
 
 

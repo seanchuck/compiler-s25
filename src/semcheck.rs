@@ -680,9 +680,16 @@ pub fn build_statement(
             }
         }
 
-        AST::Statement(Statement::Break { span }) => SymStatement::Break { span: span.clone() },
+        AST::Statement(Statement::Break { span }) => {
+            check_in_loop(scope.clone(), span, writer, context);
+            SymStatement::Break { span: span.clone() }
+
+        }
+
         AST::Statement(Statement::Continue { span }) => {
-            SymStatement::Continue { span: span.clone() }
+            check_in_loop(scope.clone(), span, writer, context);
+            SymStatement::Continue { span: span.clone()}
+
         }
 
         _ => panic!(
@@ -1341,6 +1348,30 @@ fn check_equality_compatible(
         .expect("Failed to write error message");
     }
 }
+
+/// Rule 19
+fn check_in_loop(
+    scope: Rc<RefCell<Scope>>,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    if !scope.borrow().is_inside_loop() {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                "break/return",
+                Some(span),
+                "Break and continue statements must be inside a loop.",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+    }
+}
+
+
 
 
 
