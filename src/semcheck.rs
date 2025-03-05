@@ -763,7 +763,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
         AST::Expr(Expr::BinaryExpr { left, right, op, .. }) => {
             let left_type = infer_expr_type(left, scope);
             let right_type = infer_expr_type(right, scope);
-
+        
             match op {
                 BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply |
                 BinaryOp::Divide | BinaryOp::Modulo => {
@@ -785,7 +785,8 @@ fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
                 BinaryOp::Equal | BinaryOp::NotEqual | BinaryOp::Less |
                 BinaryOp::Greater | BinaryOp::LessEqual | BinaryOp::GreaterEqual => Type::Bool,
             }
-        },
+        }
+        
 
         // Unary Expressions (`-`, `!`)
         AST::Expr(Expr::UnaryExpr { op, expr, .. }) => {
@@ -816,14 +817,12 @@ fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
             }
 
             match scope.lookup(id) {
-                Some(TableEntry::Variable { typ, .. }) => match typ {
-                    Type::Int => Type::Int,
-                    Type::Long => Type::Long,
-                    Type::Bool => Type::Bool,
-                    _ => Type::Unknown,
-                },
-                _ => Type::Unknown, // Array not found in scope
+                // CHECK: array access must be type array
+                Some(TableEntry::Variable { typ, is_array, .. }) if is_array => typ.clone(),
+                Some(_) => Type::Unknown, // Non-array variable used incorrectly
+                None => Type::Unknown, // Variable not declared
             }
+        
         },
 
         // Method Call (`foo(5, true)`)
