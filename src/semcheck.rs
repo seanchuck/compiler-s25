@@ -67,12 +67,19 @@ fn format_error_message(invalid_token: &str, span: Option<&Span>, msg: &str, con
 
 /// Infer the type of an expression from the given scope
 /// The legal types are: Int, Long, Bool, Void, Unknown.
-fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
+fn infer_expr_type(expr: &AST, scope: &Scope, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Type {
     match expr {
         // Integer, Boolean, and Long Literals
-        AST::Expr(Expr::Literal { lit, .. }) => match lit {
-            Literal::Int(_) => Type::Int,
-            Literal::Long(_) => Type::Long,
+        AST::Expr(Expr::Literal { lit, span }) => match lit {
+            Literal::Int(value) => {
+                check_int_range(false, value.clone(), span, writer, context);
+                Type::Int
+            }
+            Literal::Long(value) => {
+                // check_long_range(value, span, &mut std::io::stderr(), &mut SemanticContext::new());
+                Type::Long
+            }
+
             Literal::Bool(_) => Type::Bool,
             _=> Type::Unknown
         },
@@ -92,8 +99,8 @@ fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
 
         // Binary Expressions (`+`, `-`, `*`, `/`, `%`, etc.): evaluate recursively
         AST::Expr(Expr::BinaryExpr { left, right, op, .. }) => {
-            let left_type = infer_expr_type(left, scope);
-            let right_type = infer_expr_type(right, scope);
+            let left_type = infer_expr_type(left, scope, writer, context);
+            let right_type = infer_expr_type(right, scope, writer, context);
         
             match op {
                 BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply |
@@ -121,7 +128,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
 
         // Unary Expressions (`-`, `!`)
         AST::Expr(Expr::UnaryExpr { op, expr, .. }) => {
-            let expr_type = infer_expr_type(expr, scope);
+            let expr_type = infer_expr_type(expr, scope, writer, context);
             match op {
                 UnaryOp::Neg => {
                     if expr_type == Type::Int || expr_type == Type::Long {
@@ -142,7 +149,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
 
         // Array Access (`arr[i]`)
         AST::Expr(Expr::ArrAccess { id, index, .. }) => {
-            let index_type = infer_expr_type(index, scope);
+            let index_type = infer_expr_type(index, scope, writer, context);
             if index_type != Type::Int {
                 return Type::Unknown; // Array indices must be `int`
             }
@@ -170,7 +177,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
 
         // Casting (`(int) x`)
         AST::Expr(Expr::Cast { target_type, expr, .. }) => {
-            let expr_type = infer_expr_type(expr, scope);
+            let expr_type = infer_expr_type(expr, scope, writer, context);
             if expr_type == Type::Int || expr_type == Type::Long {
                 target_type.clone()
             } else {
@@ -716,8 +723,8 @@ pub fn build_expr(
             let left_expr = Rc::new(build_expr(left, Rc::clone(&scope), writer, context));
             let right_expr = Rc::new(build_expr(right, Rc::clone(&scope), writer, context));
 
-            let left_type = infer_expr_type(left, &scope.borrow());
-            let right_type = infer_expr_type(right, &scope.borrow());
+            let left_type = infer_expr_type(left, &scope.borrow(), writer, context);
+            let right_type = infer_expr_type(right, &scope.borrow(), writer, context);
             let mut result_type = Type::Unknown; // Set result type based on operator
 
             match *op {
@@ -768,7 +775,7 @@ pub fn build_expr(
 
         AST::Expr(Expr::UnaryExpr { op, expr, span }) => {
             // Rule 14: Unary minus must have numeric type
-            let expr_type = infer_expr_type(expr, &scope.borrow());
+            let expr_type = infer_expr_type(expr, &scope.borrow(), writer, context);
             match *op {
                 // operand of unary minus must be numeric!
                 UnaryOp::Neg => {// check_is_numeric_and_compatible(false, expr, None, span, scope.clone(), writer, context);
@@ -867,7 +874,6 @@ pub fn build_expr(
                 _=> {}
             }
             
-        
             SymExpr::Literal {
                 value: lit.clone(),
                 span: span.clone(),
@@ -997,7 +1003,7 @@ fn check_methodcall(
 
             // Validate argument types; string and char not allowed for non-imports
             for ((expected_type, param_name), arg) in params.iter().zip(args.iter()) {
-                let arg_type = infer_expr_type(arg, &scope); // Assuming `infer_expr_type()` exists
+                let arg_type = infer_expr_type(arg, &scope, writer, context); // Assuming `infer_expr_type()` exists
                 if arg_type != *expected_type {
                     let err_msg = format_error_message(
                         method_name,
@@ -1115,7 +1121,7 @@ fn check_return_value(
             writeln!(writer, "{}", error_msg).expect("Failed to write output!");
         }
         (Some(expr), return_type) => {
-            let expr_type = infer_expr_type(expr, scope);
+            let expr_type = infer_expr_type(expr, scope, writer, context);
             if expr_type != return_type {
                 let error_msg = format_error_message(
                     &format!("{:#?}", expr),  // ✅ Keep format exactly the same
@@ -1155,7 +1161,7 @@ fn check_arraccess(
     }
 
     // Rule 11(b): Ensure that the index expression evaluates to an int
-    let index_type = infer_expr_type(array_index, &scope.borrow());
+    let index_type = infer_expr_type(array_index, &scope.borrow(), writer, context);
     if index_type != Type::Int {
         let error_msg = format_error_message(
             format!("{:#?}", array_index).as_str(),
@@ -1230,7 +1236,7 @@ fn check_evaluates_to_bool(
 ) {
     // Note: evalutes to bool as same as just being bool!
     // if, while, bool expressions must evaluate to type bool
-    let inferred_type = infer_expr_type(expression, &scope.borrow());
+    let inferred_type = infer_expr_type(expression, &scope.borrow(), writer, context);
 
     if inferred_type != Type::Bool {
         writeln!(
@@ -1277,8 +1283,8 @@ fn check_is_numeric_and_compatible(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    let left_type = infer_expr_type(left, &scope.borrow());
-    let right_type = right.map(|r| infer_expr_type(r, &scope.borrow()));
+    let left_type = infer_expr_type(left, &scope.borrow(), writer, context);
+    let right_type = right.map(|r| infer_expr_type(r, &scope.borrow(), writer, context));
 
     // Ensure left operand is numeric
     if left_type != Type::Int && left_type != Type::Long {
@@ -1339,8 +1345,8 @@ fn check_equality_compatible(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    let left_type = infer_expr_type(left, &scope.borrow());
-    let right_type = infer_expr_type(right, &scope.borrow());
+    let left_type = infer_expr_type(left, &scope.borrow(), writer, context);
+    let right_type = infer_expr_type(right, &scope.borrow(), writer, context);
 
     // Allowable types: `int`, `long`, `bool`
     if left_type != right_type {
@@ -1406,7 +1412,7 @@ fn check_cast(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    let expr_type = infer_expr_type(expr, &scope.borrow());
+    let expr_type = infer_expr_type(expr, &scope.borrow(), writer, context);
 
     // ✅ Casts are only valid if `expr` is already `int` or `long`
     if expr_type != Type::Int && expr_type != Type::Long {
