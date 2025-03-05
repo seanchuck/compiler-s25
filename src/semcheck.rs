@@ -69,7 +69,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope, writer: &mut dyn std::io::Write, c
         // Integer, Boolean, and Long Literals
         AST::Expr(Expr::Literal { lit, span }) => match lit {
             Literal::Int(value) => {
-                // check_int_range(false, value.clone(), span, writer, context);
+                check_int_range(false, value.clone(), span, writer, context);
                 Type::Int
             }
             Literal::Long(value) => {
@@ -857,7 +857,7 @@ pub fn build_expr(
         AST::Expr(Expr::Literal { lit, span }) => {
             match lit {
                 Literal::Int(value) => {
-                    // check_int_range(false, value.clone(), span, writer, context);
+                    check_int_range(false, value.clone(), span, writer, context);
                 }
                 Literal::Long(value) => {
                                 // check_long_range(value.clone(), span, writer, context); // ✅ Enforce explicit range check
@@ -1441,38 +1441,25 @@ fn check_int_range(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    // parse based on whether it is hex
-    let parsed_value = if is_hex {
-        if value.len() > 2 {
-            i32::from_str_radix(&value[2..], 16).ok()
-        } else {
-            None
-        }
-    } else {
-        value.parse::<i32>().ok()
-    };
+    match value.parse::<i32>() {
+        Ok(_) => {},
+        Err(_) => {
+            // fails if out of range or not a valid number
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(
+                    &format!("`{}`", value),
+                    Some(span),
+                    "Invalid int literal",
+                    context
+                )
+            )
+            .expect("Failed to write output");
 
-    let output_message = if let Some(num) = parsed_value {
-        if (i32::MIN..=i32::MAX).contains(&num) {
-            return; // ✅ Valid number, do nothing
         }
-        "Integer out of range: must be between -2147483648 and 2147483647."
-    } else {
-        "Invalid integer format: must be a valid signed 32-bit integer."
-    };
+    }
 
-    // ✅ Always output the message if parsing fails or number is out of range
-    writeln!(
-        writer,
-        "{}",
-        format_error_message(
-            &format!("integer literal `{}`", value),
-            Some(span),
-            output_message,
-            context
-        )
-    )
-    .expect("Failed to write output");
 }
 
 
