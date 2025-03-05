@@ -69,7 +69,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope, writer: &mut dyn std::io::Write, c
         // Integer, Boolean, and Long Literals
         AST::Expr(Expr::Literal { lit, span }) => match lit {
             Literal::Int(value) => {
-                check_int_range(false, value.clone(), span, writer, context);
+                // check_int_range(false, value.clone(), span, writer, context);
                 Type::Int
             }
             Literal::Long(value) => {
@@ -860,7 +860,7 @@ pub fn build_expr(
                     check_int_range(false, value.clone(), span, writer, context);
                 }
                 Literal::Long(value) => {
-                                // check_long_range(value.clone(), span, writer, context); // ✅ Enforce explicit range check
+                    // check_long_range(value.clone(), span, writer, context); // ✅ Enforce explicit range check
                 }
                 Literal::HexInt(value) => {
                     // check_int_range(true, value.clone(), span, writer, context);
