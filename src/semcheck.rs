@@ -267,12 +267,14 @@ pub fn build_block(
             statements,
             span,
         } => {
-            // Don't create a new scope if this is just a method body
+            // Don't create a new scope if this is just the outer method body (void main(){})
             let is_function_body = parent_scope.borrow().enclosing_method.is_some();
 
             let scope = if is_function_body {
                 Rc::clone(&parent_scope) // get a reference to the same scope
             } else {
+                // Do create new scope if this is within method body (Void main(){ if(){} })
+                // and inherit the enclosing method
                 Rc::new(RefCell::new(Scope::add_child(
                     Rc::clone(&parent_scope),
                     parent_scope.borrow().enclosing_method.clone(), 
@@ -432,23 +434,33 @@ pub fn build_statement(
             then_block,
             else_block,
             span,
-        }) => SymStatement::If {
-            condition: build_expr(condition, Rc::clone(&scope), writer, context),
-            then_block: Rc::new(build_block(then_block, Rc::clone(&scope), writer, context)),
-            else_block: else_block
-                .as_ref()
-                .map(|blk| Rc::new(build_block(blk, Rc::clone(&scope), writer, context))),
-            span: span.clone(),
-        },
+        }) => {
+            check_is_bool(condition, span, scope.clone(), writer, context);
+
+
+            SymStatement::If {
+                condition: build_expr(condition, Rc::clone(&scope), writer, context),
+                then_block: Rc::new(build_block(then_block, Rc::clone(&scope), writer, context)),
+                else_block: else_block
+                    .as_ref()
+                    .map(|blk| Rc::new(build_block(blk, Rc::clone(&scope), writer, context))),
+                span: span.clone(),
+        }
+    }
+    
 
         AST::Statement(Statement::While {
             condition,
             block,
             span,
-        }) => SymStatement::While {
-            condition: build_expr(condition, Rc::clone(&scope), writer, context),
-            block: Rc::new(build_block(block, Rc::clone(&scope), writer, context)),
-            span: span.clone(),
+        }) => {
+            check_is_bool(condition, span, scope.clone(), writer, context);
+
+            SymStatement::While {
+                condition: build_expr(condition, Rc::clone(&scope), writer, context),
+                block: Rc::new(build_block(block, Rc::clone(&scope), writer, context)),
+                span: span.clone(),
+            }
         },
 
         AST::Statement(Statement::For {
@@ -468,6 +480,8 @@ pub fn build_statement(
                     span: span.clone(),
                 },
             );
+
+            check_is_bool(condition, span, scope.clone(), writer, context);
 
             let update_expr = match update.as_ref() {
                 AST::Statement(Statement::Assignment { location, expr, .. }) => {
@@ -1051,6 +1065,7 @@ fn check_arraccess(
     }
 }
 
+/// Rule 12
 fn check_len_argument(id: &AST, span: &Span, scope: &Scope, writer: &mut dyn std::io::Write, context: &mut SemanticContext)-> bool{
     if let AST::Identifier { id, .. } = id {
         if let Some(entry) = scope.lookup(id) {
@@ -1102,6 +1117,32 @@ fn check_len_argument(id: &AST, span: &Span, scope: &Scope, writer: &mut dyn std
     false
 }
 
+
+/// Rule 13
+fn check_is_bool(
+    condition: &AST,
+    span: &Span,
+    scope: Rc<RefCell<Scope>>,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    // if, while, bool expressions must evaluate to type bool
+    let inferred_type = infer_expr_type(condition, &scope.borrow());
+
+    if inferred_type != Type::Bool {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(
+                format!("{:#?}", condition).as_str(),
+                Some(span),
+                "Condition must have type bool",
+                context
+            )
+        )
+        .expect("Failed to write error message");
+    }
+}
 
 
 fn check_array_size(size: &str, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
