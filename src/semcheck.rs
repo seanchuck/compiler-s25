@@ -854,13 +854,19 @@ pub fn build_expr(
         AST::Expr(Expr::Literal { lit, span }) => {
             match lit {
                 Literal::Int(value) => {
-                    check_int_range(value.clone(), span, writer, context); // ✅ Enforce explicit range check
+                    check_int_range(false, value.clone(), span, writer, context);
                 }
                 Literal::Long(value) => {
-                    check_long_range(value.clone(), span, writer, context); // ✅ Enforce explicit range check
+                                // check_long_range(value.clone(), span, writer, context); // ✅ Enforce explicit range check
                 }
-                _ => {}
+                Literal::HexInt(value) => {
+                    check_int_range(true, value.clone(), span, writer, context);
+
+                }
+                Literal::HexLong(_) => {}
+                _=> {}
             }
+            
         
             SymExpr::Literal {
                 value: lit.clone(),
@@ -895,6 +901,7 @@ pub fn build_expr(
 // Others are checked later explicitly.
 
 /// RULE 1
+/// // TODO: UPDATE
 fn check_duplicate_imports(imports: &[Box<AST>],writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     let mut seen = HashSet::new();
 
@@ -1423,38 +1430,42 @@ fn check_cast(
         .expect("Failed to write error message");
     }
 }
+
 /// Rule 21
 fn check_int_range(
+    is_hex: bool,
     value: String,
     span: &Span,
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    // ✅ Attempt to parse the string as a 64-bit integer
-    match value.parse::<i64>() {
+    let parsed_value = if is_hex {
+        // Parse as hexadecimal (skip "0x" prefix)
+        i32::from_str_radix(&value[2..], 16)
+    } else {
+        // Parse as decimal
+        value.parse::<i32>()
+    };
+
+    match parsed_value {
         Ok(num) => {
-            if !(i32::MIN as i64..=i32::MAX as i64).contains(&num) {
-                writeln!(
-                    writer,
-                    "{}",
-                    format_error_message(
-                        &format!("integer literal `{}`", value),
-                        Some(span),
-                        "Int literal out of range: must be between -2147483648 and 2147483647.",
-                        context
-                    )
-                )
-                .expect("Failed to write error message");
-            }
+            // The number is in the valid i32 range, do nothing (it's valid)
         }
         Err(_) => {
+            // Determine the error message (range error vs invalid format)
+            let error_message = if value.starts_with("0x") || value.starts_with("0X") {
+                "Invalid hexadecimal format: must be a valid 32-bit integer."
+            } else {
+                "Invalid integer format: must be a valid signed 32-bit integer."
+            };
+
             writeln!(
                 writer,
                 "{}",
                 format_error_message(
                     &format!("integer literal `{}`", value),
                     Some(span),
-                    "Invalid integer format: must be a valid signed 32-bit integer.",
+                    error_message,
                     context
                 )
             )
@@ -1462,6 +1473,7 @@ fn check_int_range(
         }
     }
 }
+
 
 /// Rule 22
 fn check_long_range(
