@@ -582,7 +582,7 @@ pub fn build_expr(
                 // Equality operators always return bool
                 BinaryOp::Equal
                 | BinaryOp::NotEqual => {
-                    // check_equality_compatible(left, right, span, scope.clone(), writer, context);
+                    check_equality_compatible(left, right, span, scope.clone(), writer, context);
                     result_type = Type::Bool;
                 }
 
@@ -618,10 +618,10 @@ pub fn build_expr(
 
         AST::Expr(Expr::UnaryExpr { op, expr, span }) => {
             // Rule 14: Unary minus must have numeric type
-            match *op {
-                UnaryOp::Neg => {check_is_numeric_and_compatible(false, expr, None, span, scope.clone(), writer, context);}
-                _=>{}
-            }
+            // match *op {
+            //     UnaryOp::Neg => {check_is_numeric_and_compatible(false, expr, None, span, scope.clone(), writer, context);}
+            //     _=>{}
+            // }
     
             SymExpr::UnaryExpr {
                 op: op.clone(),
@@ -735,6 +735,7 @@ fn format_error_message(invalid_token: &str, span: Option<&Span>, msg: &str, con
 }
 
 /// Infer the type of an expression from the given scope
+/// The legal types are: Int, Long, Bool, Void, Unknown.
 fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
     match expr {
         // Integer, Boolean, and Long Literals
@@ -745,13 +746,20 @@ fn infer_expr_type(expr: &AST, scope: &Scope) -> Type {
             _=> Type::Unknown
         },
 
-        // Variable Reference (Check Scope)
-        AST::Identifier { id, .. } => match scope.lookup(id) {
-            Some(TableEntry::Variable { typ, .. }) => typ.clone(),
-            _ => Type::Unknown,
-        },
+        // Variable Reference (Check scope table)
+        AST::Identifier { id, .. } => {
+            let entry = scope.lookup(id);
+            match entry {
+                Some(TableEntry::Variable { typ, .. }) => typ.clone(),
+                Some(_) => Type::Unknown, // Should never happen, but defensive
+                None => {
+                    println!("DEBUG: Variable `{}` not found in scope!", id);
+                    Type::Unknown
+                }
+            }
+        }        
 
-        // Binary Expressions (`+`, `-`, `*`, `/`, `%`, etc.)
+        // Binary Expressions (`+`, `-`, `*`, `/`, `%`, etc.): evaluate recursively
         AST::Expr(Expr::BinaryExpr { left, right, op, .. }) => {
             let left_type = infer_expr_type(left, scope);
             let right_type = infer_expr_type(right, scope);
