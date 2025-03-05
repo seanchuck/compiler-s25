@@ -23,7 +23,7 @@ Running test: tests/semantics/rule3-illegal.dcf
 ~~~tests/semantics/rule3-illegal.dcf: semantic error: 
 |	Missing entry point: `main`
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -31,7 +31,7 @@ Running test: tests/semantics/rule4-illegal.dcf
 ~~~tests/semantics/rule4-illegal.dcf (line 1, col 1): semantic error:
 |	Incorrect number of arguments for method. Expected 1, but got 0. `foo`
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -39,7 +39,7 @@ Running test: tests/semantics/rule5-illegal.dcf
 ~~~tests/semantics/rule5-illegal.dcf (line 1, col 1): semantic error:
 |	Method does not return a value but is used in an expression. `foo`
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -71,7 +71,7 @@ Running test: tests/semantics/rule7-illegal.dcf
     },
 )`
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -91,7 +91,7 @@ Running test: tests/semantics/rule8-illegal.dcf
     },
 )`
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -99,7 +99,7 @@ Running test: tests/semantics/rule9-illegal.dcf
 ~~~tests/semantics/rule9-illegal.dcf (line 2, col 5): semantic error:
 |	Use before declaration `x`
 
-thread 'main' panicked at src/semcheck.rs:550:59:
+thread 'main' panicked at src/semcheck.rs:552:59:
 Variable should be declared
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -107,7 +107,7 @@ Running test: tests/semantics/rule10-illegal.dcf
 ~~~tests/semantics/rule10-illegal.dcf (line 2, col 5): semantic error:
 |	Call to undefined method. `foo`
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -127,7 +127,7 @@ Running test: tests/semantics/rule11-illegal.dcf
     },
 )`
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -135,7 +135,7 @@ Running test: tests/semantics/rule12-illegal.dcf
 ~~~tests/semantics/rule12-illegal.dcf (line 6, col 9): semantic error:
 |	Invalid use of `len`: argument must be an array variable. `x`
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -151,7 +151,7 @@ Running test: tests/semantics/rule13-illegal.dcf
     },
 }`
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -186,7 +186,7 @@ Running test: tests/semantics/rule15-illegal.dcf
     },
 )``
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -216,7 +216,7 @@ Running test: tests/semantics/rule16-illegal.dcf
     },
 )`
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -233,17 +233,12 @@ Running test: tests/semantics/rule20-illegal.dcf
 ~~~tests/semantics/rule20-illegal.dcf (line 3, col 9): semantic error:
 |	Invalid cast: `int()` can only be applied to `int` or `long` types. `cast to `Int` from `Bool``
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
+thread 'main' panicked at src/semcheck.rs:1692:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
 Running test: tests/semantics/rule21-illegal.dcf
-~~~tests/semantics/rule21-illegal.dcf (line 3, col 9): semantic error:
-|	Invalid integer format: must be a valid signed 32-bit integer. `integer literal `2147483648``
 
-thread 'main' panicked at src/semcheck.rs:1624:9:
-Semantic check failed.
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
 Running test: tests/semantics/rule22-illegal.dcf
 

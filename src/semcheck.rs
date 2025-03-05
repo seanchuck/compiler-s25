@@ -21,8 +21,9 @@ TODO:
         - Don't create multiple messages for same error
         - Test that we can output multiple error messages for single pass
 
-    - For range checking
+    - For range checking (int, long)
         - must check for literals: array declaration sizes, etc.
+        - need to fold unary minus (see https://6110-sp25.github.io/phase-2)
 
 
 */
@@ -323,7 +324,6 @@ pub fn build_symbol_table(
                                 span: span.clone(),
                             },
                         );
-                        // println!("method table is now: {:#?}", global_scope);
                         
                         // Now process the function body
                         let method = build_method(method, Rc::clone(&global_scope), writer, context);
@@ -347,6 +347,7 @@ pub fn build_symbol_table(
     }
 }
 
+
 /// Builds an IR representation of a method
 pub fn build_method(
     method: &AST,
@@ -365,7 +366,7 @@ pub fn build_method(
             // ✅ Create a new scope for this method, with `enclosing_block` set to Method
             let method_scope = Rc::new(RefCell::new(Scope::add_child(
                 Rc::clone(&parent_scope),
-                Some(EnclosingBlock::Method(name.clone())), // 🔥 Now tracks method scope properly
+                Some(EnclosingBlock::Method(name.clone())),
             )));
             
             // Process method params, and add into method's outer-most scope
@@ -416,6 +417,7 @@ pub fn build_method(
         _ => panic!("Expected AST::MethodDecl"),
     }
 }
+
 
 /// Builds an IR representation of a block
 pub fn build_block(
@@ -1184,7 +1186,7 @@ fn check_return_value(
             let expr_type = infer_expr_type(expr, scope, writer, context);
             if expr_type != return_type {
                 let error_msg = format_error_message(
-                    &format!("{:#?}", expr),  // ✅ Keep format exactly the same
+                    &format!("{:#?}", expr),  // Keep format exactly the same
                     Some(span),
                     &format!("Return type mismatch. Expected '{:#?}', found '{:#?}'.", return_type, expr_type), // ✅ Keep format unchanged
                     context
@@ -1192,7 +1194,7 @@ fn check_return_value(
                 writeln!(writer, "{}", error_msg).expect("Failed to write output!");
             }
         }
-        _ => {} // ✅ No changes to valid case
+        _ => {} // No changes to valid case
     }
 }
 
@@ -1240,10 +1242,10 @@ fn check_len_argument(id: &AST, span: &Span, scope: &Scope, writer: &mut dyn std
             match entry {
                 TableEntry::Variable { is_array: true, .. } => {
                     return true
-                    // ✅ Valid: `len` is used on an array
+                    // Valid: `len` is used on an array
                 }
                 _ => {
-                    // ❌ Error: `len` called on a non-array variable
+                    // Error: `len` called on a non-array variable
                     writeln!(
                         writer,
                         "{}",
@@ -1257,7 +1259,7 @@ fn check_len_argument(id: &AST, span: &Span, scope: &Scope, writer: &mut dyn std
                 }
             }
         } else {
-            // ❌ Error: `len` called on an undefined variable
+            // Error: `len` called on an undefined variable
             writeln!(
                 writer,
                 "{}",
@@ -1441,12 +1443,12 @@ fn check_equality_compatible(
 
 /// Rule 19
 fn check_in_loop(
-    scope: Rc<RefCell<Scope>>, // ✅ Keep `Rc<RefCell<Scope>>` instead of `&Scope`
+    scope: Rc<RefCell<Scope>>, // Keep `Rc<RefCell<Scope>>` instead of `&Scope`
     span: &Span,
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    if !Scope::is_inside_loop(scope.clone()) { // ✅ Correct call
+    if !Scope::is_inside_loop(scope.clone()) { // Correct call
         writeln!(
             writer,
             "{}",
@@ -1463,7 +1465,7 @@ fn check_in_loop(
 
 
 // Rule 20
-/// ✅ Ensures that `int(expr)` and `long(expr)` casts only take `int` or `long` as input
+/// Ensures that `int(expr)` and `long(expr)` casts only take `int` or `long` as input
 fn check_cast(
     target_type: &Type,
     expr: &AST,
@@ -1474,7 +1476,7 @@ fn check_cast(
 ) {
     let expr_type = infer_expr_type(expr, &scope.borrow(), writer, context);
 
-    // ✅ Casts are only valid if `expr` is already `int` or `long`
+    // Casts are only valid if `expr` is already `int` or `long`
     if expr_type != Type::Int && expr_type != Type::Long {
         writeln!(
             writer,
@@ -1514,10 +1516,8 @@ fn check_int_range(
 
     match parse_result {
         Ok(num) if -2147483648 <= num && num <= 2147483647 => {
-            // ✅ Valid int, do nothing
         }
         Ok(_) => {
-            // ❌ Out of range
             writeln!(
                 writer,
                 "{}",
@@ -1531,7 +1531,7 @@ fn check_int_range(
             .expect("Failed to write output");
         }
         Err(_) => {
-            // ❌ Not a valid number
+            // Not a valid number
             writeln!(
                 writer,
                 "{}",
@@ -1656,17 +1656,16 @@ fn check_scalar_assignment(
 
 
 
-
 // #################################################
 // ENTRY POINT
 // #################################################
 
 
-/// Perform all semantic checks not already performed
-/// during SymTree construction.
-pub fn check_semantics(sym_tree: SymProgram, filename: &str, writer: &mut dyn std::io::Write) {
+// /// Perform all semantic checks not already performed
+// /// during SymTree construction.
+// pub fn check_semantics(sym_tree: SymProgram, filename: &str, writer: &mut dyn std::io::Write) {
 
-}
+// }
 
 /// Semantically check the given file by parsing it and 
 /// turning the AST into a symbol table tree.
