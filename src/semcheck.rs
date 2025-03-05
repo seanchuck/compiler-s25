@@ -7,6 +7,11 @@ symbol table, and others are performed explicitly after.
 
 Use-before-declaration is caught by the grammar/parser.
 
+This semantic chcecker was written by :
+    1. Constructing a modified AST with symbol tables and scopes
+    2. Writing functions to check each rule and "injecting"
+        them into the construction of the modified AST.
+
 
 Be careful with how you pass Scope:
     - Use Rc<Refcell<Scope>> for shared, mutable references.
@@ -577,7 +582,7 @@ pub fn build_expr(
                 // Equality operators always return bool
                 BinaryOp::Equal
                 | BinaryOp::NotEqual => {
-                    check_equality_compatible(left, right, span, scope.clone(), writer, context);
+                    // check_equality_compatible(left, right, span, scope.clone(), writer, context);
                     result_type = Type::Bool;
                 }
 
@@ -610,7 +615,6 @@ pub fn build_expr(
                 span: span.clone(),
             }
         }
-
 
         AST::Expr(Expr::UnaryExpr { op, expr, span }) => {
             // Rule 14: Unary minus must have numeric type
