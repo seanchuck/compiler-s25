@@ -570,7 +570,7 @@ pub fn build_expr(
                 | BinaryOp::GreaterEqual
                 | BinaryOp::Less
                 | BinaryOp::LessEqual => {
-                    check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);
+                    // check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);
                     result_type = Type::Bool;
                 }
 
@@ -1232,11 +1232,9 @@ fn check_is_numeric_and_compatible(
 ) {
     let left_type = infer_expr_type(left, &scope.borrow());
     let right_type = right.map(|r| infer_expr_type(r, &scope.borrow()));
-    // let mut valid = true; // ✅ Track validity instead of early return
 
     // Ensure left operand is numeric
     if left_type != Type::Int && left_type != Type::Long {
-        // valid = false;
         writeln!(
             writer,
             "{}",
@@ -1246,13 +1244,14 @@ fn check_is_numeric_and_compatible(
                 "Left operand must be numeric (int or long).",
                 context
             )
-        ).expect("Failed to write error message");
+        )
+        .expect("Failed to write error message");
+        return;
     }
 
     if let Some(right_type) = right_type {
         // Ensure right operand is also numeric
         if right_type != Type::Int && right_type != Type::Long {
-            // valid = false;
             writeln!(
                 writer,
                 "{}",
@@ -1262,12 +1261,13 @@ fn check_is_numeric_and_compatible(
                     "Right operand must be numeric (int or long).",
                     context
                 )
-            ).expect("Failed to write error message");
+            )
+            .expect("Failed to write error message");
+            return;
         }
 
         // Arithmetic operators (`+`, `-`, etc.) require both operands to have the SAME type
         if is_arithmetic && left_type != right_type {
-            // valid = false;
             writeln!(
                 writer,
                 "{}",
@@ -1277,12 +1277,11 @@ fn check_is_numeric_and_compatible(
                     "Operands of arithmetic expressions must have the same type.",
                     context
                 )
-            ).expect("Failed to write error message");
+            )
+            .expect("Failed to write error message");
         }
     }
-
 }
-
 
 
 
