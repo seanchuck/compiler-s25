@@ -561,7 +561,7 @@ pub fn build_expr(
                 | BinaryOp::Divide
                 | BinaryOp::Modulo => {
                     // Rule 14: Must be (1) numeric, (2) left and right have same type
-                    check_is_numeric_and_compatible(true, left, Some(right), span, scope.clone(), writer, context);
+                    // check_is_numeric_and_compatible(true, left, Some(right), span, scope.clone(), writer, context);
                     result_type = left_type; // If valid, set type to operand type
                 }
 
@@ -570,7 +570,7 @@ pub fn build_expr(
                 | BinaryOp::GreaterEqual
                 | BinaryOp::Less
                 | BinaryOp::LessEqual => {
-                    // check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);
+                    check_is_numeric_and_compatible(false, left, Some(right), span, scope.clone(), writer, context);
                     result_type = Type::Bool;
                 }
 
