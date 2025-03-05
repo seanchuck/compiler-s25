@@ -93,22 +93,31 @@ impl Scope {
         }
     }
 
-    /// ✅ Checks if the current scope or any parent scope is inside a loop
-    pub fn is_inside_loop(&self) -> bool {
-        let mut current_scope: Option<Rc<RefCell<Scope>>> = self.parent.clone(); // ✅ Start at parent
+
+    /// ✅ Recursively checks if the current scope or any parent scope is inside a loop
+
+    /// ✅ Recursively checks if the current scope or any parent scope is inside a loop
+    pub fn is_inside_loop(scope: Rc<RefCell<Scope>>) -> bool {
+        let mut current_scope = Some(scope); // ✅ Start from current scope
 
         while let Some(scope_rc) = current_scope {
-            let scope_ref = scope_rc.borrow(); // ✅ Borrow the scope
-            
-            if let Some(EnclosingBlock::Loop) = &scope_ref.enclosing_block {
-                return true; // ✅ Found a loop, return immediately
+            let scope_ref = scope_rc.borrow(); // ✅ Borrow safely
+
+            // ✅ Check if this scope is inside a loop
+            if matches!(scope_ref.enclosing_block, Some(EnclosingBlock::Loop)) {
+                return true; // ✅ Found a loop, `break` or `continue` is legal
             }
 
-            current_scope = scope_ref.parent.clone(); // ✅ Move up scope tree safely
+            // ✅ Move up the scope tree safely
+            current_scope = scope_ref.parent.clone();
         }
 
-        false 
+        false // ❌ No enclosing loop found
     }
+
+    
+    
+
 
     /// ✅ Recursively finds the closest enclosing method scope, if it exists
     pub fn find_enclosing_method(&self) -> Option<String> {

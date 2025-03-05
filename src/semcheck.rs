@@ -424,20 +424,21 @@ pub fn build_block(
             statements,
             span,
         } => {
-            let is_function_body = matches!(
+            // ✅ Detect if this block is inside a `for` or `while`
+            let is_loop_body = matches!(
                 parent_scope.borrow().enclosing_block,
-                Some(EnclosingBlock::Method(_))
+                Some(EnclosingBlock::Loop)
             );
 
-            let enclosing_block = if is_function_body {
-                parent_scope.borrow().enclosing_block.clone()
+            let enclosing_block = if is_loop_body {
+                Some(EnclosingBlock::Loop) // ✅ Explicitly mark this block as a loop
             } else {
-                None
+                parent_scope.borrow().enclosing_block.clone() // ✅ Inherit from parent
             };
 
             let scope = Rc::new(RefCell::new(Scope::add_child(
                 Rc::clone(&parent_scope),
-                enclosing_block, // 🔥 Ensures we track methods properly
+                enclosing_block,
             )));
 
             let mut sym_statements = Vec::new();
@@ -689,7 +690,6 @@ pub fn build_statement(
         AST::Statement(Statement::Continue { span }) => {
             check_in_loop(scope.clone(), span, writer, context);
             SymStatement::Continue { span: span.clone()}
-
         }
 
         _ => panic!(
@@ -1351,17 +1351,17 @@ fn check_equality_compatible(
 
 /// Rule 19
 fn check_in_loop(
-    scope: Rc<RefCell<Scope>>,
+    scope: Rc<RefCell<Scope>>, // ✅ Keep `Rc<RefCell<Scope>>` instead of `&Scope`
     span: &Span,
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    if !scope.borrow().is_inside_loop() {
+    if !Scope::is_inside_loop(scope.clone()) { // ✅ Correct call
         writeln!(
             writer,
             "{}",
             format_error_message(
-                "break/return",
+                "loop control statement",
                 Some(span),
                 "Break and continue statements must be inside a loop.",
                 context
@@ -1370,9 +1370,6 @@ fn check_in_loop(
         .expect("Failed to write error message");
     }
 }
-
-
-
 
 
 
