@@ -23,7 +23,7 @@ Running test: tests/semantics/rule3-illegal.dcf
 ~~~tests/semantics/rule3-illegal.dcf: semantic error: 
 |	Missing entry point: `main`
 
-thread 'main' panicked at src/semcheck.rs:1324:9:
+thread 'main' panicked at src/semcheck.rs:1385:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -31,7 +31,7 @@ Running test: tests/semantics/rule4-illegal.dcf
 ~~~tests/semantics/rule4-illegal.dcf (line 1, col 1): semantic error:
 |	Incorrect number of arguments for method. Expected 1, but got 0. `foo`
 
-thread 'main' panicked at src/semcheck.rs:1324:9:
+thread 'main' panicked at src/semcheck.rs:1385:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -39,7 +39,7 @@ Running test: tests/semantics/rule5-illegal.dcf
 ~~~tests/semantics/rule5-illegal.dcf (line 1, col 1): semantic error:
 |	Method does not return a value but is used in an expression. `foo`
 
-thread 'main' panicked at src/semcheck.rs:1324:9:
+thread 'main' panicked at src/semcheck.rs:1385:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -71,7 +71,7 @@ Running test: tests/semantics/rule7-illegal.dcf
     },
 ) ret`
 
-thread 'main' panicked at src/semcheck.rs:1324:9:
+thread 'main' panicked at src/semcheck.rs:1385:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -91,7 +91,7 @@ Running test: tests/semantics/rule8-illegal.dcf
     },
 ) ret`
 
-thread 'main' panicked at src/semcheck.rs:1324:9:
+thread 'main' panicked at src/semcheck.rs:1385:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -99,7 +99,7 @@ Running test: tests/semantics/rule9-illegal.dcf
 ~~~tests/semantics/rule9-illegal.dcf (line 2, col 5): semantic error:
 |	Use before declaration `x`
 
-thread 'main' panicked at src/semcheck.rs:384:59:
+thread 'main' panicked at src/semcheck.rs:390:59:
 Variable should be declared
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -107,7 +107,7 @@ Running test: tests/semantics/rule10-illegal.dcf
 ~~~tests/semantics/rule10-illegal.dcf (line 2, col 5): semantic error:
 |	Call to undefined method. `foo`
 
-thread 'main' panicked at src/semcheck.rs:1324:9:
+thread 'main' panicked at src/semcheck.rs:1385:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -127,7 +127,7 @@ Running test: tests/semantics/rule11-illegal.dcf
     },
 )`
 
-thread 'main' panicked at src/semcheck.rs:1324:9:
+thread 'main' panicked at src/semcheck.rs:1385:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
@@ -135,13 +135,13 @@ Running test: tests/semantics/rule12-illegal.dcf
 ~~~tests/semantics/rule12-illegal.dcf (line 6, col 9): semantic error:
 |	Invalid use of `len`: argument must be an array variable. `x`
 
-thread 'main' panicked at src/semcheck.rs:1324:9:
+thread 'main' panicked at src/semcheck.rs:1385:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
 Running test: tests/semantics/rule13-illegal.dcf
 ~~~tests/semantics/rule13-illegal.dcf (line 4, col 5): semantic error:
-|	Condition must have type bool `Identifier {
+|	Expression must have type bool `Identifier {
     id: "x",
     span: Span {
         sline: 4,
@@ -151,65 +151,74 @@ Running test: tests/semantics/rule13-illegal.dcf
     },
 }`
 
-thread 'main' panicked at src/semcheck.rs:1324:9:
+thread 'main' panicked at src/semcheck.rs:1385:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
 Running test: tests/semantics/rule14-illegal.dcf
-~~~tests/semantics/rule14-illegal.dcf (line 3, col 9): semantic error:
-|	Right operand must be numeric (int or long). `right operand `Some(
-    Expr(
-        Literal {
-            lit: Bool(
-                true,
-            ),
-            span: Span {
-                sline: 3,
-                scol: 13,
-                eline: 3,
-                ecol: 17,
-            },
-        },
-    ),
-)``
-~~~tests/semantics/rule14-illegal.dcf (line 3, col 9): semantic error:
-|	Operands of arithmetic expressions must have the same type. `left `Expr(
+
+---------------------------------
+Running test: tests/semantics/rule15-illegal.dcf
+~~~tests/semantics/rule15-illegal.dcf (line 3, col 9): semantic error:
+|	Equality operator requires both operands to have the same type. `left `Expr(
     Literal {
         lit: Int(
             "5",
         ),
         span: Span {
             sline: 3,
-            scol: 9,
+            scol: 10,
             eline: 3,
-            ecol: 10,
+            ecol: 11,
         },
     },
-)`, right `Some(
-    Expr(
-        Literal {
-            lit: Bool(
-                true,
-            ),
-            span: Span {
-                sline: 3,
-                scol: 13,
-                eline: 3,
-                ecol: 17,
-            },
+)`, right `Expr(
+    Literal {
+        lit: Bool(
+            true,
+        ),
+        span: Span {
+            sline: 3,
+            scol: 15,
+            eline: 3,
+            ecol: 19,
         },
-    ),
+    },
 )``
 
-thread 'main' panicked at src/semcheck.rs:1324:9:
+thread 'main' panicked at src/semcheck.rs:1385:9:
 Semantic check failed.
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
-Running test: tests/semantics/rule15-illegal.dcf
-
----------------------------------
 Running test: tests/semantics/rule16-illegal.dcf
+~~~tests/semantics/rule16-illegal.dcf (line 6, col 9): semantic error:
+|	Expression must have type bool `Identifier {
+    id: "x",
+    span: Span {
+        sline: 6,
+        scol: 9,
+        eline: 6,
+        ecol: 10,
+    },
+}`
+~~~tests/semantics/rule16-illegal.dcf (line 6, col 9): semantic error:
+|	Expression must have type bool `Expr(
+    Literal {
+        lit: Int(
+            "3",
+        ),
+        span: Span {
+            sline: 6,
+            scol: 14,
+            eline: 6,
+            ecol: 15,
+        },
+    },
+)`
 
+thread 'main' panicked at src/semcheck.rs:1385:9:
+Semantic check failed.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ---------------------------------
 Running test: tests/semantics/rule17-illegal.dcf
 
