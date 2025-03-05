@@ -72,7 +72,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope, writer: &mut dyn std::io::Write, c
         // Integer, Boolean, and Long Literals
         AST::Expr(Expr::Literal { lit, span }) => match lit {
             Literal::Int(value) => {
-                check_int_range(false, value.clone(), span, writer, context);
+                // check_int_range(false, value.clone(), span, writer, context);
                 Type::Int
             }
             Literal::Long(value) => {
@@ -125,7 +125,6 @@ fn infer_expr_type(expr: &AST, scope: &Scope, writer: &mut dyn std::io::Write, c
             }
         }
         
-
         // Unary Expressions (`-`, `!`)
         AST::Expr(Expr::UnaryExpr { op, expr, .. }) => {
             let expr_type = infer_expr_type(expr, scope, writer, context);
@@ -1445,40 +1444,41 @@ fn check_int_range(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
+    // parse based on whether it is hex
     let parsed_value = if is_hex {
-        // Parse as hexadecimal (skip "0x" prefix)
-        i32::from_str_radix(&value[2..], 16)
+        if value.len() > 2 {
+            i32::from_str_radix(&value[2..], 16).ok()
+        } else {
+            None
+        }
     } else {
-        // Parse as decimal
-        value.parse::<i32>()
+        value.parse::<i32>().ok()
     };
 
-    match parsed_value {
-        Ok(num) => {
-            // The number is in the valid i32 range, do nothing (it's valid)
+    let output_message = if let Some(num) = parsed_value {
+        if (i32::MIN..=i32::MAX).contains(&num) {
+            return; // ✅ Valid number, do nothing
         }
-        Err(_) => {
-            // Determine the error message (range error vs invalid format)
-            let error_message = if value.starts_with("0x") || value.starts_with("0X") {
-                "Invalid hexadecimal format: must be a valid 32-bit integer."
-            } else {
-                "Invalid integer format: must be a valid signed 32-bit integer."
-            };
+        "Integer out of range: must be between -2147483648 and 2147483647."
+    } else {
+        "Invalid integer format: must be a valid signed 32-bit integer."
+    };
 
-            writeln!(
-                writer,
-                "{}",
-                format_error_message(
-                    &format!("integer literal `{}`", value),
-                    Some(span),
-                    error_message,
-                    context
-                )
-            )
-            .expect("Failed to write error message");
-        }
-    }
+    // ✅ Always output the message if parsing fails or number is out of range
+    writeln!(
+        writer,
+        "{}",
+        format_error_message(
+            &format!("integer literal `{}`", value),
+            Some(span),
+            output_message,
+            context
+        )
+    )
+    .expect("Failed to write output");
 }
+
+
 
 
 /// Rule 22
