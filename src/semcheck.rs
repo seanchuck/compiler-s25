@@ -74,12 +74,19 @@ fn infer_expr_type(expr: &AST, scope: &Scope, writer: &mut dyn std::io::Write, c
             Literal::Int(value) => {
                 check_int_range(false, value.clone(), span, writer, context);
                 Type::Int
-            }
+            },
             Literal::Long(value) => {
-                // check_long_range(value, span, &mut std::io::stderr(), &mut SemanticContext::new());
+                check_long_range(false, value.clone(), span, writer, context);
                 Type::Long
-            }
-
+            },
+            Literal::HexInt(value) => {
+                check_int_range(true, value.clone(), span, writer, context);
+                Type::Int
+            },
+            Literal::HexLong(value) => {
+                check_long_range(true, value.clone(), span, writer, context);
+                Type::Long
+            },
             Literal::Bool(_) => Type::Bool,
             _=> {
                 format_error_message(&format!("{:?}", lit), Some(span), "unknown type", context);
@@ -943,13 +950,16 @@ pub fn build_expr(
         AST::Expr(Expr::Literal { lit, span }) => {
             match lit {
                 Literal::Int(value) => {
-                    // check_int_range(false, value.clone(), span, writer, context);
+                    check_int_range(false, value.clone(), span, writer, context);
                 }
                 Literal::Long(value) => {
-                    // check_long_range(value.clone(), span, writer, context); // ✅ Enforce explicit range check
+                    check_long_range(false, value.clone(), span, writer, context);
                 }
                 Literal::HexInt(value) => {
-                    // check_int_range(true, value.clone(), span, writer, context);
+                    check_int_range(true, value.clone(), span, writer, context);
+                }
+                Literal::HexLong(value) => {
+                    check_long_range(true, value.clone(), span, writer, context);
 
                 }
                 Literal::HexLong(_) => {}
@@ -1572,13 +1582,19 @@ fn check_int_range(
 
 /// Rule 22
 fn check_long_range(
+    is_hex: bool,
     value: String,
     span: &Span,
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
+    let parse_result = if is_hex {
+        i128::from_str_radix(&value, 16)
+    } else {
+        value.parse::<i128>()
+    };
     // ✅ Attempt to parse the string as a 128-bit integer
-    match value.parse::<i128>() {
+    match parse_result {
         Ok(num) => {
             if !(i64::MIN as i128..=i64::MAX as i128).contains(&num) {
                 writeln!(
