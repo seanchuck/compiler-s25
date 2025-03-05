@@ -127,9 +127,7 @@ fn infer_expr_type(expr: &AST, scope: &Scope, writer: &mut dyn std::io::Write, c
                 }
                 BinaryOp::Equal | BinaryOp::NotEqual | BinaryOp::Less |
                 BinaryOp::Greater | BinaryOp::LessEqual | BinaryOp::GreaterEqual => {
-                    if left_type == Type::Int && right_type == Type::Int {
-                        Type::Bool
-                    } else if left_type == Type::Long && right_type == Type::Long {
+                    if left_type == right_type && (left_type == Type::Int || left_type == Type::Long || left_type == Type::Bool) {
                         Type::Bool
                     } else {
                         format_error_message(&format!("mismatching types for operator {:?}", op), Some(span), "incompatible type", context);
@@ -1438,7 +1436,7 @@ fn check_equality_compatible(
             writer,
             "{}",
             format_error_message(
-                &format!("left `{:#?}`, right `{:#?}`", left, right),
+                &format!("left `{:#?}` {:?}, right `{:#?}` {:?}", left, left_type, right, right_type),
                 Some(span),
                 "Equality operator requires both operands to have the same type.",
                 context
