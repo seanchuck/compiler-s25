@@ -17,7 +17,15 @@ pub struct Scope {
     pub parent: Option<Rc<RefCell<Scope>>>,
     pub table: HashMap<String, TableEntry>,
     pub id: Option<String>, // for debugging purposes
-    pub enclosing_method: Option<String>,
+    pub enclosing_block: Option<EnclosingBlock>, // can be a method_decl (main) or a block (while (){})
+                                          // can be recursively looked up
+}
+
+#[derive(Debug, Clone)]
+pub enum EnclosingBlock {
+    Method(String),
+    Loop
+
 }
 
 /// Symbol table entry type, representing locally-
@@ -53,26 +61,23 @@ impl Scope {
             table: HashMap::new(),
             parent: None,
             id: Some("Global scope".to_string()),
-            enclosing_method: None,
+            enclosing_block: None,
         }
     }
 
     /// Add a child scope with a pointer back to the parent.
     /// Optionally, define the method this scope represents.
-    pub fn add_child(parent: Rc<RefCell<Scope>>, enclosing_method: Option<String>) -> Self {
-        let parent_id = parent
-            .borrow_mut()
-            .id
-            .clone()
-            .unwrap_or_else(|| "??".to_string());
-
+    pub fn add_child(parent: Rc<RefCell<Scope>>, enclosing_block: Option<EnclosingBlock>) -> Self {
+        let parent_id = parent.borrow().id.clone().unwrap_or_else(|| "??".to_string());
+    
         Scope {
             table: HashMap::new(),
             parent: Some(parent),
             id: Some(format!("Child of: {}", parent_id)),
-            enclosing_method,
+            enclosing_block, // Now tracks both methods and loops
         }
     }
+    
 
     pub fn insert(&mut self, name: String, datatype: TableEntry) {
         self.table.insert(name, datatype);
@@ -87,4 +92,43 @@ impl Scope {
             None
         }
     }
+
+    /// ✅ Checks if the current scope or any parent scope is inside a loop
+    pub fn is_inside_loop(&self) -> bool {
+        let mut current_scope: Option<Rc<RefCell<Scope>>> = self.parent.clone(); // ✅ Start at parent
+
+        while let Some(scope_rc) = current_scope {
+            let scope_ref = scope_rc.borrow(); // ✅ Borrow the scope
+            
+            if let Some(EnclosingBlock::Loop) = &scope_ref.enclosing_block {
+                return true; // ✅ Found a loop, return immediately
+            }
+
+            current_scope = scope_ref.parent.clone(); // ✅ Move up scope tree safely
+        }
+
+        false // ❌ No loop found
+    }
+
+
+    /// ✅ Recursively finds the closest enclosing method scope, if it exists
+    pub fn find_enclosing_method(&self) -> Option<String> {
+        let mut current_scope: Option<Rc<RefCell<Scope>>> = self.parent.clone(); // ✅ Start at parent
+    
+        while let Some(scope_rc) = current_scope {
+            let scope_ref = scope_rc.borrow(); // ✅ Borrow the scope
+            
+            if let Some(EnclosingBlock::Method(name)) = &scope_ref.enclosing_block {
+                return Some(name.clone()); // ✅ Clone method name to avoid lifetime issues
+            }
+    
+            current_scope = scope_ref.parent.clone(); // ✅ Move up scope tree safely
+        }
+    
+        None // ❌ No enclosing method found
+    }
+    
+
+
+
 }
