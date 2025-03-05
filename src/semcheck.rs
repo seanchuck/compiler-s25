@@ -1,4 +1,3 @@
-
 /*
 Perform semantic checks on the AST produced by parsing.
 Build a symbol table to enable these checks.
