@@ -1,37 +1,28 @@
-/**
- * A simple example of how to write unit tests for your code.
- * This example creates a module which contains tests for the  
- * two versions of an add function. You can run the tests by
- * inputting the command `cargo test` into your terminal
- *
- */
-
-#[allow(dead_code)]
-fn add(a: i32, b: i32) -> i32 {
-    a + b
-}
-
-// This is a really bad adding function, its purpose is to fail in this
-// example.
-#[allow(dead_code)]
-fn bad_add(a: i32, b: i32) -> i32 {
-    a - b
-}
-
 #[cfg(test)]
 mod tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
-    use super::*;
+    // Include the generated tests.
+    include!(concat!(env!("OUT_DIR"), "/generated_tests.rs"));
 
-    #[test]
-    fn test_add() {
-        assert_eq!(add(1, 2), 3);
-    }
-
-    #[test]
-    fn test_bad_add() {
-        // This assert would fire and test will fail.
-        // Please note, that private functions can be tested too!
-        assert_eq!(bad_add(1, 2), 3);
+    // This is your parser test function.
+    // Adjust the signature and logic to call your actual parser and perform the semantic checks.
+    fn run_parser_test(file: &str) -> bool {
+        // For example, you might:
+        // 1. Read the test file.
+        // 2. Invoke your parser with the file content.
+        // 3. Compare the parser’s output (or error) to the expected “legal” or “illegal” result.
+        //
+        // Here we use a dummy implementation that always returns true.
+        //
+        // Replace this with your parser invocation logic.
+        use std::fs;
+        let content = fs::read_to_string(file)
+            .unwrap_or_else(|_| panic!("Failed to read test file: {}", file));
+        
+        // Call your parser function here, for example:
+        // let parse_result = my_parser::parse(&content);
+        // Then check if parse_result is as expected.
+        
+        // Dummy condition – replace with real check.
+        !content.is_empty()
     }
 }
