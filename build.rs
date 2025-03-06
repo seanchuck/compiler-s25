@@ -4,15 +4,15 @@ use std::io::Write;
 use std::path::Path;
 
 fn main() {
-    // Output file for generated tests
+    // Where to write the generated test functions.
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("generated_tests.rs");
-    let mut f = File::create(&dest_path).unwrap();
+    let mut f = File::create(&dest_path).expect("Could not create generated_tests.rs");
 
-    // Directory containing your semantic test files
+    // Directory containing semantic test files.
     let test_dir = "tests/semantics";
 
-    // Collect all .dcf files in the directory, then sort them
+    // Collect all .dcf files from the directory.
     let mut test_files: Vec<_> = fs::read_dir(test_dir)
         .expect("Unable to read tests/semantics directory")
         .filter_map(|entry| {
@@ -26,30 +26,29 @@ fn main() {
         })
         .collect();
 
-    // Sort files (you can adjust the sorting if needed)
+    // Sort the test files (adjust sorting if needed).
     test_files.sort();
 
-    // Generate a test function for each file.
+    // Generate one test function per file.
     for test_file in test_files {
-        // Create a valid Rust identifier from the file stem (you may need to adjust for illegal characters)
+        // Create a valid Rust identifier from the file stem.
         let file_stem = test_file.file_stem().unwrap().to_str().unwrap();
-        let test_name = file_stem.replace("-", "_"); // simple conversion
+        let test_name = file_stem.replace("-", "_"); // Replace dashes with underscores.
 
-        // Write out a test function that calls your parser test function
         writeln!(
             f,
             "#[test]
 fn test_{name}() {{
     let test_file = \"{file}\";
-    let result = run_parser_test(test_file);
+    let result = crate::tests::run_parser_test(test_file);
     assert!(result, \"Parser result for {{}} did not match expectation\", test_file);
 }}",
             name = test_name,
             file = test_file.display()
         )
-        .unwrap();
+        .expect("Failed to write test function");
     }
 
-    // Tell Cargo to re-run this script if anything in the test directory changes.
+    // Instruct Cargo to re-run this build script if any file in tests/semantics changes.
     println!("cargo:rerun-if-changed=tests/semantics");
 }
