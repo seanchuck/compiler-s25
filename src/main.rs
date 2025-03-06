@@ -11,6 +11,7 @@ mod token;
 mod parse;
 mod scan;
 mod semcheck;
+mod traverse;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {

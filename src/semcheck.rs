@@ -40,6 +40,7 @@ use crate::scope::{Scope, EnclosingBlock, TableEntry};
 use crate::symtable::*;
 use crate::token::Literal;
 use crate::token::Span;
+use crate::traverse::traverse_ir;
 use crate::utils::print::*;
 
 
@@ -50,7 +51,7 @@ use crate::utils::print::*;
 /// Formats an error message for printing to stdout.
 /// Also flags that an error has occurred, so we can
 /// return a non-zero exist code once checking is finished.
-fn format_error_message(invalid_token: &str, span: Option<&Span>, msg: &str, context: &mut SemanticContext) -> String {
+pub fn format_error_message(invalid_token: &str, span: Option<&Span>, msg: &str, context: &mut SemanticContext) -> String {
     // direct checker to panic after completing semantic checks
     context.error_found = true;
 
@@ -71,29 +72,19 @@ fn format_error_message(invalid_token: &str, span: Option<&Span>, msg: &str, con
 fn infer_expr_type(expr: &AST, scope: &Scope, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Type {
     match expr {
         // Integer, Boolean, and Long Literals
-        AST::Expr(Expr::Literal { lit, span }) => match lit {
-            Literal::Int(value) => {
-                check_int_range(false, value.clone(), span, writer, context);
-                Type::Int
-            },
-            Literal::Long(value) => {
-                check_long_range(false, value.clone(), span, writer, context);
-                Type::Long
-            },
-            Literal::HexInt(value) => {
-                check_int_range(true, value.clone(), span, writer, context);
-                Type::Int
-            },
-            Literal::HexLong(value) => {
-                check_long_range(true, value.clone(), span, writer, context);
-                Type::Long
-            },
-            Literal::Bool(_) => Type::Bool,
-            _=> {
-                format_error_message(&format!("{:?}", lit), Some(span), "unknown type", context);
-                Type::Unknown
+        AST::Expr(Expr::Literal { lit, span }) => {
+            match lit {
+                Literal::Int(value) => Type::Int,
+                Literal::Long(value) => Type::Long,
+                Literal::HexInt(value) => Type::Int,
+                Literal::HexLong(value) => Type::Long,
+                Literal::Bool(_) => Type::Bool,
+                _=> {
+                    format_error_message(&format!("{:?}", lit), Some(span), "unknown type", context);
+                    Type::Unknown
+                }
             }
-        },
+        }
 
         // Variable Reference (Check scope table)
         AST::Identifier { id, span } => {
@@ -805,60 +796,23 @@ pub fn build_expr(
         AST::Expr(Expr::UnaryExpr { op, expr, span }) => {
             let expr_type = infer_expr_type(expr, &scope.borrow(), writer, context);
         
-            // Rule 21-22. Some range checking done here!
             match (op, &**expr) {
-                // Fold `-` applied to an integer literal
-                (UnaryOp::Neg, AST::Expr(Expr::Literal { lit: Literal::Int(value), span })) => {
-                    if let Ok(num) = value.parse::<i64>() {
-                        let negated_value = -num;
-        
-                        if (-2147483648..=2147483647).contains(&negated_value) {
-                            return SymExpr::Literal {
-                                value: Literal::Int(negated_value.to_string()),
-                                span: span.clone(),
-                            };
-                        } else {
-                            writeln!(
-                                writer,
-                                "{}",
-                                format_error_message(
-                                    &format!("Integer out of range: `-{}`", value),
-                                    Some(span),
-                                    "Integer out of range",
-                                    context
-                                )
-                            ).expect("Failed to write output");
-        
-                            return SymExpr::Error { span: span.clone() };
-                        }
-                    }
-                }
-        
-                // Fold `-` applied to a long literal
-                (UnaryOp::Neg, AST::Expr(Expr::Literal { lit: Literal::Long(value), span })) => {
-                    if let Ok(num) = value.parse::<i128>() {
-                        let negated_value = -num;
-        
-                        if (-9223372036854775808..=9223372036854775807).contains(&negated_value) {
-                            return SymExpr::Literal {
-                                value: Literal::Long(negated_value.to_string()),
-                                span: span.clone(),
-                            };
-                        } else {
-                            writeln!(
-                                writer,
-                                "{}",
-                                format_error_message(
-                                    &format!("Long integer out of range: `-{}`", value),
-                                    Some(span),
-                                    "Long integer out of range",
-                                    context
-                                )
-                            ).expect("Failed to write output");
-        
-                            return SymExpr::Error { span: span.clone() };
-                        }
-                    }
+                // Fold `-` applied to an integer or long literal
+                (UnaryOp::Neg, AST::Expr(Expr::Literal { lit: l @ Literal::Int(value), span } 
+                                        | Expr::Literal { lit: l @ Literal::Long(value), span }
+                                        | Expr::Literal { lit: l @ Literal::HexInt(value), span }
+                                        | Expr::Literal { lit: l @ Literal::HexLong(value), span })) => {                    
+
+                    return SymExpr::Literal {
+                        value: match l {
+                            Literal::Int(_) => Literal::Int(("-".to_owned() + value).to_string()),
+                            Literal::Long(_) => Literal::Long(("-".to_owned() + value).to_string()),
+                            Literal::HexInt(_) => Literal::HexInt(("-".to_owned() + value).to_string()),
+                            Literal::HexLong(_) => Literal::HexLong(("-".to_owned() + value).to_string()),
+                            _ => panic!("should only match int or long")
+                        },
+                        span: span.clone(),
+                    };
                 }
         
                 // Normal unary minus handling
@@ -948,32 +902,11 @@ pub fn build_expr(
             }
         }
 
-        AST::Expr(Expr::Literal { lit, span }) => {
-            match lit {
-                Literal::Int(value) => {
-                    check_int_range(false, value.clone(), span, writer, context);
-                }
-                Literal::Long(value) => {
-                    check_long_range(false, value.clone(), span, writer, context);
-                }
-                Literal::HexInt(value) => {
-                    check_int_range(true, value.clone(), span, writer, context);
-                }
-                Literal::HexLong(value) => {
-                    check_long_range(true, value.clone(), span, writer, context);
-
-                }
-                Literal::HexLong(_) => {}
-                _=> {}
-            }
-            
-            SymExpr::Literal {
-                value: lit.clone(),
-                span: span.clone(),
-            }
-        }
+        AST::Expr(Expr::Literal { lit, span }) => SymExpr::Literal {
+            value: lit.clone(),
+            span: span.clone(),
+        },
         
-
         AST::Identifier { ref id, ref span } => {
             // RULE 2: no identifier is used before being declared
             check_used_before_decl(id, Rc::clone(&scope), span, writer, context);
@@ -1229,9 +1162,6 @@ fn check_return_value(
     }
     
 }
-
-
-
 
 /// Rule 11
 fn check_arraccess(
@@ -1531,104 +1461,6 @@ fn check_cast(
     }
 }
 
-/// Rule 21 - - this doesn't work!
-fn check_int_range(
-    is_hex: bool,
-    value: String,
-    span: &Span,
-    writer: &mut dyn std::io::Write,
-    context: &mut SemanticContext,
-) {
-    // Parse as a larger type (`i64`) to safely check the bounds
-    let parse_result = if is_hex {
-        i64::from_str_radix(&value, 16)
-    } else {
-        value.parse::<i64>()
-    };
-
-    match parse_result {
-        Ok(num) => {
-            if !(i32::MIN as i64..=i32::MAX as i64).contains(&num)
-            {
-                writeln!(
-                    writer,
-                    "{}",
-                    format_error_message(
-                        &format!("Invalid int literal `{}`", value),
-                        Some(span),
-                        "Integer out of range",
-                        context
-                    )
-                )
-                .expect("Failed to write output");
-            }
-        }
-        Err(_) => {
-            // Not a valid number
-            writeln!(
-                writer,
-                "{}",
-                format_error_message(
-                    &format!("Invalid int literal `{}`", value),
-                    Some(span),
-                    "Invalid integer format",
-                    context
-                )
-            )
-            .expect("Failed to write output");
-        }
-    }
-}
-
-
-
-
-/// Rule 22
-fn check_long_range(
-    is_hex: bool,
-    value: String,
-    span: &Span,
-    writer: &mut dyn std::io::Write,
-    context: &mut SemanticContext,
-) {
-    let parse_result = if is_hex {
-        i128::from_str_radix(&value, 16)
-    } else {
-        value.parse::<i128>()
-    };
-    // ✅ Attempt to parse the string as a 128-bit integer
-    match parse_result {
-        Ok(num) => {
-            if !(i64::MIN as i128..=i64::MAX as i128).contains(&num) {
-                writeln!(
-                    writer,
-                    "{}",
-                    format_error_message(
-                        &format!("long literal `{}`", value),
-                        Some(span),
-                        "Long literal out of range: must be between -9223372036854775808 and 9223372036854775807.",
-                        context
-                    )
-                )
-                .expect("Failed to write error message");
-            }
-        }
-        Err(_) => {
-            writeln!(
-                writer,
-                "{}",
-                format_error_message(
-                    &format!("long literal `{}`", value),
-                    Some(span),
-                    "Invalid long format: must be a valid signed 64-bit integer.",
-                    context
-                )
-            )
-            .expect("Failed to write error message");
-        }
-    }
-}
-
 
 /// Rule 23
 /// ✅ Ensures that assignment targets are scalars (not arrays)
@@ -1695,6 +1527,7 @@ fn check_scalar_assignment(
 
 
 
+
 // #################################################
 // ENTRY POINT
 // #################################################
@@ -1718,6 +1551,9 @@ pub fn semcheck(file: &str, filename: &str, writer: &mut dyn std::io::Write, ver
 
     // Build the semantic tree
     let sym_tree: SymProgram = build_symbol_table(&parse_tree, writer, &mut context);
+
+    // traverse tree
+    traverse_ir(&sym_tree, writer, &mut context);
 
     if verbose {
         println!("Successfully built symbol table!");
