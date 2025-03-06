@@ -246,7 +246,6 @@ pub fn build_symbol_table(
             for import in imports {
                 match **import {
                     AST::ImportDecl { ref id, span } => {
-
                         global_scope.borrow_mut().insert(
                             id.clone(),
                             TableEntry::Import { 
@@ -271,7 +270,7 @@ pub fn build_symbol_table(
                             match **decl {
                                 // scalar variable declaration
                                 AST::Identifier { ref id, ref span } => {
-                                    global_scope.borrow_mut().insert(
+                                    if global_scope.borrow_mut().insert(
                                         id.clone(),
                                         TableEntry::Variable {
                                             name: id.clone(),
@@ -279,7 +278,14 @@ pub fn build_symbol_table(
                                             is_array: false,
                                             span: span.clone(),
                                         },
-                                    );
+                                    ).is_some() { // rule 1
+                                        writeln!(
+                                            writer,
+                                            "{}",
+                                            format_error_message(id, Some(span), "duplicate field declaration", context)
+                                        )
+                                        .expect("Failed to write output!");
+                                    }
                                 }
 
                                 // array variabe declaration
@@ -293,7 +299,7 @@ pub fn build_symbol_table(
                                     check_array_size(size, span, writer, context);
 
                                     // Insert variable into the global scope
-                                    global_scope.borrow_mut().insert(
+                                    if global_scope.borrow_mut().insert(
                                         id.clone(),
                                         TableEntry::Variable {
                                             name: id.clone(),
@@ -301,7 +307,14 @@ pub fn build_symbol_table(
                                             is_array: true,
                                             span: span.clone(),
                                         },
-                                    );
+                                    ).is_some() { // rule 1
+                                        writeln!(
+                                            writer,
+                                            "{}",
+                                            format_error_message(id, Some(span), "duplicate field declaration", context)
+                                        )
+                                        .expect("Failed to write output!");
+                                    }
                                 }
                                 _ => panic!("Unexpected field declaration type")
                             }
@@ -323,7 +336,7 @@ pub fn build_symbol_table(
                     } => {
                         // println!("serint method{}", name);
                         // Insert function into table before processing body
-                        global_scope.borrow_mut().insert(
+                        if global_scope.borrow_mut().insert(
                             name.clone(),
                             TableEntry::Method {
                                 name: name.clone(),
@@ -342,7 +355,14 @@ pub fn build_symbol_table(
                                     .collect(),
                                 span: span.clone(),
                             },
-                        );
+                        ).is_some() { // rule 1
+                            writeln!(
+                                writer,
+                                "{}",
+                                format_error_message(name, Some(span), "duplicate method declaration", context)
+                            )
+                            .expect("Failed to write output!");
+                        }
                         
                         // Now process the function body
                         let method = build_method(method, Rc::clone(&global_scope), writer, context);
@@ -392,7 +412,7 @@ pub fn build_method(
             for param in params {
                 match param.name.as_ref() {
                     AST::Identifier { id, span } => {
-                        method_scope.borrow_mut().insert(
+                        if method_scope.borrow_mut().insert(
                             id.clone(),
                             TableEntry::Variable {
                                 name: id.clone(),
@@ -400,7 +420,14 @@ pub fn build_method(
                                 is_array: false,
                                 span: span.clone(),
                             },
-                        );
+                        ).is_some() {
+                            writeln!(
+                                writer,
+                                "{}",
+                                format_error_message(id, Some(span), "duplicate parameter name", context)
+                            )
+                            .expect("Failed to write output!");
+                        }
                     }
                     _ => unreachable!(),
                 }
@@ -482,7 +509,7 @@ pub fn build_block(
                             match **decl {
                                 // Scalar field declaration
                                 AST::Identifier { ref id, ref span } => {
-                                    scope.borrow_mut().insert(
+                                    if scope.borrow_mut().insert(
                                         id.clone(),
                                         TableEntry::Variable {
                                             name: id.clone(),
@@ -490,7 +517,14 @@ pub fn build_block(
                                             is_array: false,
                                             span: span.clone(),
                                         },
-                                    );
+                                    ).is_some() {
+                                        writeln!(
+                                            writer,
+                                            "{}",
+                                            format_error_message(id, Some(span), "duplicate field declaration", context)
+                                        )
+                                        .expect("Failed to write output!");
+                                    }
 
                                     sym_statements.push(Rc::new(SymStatement::VarDecl {
                                         name: id.clone(),
@@ -508,7 +542,7 @@ pub fn build_block(
                                 } => {
                                     check_array_size(size, span, writer, context);
 
-                                    scope.borrow_mut().insert(
+                                    if scope.borrow_mut().insert(
                                         id.clone(),
                                         TableEntry::Variable {
                                             name: id.clone(),
@@ -516,7 +550,14 @@ pub fn build_block(
                                             is_array: true,
                                             span: span.clone(),
                                         },
-                                    );
+                                    ).is_some() {
+                                        writeln!(
+                                            writer,
+                                            "{}",
+                                            format_error_message(id, Some(span), "duplicate field declaration", context)
+                                        )
+                                        .expect("Failed to write output!");
+                                    }
 
                                     sym_statements.push(Rc::new(SymStatement::VarDecl {
                                         name: id.clone(),
@@ -658,7 +699,7 @@ pub fn build_statement(
             block,
             span,
         }) => {
-            scope.borrow_mut().insert(
+            if scope.borrow_mut().insert(
                 var.clone(),
                 TableEntry::Variable {
                     name: var.clone(),
@@ -666,7 +707,14 @@ pub fn build_statement(
                     is_array: false,
                     span: span.clone(),
                 },
-            );
+            ).is_none() {
+                writeln!(
+                    writer,
+                    "{}",
+                    format_error_message(var, Some(span), "for loop variable not declared", context)
+                )
+                .expect("Failed to write output!");
+            }
 
             check_evaluates_to_bool(condition, span, scope.clone(), writer, context);
 
@@ -933,14 +981,13 @@ pub fn build_expr(
 // Others are checked later explicitly.
 
 /// RULE 1
-/// // TODO: UPDATE to check 
 fn check_duplicate_imports(imports: &[Box<AST>],writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     let mut seen = HashSet::new();
 
     for import in imports {
-        if !seen.insert(import) {
-            match **import {
-                AST::ImportDecl { ref id, ref span } => {
+        match **import {
+            AST::ImportDecl { ref id, ref span } => {
+                if !seen.insert(id.clone()) {
                     writeln!(
                         writer,
                         "{}",
@@ -948,8 +995,8 @@ fn check_duplicate_imports(imports: &[Box<AST>],writer: &mut dyn std::io::Write,
                     )
                     .expect("Failed to write output!");
                 }
-                _ => unreachable!(),
             }
+            _ => unreachable!(),
         }
     }
 }

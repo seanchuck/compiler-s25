@@ -79,8 +79,8 @@ impl Scope {
     }
     
 
-    pub fn insert(&mut self, name: String, datatype: TableEntry) {
-        self.table.insert(name, datatype);
+    pub fn insert(&mut self, name: String, datatype: TableEntry) -> Option<TableEntry> {
+        self.table.insert(name, datatype)
     }
 
     pub fn lookup(&self, name: &str) -> Option<TableEntry> {
