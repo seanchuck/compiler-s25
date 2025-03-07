@@ -331,7 +331,7 @@ fn infer_arr_access_type(id: &String, index: &SymExpr, scope: &Scope, span: &Spa
 
 fn infer_binary_expr_type(op: &BinaryOp, left: &SymExpr, right: &SymExpr, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Option<Type> {
     let left_type = infer_expr_type(left, scope, span, writer, context);
-    let right_type = infer_expr_type(left, scope, span, writer, context);
+    let right_type = infer_expr_type(right, scope, span, writer, context);
 
     match op {
         // rule 14

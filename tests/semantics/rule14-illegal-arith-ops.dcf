@@ -1,0 +1,6 @@
+void main() {
+    int x;
+    bool y;
+    y = true;
+    x = 5 + y; // ❌ Cannot add `int` and `bool`
+}
