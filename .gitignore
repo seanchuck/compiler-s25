@@ -25,6 +25,9 @@ out.out
 # Output for semcheck
 output.log
 
+# Test cases
+tests/semantics
+
 .DS_Store
 ._*
 
