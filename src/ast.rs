@@ -11,6 +11,8 @@ This may lead to BUGS(!) so be sure to check the validity.
     of packing stuff in enums, but whatever.
 */
 
+use std::fmt;
+
 use crate::token::{Literal, Span};
 
 #[allow(dead_code)]
@@ -33,7 +35,7 @@ pub enum AST {
     },
     ArrayFieldDecl {
         id: String,
-        size: String,
+        size: Literal, // must be Int or HexInt
         span: Span,
     },
     MethodDecl {
@@ -195,8 +197,17 @@ pub enum Type {
     Int,
     Long,
     Bool,
+    String,
+    Array(Box<Type>),
+    Method(Box<Type>),
     Void,
     Unknown,
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
 }
 
 /// Implementation of Expr to enable changing the span!

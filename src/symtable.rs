@@ -11,7 +11,7 @@ The following non-terminals create new scopes:
     - method
 */
 
-use crate::ast::{BinaryOp, Type, UnaryOp};
+use crate::ast::{AssignOp, BinaryOp, Type, UnaryOp};
 use crate::scope::{Scope, TableEntry};
 use crate::token::{Literal, Span};
 use std::cell::RefCell;
@@ -73,11 +73,13 @@ pub enum SymStatement {
         typ: Type,
         is_array: bool,
         span: Span,
+        size: Literal
     },
     Assignment {
         target: SymExpr, //Now supports both `Identifier` and `ArrAccess`
         expr: SymExpr,
         span: Span,
+        op: AssignOp
     },
     MethodCall {
         method_name: String,
@@ -120,7 +122,7 @@ pub enum SymStatement {
 
 /// IR representation for expressions
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SymExpr {
     Literal {
         value: Literal,
@@ -144,13 +146,11 @@ pub enum SymExpr {
         op: BinaryOp,
         left: Rc<SymExpr>,
         right: Rc<SymExpr>,
-        typ: Type,
         span: Span,
     },
     UnaryExpr {
         op: UnaryOp,
         expr: Rc<SymExpr>,
-        typ: Type,
         span: Span,
     },
     Cast {
