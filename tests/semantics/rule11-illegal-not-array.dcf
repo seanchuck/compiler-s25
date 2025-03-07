@@ -1,0 +1,4 @@
+void main() {
+    int a;
+    a[2];   //Not allowed since a isnt an array
+}

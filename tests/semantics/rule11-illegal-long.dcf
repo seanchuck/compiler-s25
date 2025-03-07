@@ -1,0 +1,7 @@
+void main() {
+    long x;
+    x = 9L;
+    int a[10];
+
+    a[x];   // Not allowed since x is a long variable
+}

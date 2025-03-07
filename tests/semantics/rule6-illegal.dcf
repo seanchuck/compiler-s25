@@ -1,5 +1,4 @@
 void bar(int[] a) {}
-void foo()
 
 void main() {
 }

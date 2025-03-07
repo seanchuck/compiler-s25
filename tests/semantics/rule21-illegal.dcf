@@ -1,10 +1,6 @@
 void main() {
     int x;
+    x = 2147483647; // legal inside int ramge
     int y;
-    int z;
-    int a;
-    x = 2147483648; // ❌ Exceeds max `int` range
-    y = -2147483649;
-    z = 0x80000000;
-    a = -0x80000001;
+    y = x + 2147483648; // illegal addtion of literal too large
 }

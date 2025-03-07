@@ -1,4 +1,4 @@
 void main() {
-    int x;
-    x = true; // ❌ Cannot assign `bool` to `int`
+    int x[5];
+    x[2] = true; // ❌ Cannot assign `bool` to `int`
 }

@@ -173,30 +173,15 @@ pub fn build_symbol_table(
                                     }
                                 }
 
-                                // array variabe declaration
+                                // array variable declaration
                                 AST::ArrayFieldDecl {
                                     ref id,
                                     ref size,
                                     ref span,
                                 } => {
-                                    // Insert variable into the global scope
-                                    if global_scope.borrow_mut().insert(
-                                        id.clone(),
-                                        TableEntry::Variable {
-                                            name: id.clone(),
-                                            typ: typ.clone(),
-                                            is_array: true,
-                                            span: span.clone(),
-                                        },
-                                    ).is_some() { // rule 1
-                                        writeln!(
-                                            writer,
-                                            "{}",
-                                            format_error_message(id, Some(span), "duplicate field declaration", context)
-                                        )
-                                        .expect("Failed to write output!");
-                                    }
+                                    check_and_insert_array_field(id, size, span, typ, &global_scope, writer, context);
                                 }
+
                                 _ => panic!("Unexpected field declaration type")
                             }
                         }
@@ -422,22 +407,7 @@ pub fn build_block(
                                     ref size,
                                     ref span,
                                 } => {
-                                    if scope.borrow_mut().insert(
-                                        id.clone(),
-                                        TableEntry::Variable {
-                                            name: id.clone(),
-                                            typ: typ.clone(),
-                                            is_array: true,
-                                            span: span.clone(),
-                                        },
-                                    ).is_some() {
-                                        writeln!(
-                                            writer,
-                                            "{}",
-                                            format_error_message(id, Some(span), "duplicate field declaration", context)
-                                        )
-                                        .expect("Failed to write output!");
-                                    }
+                                    check_and_insert_array_field(id, size, span, typ, &scope, writer, context);
 
                                     sym_statements.push(Rc::new(SymStatement::VarDecl {
                                         name: id.clone(),
@@ -990,6 +960,74 @@ fn check_scalar_assignment(
     }
 }
 
+
+// Array Size Rule
+fn check_and_insert_array_field(
+    id: &String,
+    size: &Literal,
+    span: &Span,
+    typ: &Type,
+    scope: &Rc<RefCell<Scope>>, // Accepts any scope
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
+    eprintln!("Debug: Found array declaration {} with size {:?}", id, size);
+
+    // Extract integer value from Literal
+    let parsed_size = match size {
+        Literal::Int(ref s) | Literal::HexInt(ref s) => {
+            let parsed = s.parse::<i32>().ok();
+            eprintln!("Debug: Parsed size {:?} -> {:?}", s, parsed);
+            parsed
+        }
+        _ => {
+            eprintln!("Debug: Invalid array size type for {}", id);
+            None
+        }
+    };
+
+    // Check if size is <= 0 or invalid
+    if let Some(size_value) = parsed_size {
+        eprintln!("Debug: Checking size_value: {}", size_value);
+        if size_value <= 0 {
+            eprintln!("Debug: Error - size is <= 0 for array {}", id);
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(id, Some(span), "array field declaration must have size > 0", context)
+            )
+            .expect("Failed to write output!");
+            return; // Exit early, no insertion into scope
+        }
+    } else {
+        eprintln!("Debug: Error - Could not parse array size for {}", id);
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(id, Some(span), "invalid array size type", context)
+        )
+        .expect("Failed to write output!");
+        return;
+    }
+
+    // Insert variable into the given scope
+    if scope.borrow_mut().insert(
+        id.clone(),
+        TableEntry::Variable {
+            name: id.clone(),
+            typ: typ.clone(),
+            is_array: true,
+            span: span.clone(),
+        },
+    ).is_some() { // rule 1
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(id, Some(span), "duplicate field declaration", context)
+        )
+        .expect("Failed to write output!");
+    }
+}
 
 
 
