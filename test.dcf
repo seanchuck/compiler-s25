@@ -1,3 +1,5 @@
-void main ( ) {
-    long a, b[32], c, d[44], e, f;
+void main(){
+    int a;
+    // Obviously too big, and needs to be illegal
+    a = 2147483647;
 }

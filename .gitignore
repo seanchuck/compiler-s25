@@ -22,6 +22,9 @@ public-tests/
 # File for debugging outputs
 out.out
 
+# Output for semcheck
+output.log
+
 .DS_Store
 ._*
 

@@ -1,0 +1,8 @@
+void main() {
+    int x;
+    x = 5;
+    if (x) { // ❌ Condition must be a `bool`
+        int y;
+        y = 10;
+    }
+}

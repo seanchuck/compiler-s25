@@ -4,22 +4,40 @@ Token data structures for scanner.
 
 use std::ops::Deref;
 
-#[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
-pub struct TokenInfo {
-    pub token: Token,
-    pub display: String,
-    pub line: i32,
-    pub col: i32,
+/// Span keep track of line information
+/// to throw more specific errors.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
+pub struct Span {
+    pub sline: i32,
+    pub scol: i32,
+    pub eline: i32,
+    pub ecol: i32,
 }
 
+/// Token is the main data structure used by the scanner.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum Token {
-    Keyword(Keyword), // Keyword variant has type Keyword
-    Identifier(String),
-    Symbol(Symbol),
-    Literal(Literal),
+    Keyword {
+        value: Keyword,
+        span: Span,
+        display: String,
+    },
+    Identifier {
+        value: String,
+        span: Span,
+        display: String,
+    },
+    Symbol {
+        value: Symbol,
+        span: Span,
+        display: String,
+    },
+    Literal {
+        value: Literal,
+        span: Span,
+        display: String,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -87,7 +105,7 @@ pub enum Punctuation {
     Comma,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Literal {
     Char(char),
     String(String),

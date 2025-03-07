@@ -1,15 +1,16 @@
 // Example usage: cargo run tests/hello.dcf -t <scan, parse,>
 // Additional packages: anyhow (error types), nom (parsing), clap (cli args)
-mod test;
 mod utils;
 
 mod ast;
-mod token;
+mod scope;
 mod symtable;
+mod token;
 
 mod parse;
 mod scan;
-mod inter;
+mod semcheck;
+mod traverse;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
@@ -45,9 +46,7 @@ fn main() {
             parse::parse(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Inter => {
-            inter::augment_ast(&input, &filename, &mut writer, args.debug);
-            todo!("check semantics");
-            // semantics::check_semantics(&input, &filename, &mut writer, true);
+            semcheck::semcheck(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Assembly => {
             todo!("assembly");

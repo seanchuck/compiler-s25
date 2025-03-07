@@ -31,25 +31,28 @@ All tokens:
 fn consume(program: &mut Vec<char>, current_col: &mut i32, nchar: i32) {
     let nchar = nchar.max(0) as usize;
     let nchar = nchar.min(program.len());
-    program.drain(0..nchar);
-    *current_col += nchar as i32;
+
+    if nchar > 0 {
+        program.drain(0..nchar);
+        *current_col += nchar as i32;
+    }
 }
 
 /// Consume all whitespace characters before the next
 /// token or EOF.
 fn gobble_whitespace(program: &mut Vec<char>, current_line: &mut i32, current_col: &mut i32) {
-    while !program.is_empty() {
-        if let Some(&character) = program.first() {
-            if character.is_whitespace() {
-                if character == '\n' {
-                    *current_line += 1;
-                    *current_col = 1;
-                }
+    while let Some(&character) = program.first() {
+        if character.is_whitespace() {
+            if character == '\n' {
                 consume(program, current_col, 1);
-                continue;
+                *current_line += 1;
+                *current_col = 1;
+            } else {
+                consume(program, current_col, 1);
             }
+        } else {
+            break;
         }
-        break;
     }
 }
 
@@ -105,7 +108,9 @@ fn lex_numeric_helper(
     current_col: &mut i32,
     current_line: &i32,
     is_hex: bool,
-) -> Result<TokenInfo, anyhow::Error> {
+) -> Result<Token, anyhow::Error> {
+    let start_line = *current_line;
+    let start_col = *current_col;
     let mut nliteral = String::new();
 
     while let Some(&c) = program.get(0) {
@@ -121,15 +126,21 @@ fn lex_numeric_helper(
             }
             'L' => {
                 consume(program, current_col, 1);
-                return Ok(TokenInfo {
-                    token: if is_hex {
-                        Token::Literal(Literal::HexLong(nliteral.clone()))
-                    } else {
-                        Token::Literal(Literal::Long(nliteral.clone()))
+
+                let literal_value = match is_hex {
+                    true => Literal::HexLong(nliteral.clone()),
+                    false => Literal::Long(nliteral.clone()),
+                };
+
+                return Ok(Token::Literal {
+                    value: literal_value,
+                    span: Span {
+                        sline: start_line,
+                        scol: start_col,
+                        eline: *current_line,
+                        ecol: *current_col,
                     },
                     display: nliteral,
-                    line: *current_line,
-                    col: *current_col,
                 });
             }
             _ => break, // Stop parsing on any other character
@@ -137,16 +148,20 @@ fn lex_numeric_helper(
     }
 
     // If we hit EOF or break, return
-    Ok(TokenInfo {
-        token: if is_hex {
-            Token::Literal(Literal::HexInt(nliteral.clone()))
-        } else {
-            Token::Literal(Literal::Int(nliteral.clone()))
+    let literal_value = match is_hex {
+        true => Literal::HexInt(nliteral.clone()),
+        false => Literal::Int(nliteral.clone()),
+    };
+    return Ok(Token::Literal {
+        value: literal_value,
+        span: Span {
+            sline: start_line,
+            scol: start_col,
+            eline: *current_line,
+            ecol: *current_col,
         },
         display: nliteral,
-        line: *current_line,
-        col: *current_col,
-    })
+    });
 }
 
 /// Lex a decimal or hex numeric literal of int or long type.
@@ -154,7 +169,7 @@ fn lex_numeric_literal(
     program: &mut Vec<char>,
     current_line: &mut i32,
     current_col: &mut i32,
-) -> Result<TokenInfo> {
+) -> Result<Token> {
     if let Some(&char1) = program.get(0) {
         if let Some(&char2) = program.get(1) {
             match (char1, char2) {
@@ -180,8 +195,10 @@ fn lex_keyword_or_identifier(
     program: &mut Vec<char>,
     current_line: &mut i32,
     current_col: &mut i32,
-) -> Result<TokenInfo> {
+) -> Result<Token> {
     let mut keyword_or_identifier = String::new();
+    let start_line = *current_line;
+    let start_col = *current_col;
 
     // Build the keyword or identifier as the longest string of alphanumerics or underscores
     while let Some(&character) = program.get(0) {
@@ -193,109 +210,101 @@ fn lex_keyword_or_identifier(
         }
     }
 
-    match keyword_or_identifier.as_str() {
-        "if" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::If),
+    let span = Span {
+        sline: start_line,
+        scol: start_col,
+        eline: *current_line,
+        ecol: *current_col,
+    };
+
+    let token = match keyword_or_identifier.as_str() {
+        "if" => Token::Keyword {
+            value: Keyword::If,
+            span: span.clone(),
             display: "if".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "bool" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::Bool),
+        },
+        "bool" => Token::Keyword {
+            value: Keyword::Bool,
+            span: span.clone(),
             display: "bool".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "break" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::Break),
+        },
+        "break" => Token::Keyword {
+            value: Keyword::Break,
+            span: span.clone(),
             display: "break".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "import" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::Import),
+        },
+        "import" => Token::Keyword {
+            value: Keyword::Import,
+            span: span.clone(),
             display: "import".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "continue" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::Continue),
+        },
+        "continue" => Token::Keyword {
+            value: Keyword::Continue,
+            span: span.clone(),
             display: "continue".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "else" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::Else),
+        },
+        "else" => Token::Keyword {
+            value: Keyword::Else,
+            span: span.clone(),
             display: "else".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "for" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::For),
+        },
+        "for" => Token::Keyword {
+            value: Keyword::For,
+            span: span.clone(),
             display: "for".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "while" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::While),
+        },
+        "while" => Token::Keyword {
+            value: Keyword::While,
+            span: span.clone(),
             display: "while".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "int" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::Int),
+        },
+        "int" => Token::Keyword {
+            value: Keyword::Int,
+            span: span.clone(),
             display: "int".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "long" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::Long),
+        },
+        "long" => Token::Keyword {
+            value: Keyword::Long,
+            span: span.clone(),
             display: "long".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "return" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::Return),
+        },
+        "return" => Token::Keyword {
+            value: Keyword::Return,
+            span: span.clone(),
             display: "return".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "len" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::Len),
+        },
+        "len" => Token::Keyword {
+            value: Keyword::Len,
+            span: span.clone(),
             display: "len".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "void" => Ok(TokenInfo {
-            token: Token::Keyword(Keyword::Void),
+        },
+        "void" => Token::Keyword {
+            value: Keyword::Void,
+            span: span.clone(),
             display: "void".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
+        },
 
-        // "false" and "true" are keywords, but lexed as boolean literals,
-        // so these cases are probably never reached
-        "false" => Ok(TokenInfo {
-            token: Token::Literal(Literal::Bool(false)),
+        // Boolean literals
+        "false" => Token::Literal {
+            value: Literal::Bool(false),
+            span: span.clone(),
             display: "false".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
-        "true" => Ok(TokenInfo {
-            token: Token::Literal(Literal::Bool(true)),
+        },
+        "true" => Token::Literal {
+            value: Literal::Bool(true),
+            span: span.clone(),
             display: "true".to_string(),
-            line: *current_line,
-            col: *current_col,
-        }),
+        },
 
-        // If the token doesn't match any keywords, return it as an identifier
-        _ => Ok(TokenInfo {
-            token: Token::Identifier(keyword_or_identifier.clone()),
-            display: keyword_or_identifier,
-            line: *current_line,
-            col: *current_col,
-        }),
-    }
+        // Identifiers
+        _ => Token::Identifier {
+            value: keyword_or_identifier.clone(),
+            span,
+            display: keyword_or_identifier.clone(),
+        },
+    };
+
+    return Ok(token);
 }
 
 /// Lex a string literal, identified by a leading quotation mark.
@@ -304,8 +313,11 @@ fn lex_string_literal(
     program: &mut Vec<char>,
     current_line: &mut i32,
     current_col: &mut i32,
-) -> Result<TokenInfo> {
+) -> Result<Token> {
     let mut sliteral = String::new();
+    let start_line = *current_line;
+    let start_col = *current_col;
+
     consume(program, current_col, 1);
 
     while let Some(&char1) = program.get(0) {
@@ -323,12 +335,16 @@ fn lex_string_literal(
 
         match char1 {
             '"' => {
-                return Ok(TokenInfo {
-                    token: Token::Literal(Literal::String(sliteral.clone())),
-                    display: sliteral,
-                    line: *current_line,
-                    col: *current_col,
-                })
+                return Ok(Token::Literal {
+                    value: Literal::String(sliteral.clone()),
+                    span: Span {
+                        sline: start_line,
+                        scol: start_col,
+                        eline: *current_line,
+                        ecol: *current_col,
+                    },
+                    display: sliteral.clone(),
+                });
             }
             '\'' => return Err(anyhow!("Illegal single quote in string literal")),
             '\\' => match program.get(0) {
@@ -361,8 +377,10 @@ fn lex_char_literal(
     program: &mut Vec<char>,
     current_line: &mut i32,
     current_col: &mut i32,
-) -> Result<TokenInfo> {
+) -> Result<Token> {
     consume(program, current_col, 1);
+    let start_line = *current_line;
+    let start_col = *current_col;
 
     let char1 = match program.get(0) {
         Some(&c) => c,
@@ -415,11 +433,15 @@ fn lex_char_literal(
     match program.get(0) {
         Some('\'') => {
             consume(program, current_col, 1); // Consume closing quote
-            Ok(TokenInfo {
-                token: Token::Literal(Literal::Char(char_value)),
+            Ok(Token::Literal {
+                value: Literal::Char(char_value),
+                span: Span {
+                    sline: start_line,
+                    scol: start_col,
+                    eline: *current_line,
+                    ecol: *current_col,
+                },
                 display: char_value.to_string(),
-                line: *current_line,
-                col: *current_col,
             })
         }
         _ => Err(anyhow!("Character literal missing closing quote")),
@@ -436,201 +458,178 @@ fn get_next_token(
     program: &mut Vec<char>,
     current_line: &mut i32,
     current_col: &mut i32,
-) -> Result<TokenInfo> {
+) -> Result<Token> {
     if let Some(&char1) = program.get(0) {
+        let span = Span {
+            sline: *current_line,
+            scol: *current_col,
+            eline: *current_line,   // Assuming single-token span initially
+            ecol: *current_col + 1, // Adjust for token width
+        };
+
         // Attempt to match length-2 symbols first
         if let Some(&char2) = program.get(1) {
             let token = match (char1, char2) {
-                ('=', '=') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::Equal)),
+                ('=', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::Equal),
+                    span: span.clone(),
                     display: "==".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('+', '+') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::Increment)),
+                ('+', '+') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::Increment),
+                    span: span.clone(),
                     display: "++".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('-', '-') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::Decrement)),
+                ('-', '-') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::Decrement),
+                    span: span.clone(),
                     display: "--".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('!', '=') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::NotEqual)),
+                ('!', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::NotEqual),
+                    span: span.clone(),
                     display: "!=".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('<', '=') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::LessEqual)),
+                ('<', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::LessEqual),
+                    span: span.clone(),
                     display: "<=".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('>', '=') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::GreaterEqual)),
+                ('>', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::GreaterEqual),
+                    span: span.clone(),
                     display: ">=".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('&', '&') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::LogicalAnd)),
+                ('&', '&') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::LogicalAnd),
+                    span: span.clone(),
                     display: "&&".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('|', '|') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::LogicalOr)),
+                ('|', '|') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::LogicalOr),
+                    span: span.clone(),
                     display: "||".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('+', '=') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::PlusAssign)),
+                ('+', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::PlusAssign),
+                    span: span.clone(),
                     display: "+=".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('-', '=') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::MinusAssign)),
+                ('-', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::MinusAssign),
+                    span: span.clone(),
                     display: "-=".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('*', '=') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::MultiplyAssign)),
+                ('*', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::MultiplyAssign),
+                    span: span.clone(),
                     display: "*=".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('/', '=') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::DivideAssign)),
+                ('/', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::DivideAssign),
+                    span: span.clone(),
                     display: "/=".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
-                ('%', '=') => Some(TokenInfo {
-                    token: Token::Symbol(Symbol::Operator(Operator::ModuloAssign)),
+                ('%', '=') => Some(Token::Symbol {
+                    value: Symbol::Operator(Operator::ModuloAssign),
+                    span: span.clone(),
                     display: "%=".to_string(),
-                    line: *current_line,
-                    col: *current_col,
                 }),
                 _ => None,
             };
-            if token.is_some() {
+
+            if let Some(token) = token {
                 consume(program, current_col, 2);
-                return Ok(token.unwrap());
+                return Ok(token);
             }
-        };
+        }
 
-        // Match single-character Symbols directly
+        // Match single-character symbols
         let token = match char1 {
-            '(' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Punctuation(Punctuation::LeftParen)),
-                display: '('.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '(' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::LeftParen),
+                span: span.clone(),
+                display: "(".to_string(),
             }),
-            ')' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Punctuation(Punctuation::RightParen)),
-                display: ')'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            ')' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::RightParen),
+                span: span.clone(),
+                display: ")".to_string(),
             }),
-            '{' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Punctuation(Punctuation::LeftBrace)),
-                display: '{'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '{' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::LeftBrace),
+                span: span.clone(),
+                display: "{".to_string(),
             }),
-            '}' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Punctuation(Punctuation::RightBrace)),
-                display: '}'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '}' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::RightBrace),
+                span: span.clone(),
+                display: "}".to_string(),
             }),
-            '[' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Punctuation(Punctuation::LeftBracket)),
-                display: '['.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '[' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::LeftBracket),
+                span: span.clone(),
+                display: "[".to_string(),
             }),
-            ']' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Punctuation(Punctuation::RightBracket)),
-                display: ']'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            ']' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::RightBracket),
+                span: span.clone(),
+                display: "]".to_string(),
             }),
-            ';' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Punctuation(Punctuation::Semicolon)),
-                display: ';'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            ';' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::Semicolon),
+                span: span.clone(),
+                display: ";".to_string(),
             }),
-            ',' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Punctuation(Punctuation::Comma)),
-                display: ','.to_string(),
-                line: *current_line,
-                col: *current_col,
+            ',' => Some(Token::Symbol {
+                value: Symbol::Punctuation(Punctuation::Comma),
+                span: span.clone(),
+                display: ",".to_string(),
             }),
-
-            '=' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Operator(Operator::Assign)),
-                display: '='.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '=' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Assign),
+                span: span.clone(),
+                display: "=".to_string(),
             }),
-            '+' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Operator(Operator::Plus)),
-                display: '+'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '+' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Plus),
+                span: span.clone(),
+                display: "+".to_string(),
             }),
-            '-' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Operator(Operator::Minus)),
-                display: '-'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '-' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Minus),
+                span: span.clone(),
+                display: "-".to_string(),
             }),
-            '*' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Operator(Operator::Multiply)),
-                display: '*'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '*' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Multiply),
+                span: span.clone(),
+                display: "*".to_string(),
             }),
-            '/' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Operator(Operator::Divide)),
-                display: '/'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '/' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Divide),
+                span: span.clone(),
+                display: "/".to_string(),
             }),
-            '%' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Operator(Operator::Modulo)),
-                display: '%'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '%' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Modulo),
+                span: span.clone(),
+                display: "%".to_string(),
             }),
-            '<' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Operator(Operator::Less)),
-                display: '<'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '<' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Less),
+                span: span.clone(),
+                display: "<".to_string(),
             }),
-            '>' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Operator(Operator::Greater)),
-                display: '>'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '>' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::Greater),
+                span: span.clone(),
+                display: ">".to_string(),
             }),
-            '!' => Some(TokenInfo {
-                token: Token::Symbol(Symbol::Operator(Operator::LogicalNot)),
-                display: '!'.to_string(),
-                line: *current_line,
-                col: *current_col,
+            '!' => Some(Token::Symbol {
+                value: Symbol::Operator(Operator::LogicalNot),
+                span: span.clone(),
+                display: "!".to_string(),
             }),
 
             // These fn handle their own consumption
@@ -669,7 +668,7 @@ fn get_next_token(
 pub fn scan(
     file: &str,
     filename: &str,
-    writer: &mut Box<dyn std::io::Write>,
+    writer: &mut dyn std::io::Write,
     debug: bool,
 ) -> Vec<Token> {
     let mut program: Vec<char> = file.chars().collect();
@@ -704,14 +703,33 @@ pub fn scan(
         }
 
         // Generate and display the next token to standard out
-        let token = get_next_token(&mut program, &mut current_line, &mut current_col);
-        match token {
-            Ok(token_info) => {
-                let template_string = match &token_info.token {
-                    Token::Identifier(text) => {
-                        format!("{} IDENTIFIER {}", token_info.line, text)
+        let wrapped_token = get_next_token(&mut program, &mut current_line, &mut current_col);
+        match wrapped_token {
+            Ok(token) => {
+                // extract line number
+                let line_number = match &token {
+                    Token::Keyword { span, .. }
+                    | Token::Identifier { span, .. }
+                    | Token::Literal { span, .. }
+                    | Token::Symbol { span, .. } => span.sline,
+                };
+
+                // extract token display for non-special tokens
+                let token_display = match &token {
+                    Token::Keyword { display, .. }
+                    | Token::Identifier { display, .. }
+                    | Token::Literal { display, .. }
+                    | Token::Symbol { display, .. } => display.as_str(),
+                };
+
+                let template_string = match &token {
+                    Token::Identifier { value, .. } => {
+                        format!("{} IDENTIFIER {}", line_number, value)
                     }
-                    Token::Literal(Literal::Char(text)) => {
+                    Token::Literal {
+                        value: Literal::Char(text),
+                        ..
+                    } => {
                         let display_char = match text {
                             '\n' => "\\n".to_string(),
                             '\t' => "\\t".to_string(),
@@ -722,28 +740,46 @@ pub fn scan(
                             '\\' => "\\\\".to_string(),
                             _ => text.to_string(),
                         };
-                        format!("{} CHARLITERAL \'{}\'", token_info.line, display_char)
+                        format!("{} CHARLITERAL \'{}\'", line_number, display_char)
                     }
-                    Token::Literal(Literal::String(text)) => {
-                        format!("{} STRINGLITERAL \"{}\"", token_info.line, text)
+                    Token::Literal {
+                        value: Literal::String(text),
+                        ..
+                    } => {
+                        format!("{} STRINGLITERAL \"{}\"", line_number, text)
                     }
-                    Token::Literal(Literal::Int(value)) => {
-                        format!("{} INTLITERAL {}", token_info.line, value)
+                    Token::Literal {
+                        value: Literal::Int(value),
+                        ..
+                    } => {
+                        format!("{} INTLITERAL {}", line_number, value)
                     }
-                    Token::Literal(Literal::Long(value)) => {
-                        format!("{} LONGLITERAL {}L", token_info.line, value)
+                    Token::Literal {
+                        value: Literal::Long(value),
+                        ..
+                    } => {
+                        format!("{} LONGLITERAL {}L", line_number, value)
                     }
-                    Token::Literal(Literal::HexInt(value)) => {
-                        format!("{} INTLITERAL 0x{}", token_info.line, value)
+                    Token::Literal {
+                        value: Literal::HexInt(value),
+                        ..
+                    } => {
+                        format!("{} INTLITERAL 0x{}", line_number, value)
                     }
-                    Token::Literal(Literal::HexLong(value)) => {
-                        format!("{} LONGLITERAL 0x{}L", token_info.line, value)
+                    Token::Literal {
+                        value: Literal::HexLong(value),
+                        ..
+                    } => {
+                        format!("{} LONGLITERAL 0x{}L", line_number, value)
                     }
-                    Token::Literal(Literal::Bool(value)) => {
-                        format!("{} BOOLEANLITERAL {}", token_info.line, value)
+                    Token::Literal {
+                        value: Literal::Bool(value),
+                        ..
+                    } => {
+                        format!("{} BOOLEANLITERAL {}", line_number, value)
                     }
                     _ => {
-                        format!("{} {}", token_info.line, token_info.display)
+                        format!("{} {}", line_number, token_display)
                     }
                 };
 
@@ -751,7 +787,7 @@ pub fn scan(
                     writeln!(writer, "{}", template_string)
                         .expect("Failed to write error to stdout!");
                 }
-                tokens.push(token_info.token);
+                tokens.push(token);
             }
 
             Err(token_value) => {
@@ -771,6 +807,10 @@ pub fn scan(
     if found_err {
         process::exit(1);
     }
+
+    // if debug {
+    //     println!("Successfully scanned! Tokens are:\n {:#?}", tokens);
+    // }
 
     tokens
 }

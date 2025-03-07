@@ -1,135 +1,168 @@
-// ir.rs
-//
-// Intermediate Representation (IR) module that uses a Scope for symbol management
-// and provides functions to convert the AST into a lower-level IR.
+/*
+Data structure for creating symbol tables.
+
+Symbol table AST is a tree similar to the result of the
+parse, but augmented with scope to have
+tronger semantic understanding of the program.
+
+The following non-terminals create new scopes:
+    - program
+    - block
+    - method
+*/
+
+use crate::ast::{AssignOp, BinaryOp, Type, UnaryOp};
+use crate::scope::{Scope, TableEntry};
+use crate::token::{Literal, Span};
+use std::cell::RefCell;
 
 use std::collections::HashMap;
-use crate::ast::{AST, Statement, Expr, Type, BinaryOp, UnaryOp};
-use crate::token::Literal; // if needed for literal values
+use std::rc::Rc;
 
-/// A simple datatype for IR. This mirrors our AST’s types.
-#[derive(Debug, Clone)]
-pub enum Datatype {
-    Int,
-    Long,
-    Bool,
-    Void,
+/// Used to package the objects that need
+/// to be passed throughout the semantic checks.
+pub struct SemanticContext {
+    pub filename: String,
+    pub error_found: bool,
 }
 
-/// A scope contains a symbol table (mapping variable names to their datatype)
-/// and an optional parent scope.
+/// The root for the symbol table AST
+#[allow(dead_code)]
 #[derive(Debug)]
-pub struct Scope {
-    symbols: HashMap<String, Datatype>,
-    parent: Option<Box<Scope>>,
+pub enum SymNode {
+    Program(SymProgram),
+    Method(SymMethod),
+    Block(SymBlock),
 }
 
-impl Scope {
-    /// Create a new (global) scope.
-    pub fn new() -> Self {
-        Scope {
-            symbols: HashMap::new(),
-            parent: None,
-        }
-    }
-
-    /// Create a new child scope from an existing parent.
-    pub fn new_child(parent: Scope) -> Self {
-        Scope {
-            symbols: HashMap::new(),
-            parent: Some(Box::new(parent)),
-        }
-    }
-
-    /// Insert a new symbol into the scope.
-    pub fn insert(&mut self, name: String, datatype: Datatype) {
-        self.symbols.insert(name, datatype);
-    }
-
-    /// Lookup a symbol in this scope or any parent scope.
-    pub fn lookup(&self, name: &str) -> Option<&Datatype> {
-        if let Some(datatype) = self.symbols.get(name) {
-            Some(datatype)
-        } else if let Some(ref parent_scope) = self.parent {
-            parent_scope.lookup(name)
-        } else {
-            None
-        }
-    }
-}
-
-/// The Intermediate Representation (IR) is defined as an enum.
-/// Here we represent programs, functions, variable declarations, assignments,
-/// control flow, and expressions.
+#[allow(dead_code)]
 #[derive(Debug)]
-pub enum IR {
-    /// The entire program: globals and functions.
-    Program {
-        globals: Vec<IR>,
-        functions: Vec<IR>,
-    },
-    /// A function with a name, return type, parameters, body and a scope
-    /// for its local symbols.
-    Function {
-        name: String,
-        return_type: Datatype,
-        params: Vec<(String, Datatype)>,
-        body: Vec<IR>,
-        scope: Scope,
-    },
-    /// A variable declaration.
+pub struct SymProgram {
+    pub global_scope: Rc<RefCell<Scope>>, // Holds local vars and methods
+    pub methods: HashMap<String, Rc<SymMethod>>, // Methods are shared references
+    pub span: Span,
+}
+
+/// Represents a method in the IR
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct SymMethod {
+    // pub is_import: bool,
+    pub name: String,
+    pub return_type: Type,
+    pub params: Vec<(Type, String, Span)>,
+    pub scope: Rc<RefCell<Scope>>, // Stores local variables
+    pub body: SymBlock,            // Statements are reference-counted
+    pub span: Span,
+}
+
+/// Represents a block of statements in the IR
+#[derive(Debug)]
+pub struct SymBlock {
+    pub scope: Rc<RefCell<Scope>>, // Holds variables declared inside the block
+    pub statements: Vec<Rc<SymStatement>>, // Statements in this block
+    pub span: Span,
+}
+
+/// IR representation for statements
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum SymStatement {
     VarDecl {
         name: String,
-        datatype: Datatype,
+        typ: Type,
+        is_array: bool,
+        span: Span,
+        size: Literal
     },
-    /// An assignment statement.
-    Assign {
-        target: String,
-        expr: Box<IR>,
+    Assignment {
+        target: SymExpr, //Now supports both `Identifier` and `ArrAccess`
+        expr: SymExpr,
+        span: Span,
+        op: AssignOp
     },
-    /// An if statement with a condition and then/else bodies.
+    MethodCall {
+        method_name: String,
+        args: Vec<SymExpr>,
+        span: Span,
+    },
     If {
-        condition: Box<IR>,
-        then_body: Vec<IR>,
-        else_body: Option<Vec<IR>>,
+        condition: SymExpr,
+        then_block: Rc<SymBlock>,
+        else_block: Option<Rc<SymBlock>>,
+        span: Span,
     },
-    /// A while loop.
     While {
-        condition: Box<IR>,
-        body: Vec<IR>,
+        condition: SymExpr,
+        block: Rc<SymBlock>,
+        span: Span,
     },
-    /// A for loop.
     For {
         var: String,
-        init: Box<IR>,
-        condition: Box<IR>,
-        update: Box<IR>,
-        body: Vec<IR>,
+        init: SymExpr,
+        condition: SymExpr,
+        update: SymExpr,
+        block: Rc<SymBlock>,
+        span: Span,
     },
-    /// A return statement.
     Return {
-        expr: Option<Box<IR>>,
+        expr: Option<SymExpr>,
+        span: Span,
     },
-    /// An IR expression wrapped as a statement.
-    Expression(IRExpr),
+    Break {
+        span: Span,
+    },
+    Continue {
+        span: Span,
+    },
+    Error {
+        span: Span,
+    },
 }
 
-/// IR expressions. We re-use the BinaryOp and UnaryOp from the AST.
-#[derive(Debug)]
-pub enum IRExpr {
-    Binary {
+/// IR representation for expressions
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub enum SymExpr {
+    Literal {
+        value: Literal,
+        span: Span,
+    },
+    Identifier {
+        entry: TableEntry,
+        span: Span,
+    },
+    ArrAccess {
+        id: String,
+        index: Rc<SymExpr>,
+        span: Span,
+    },
+    MethodCall {
+        method_name: String,
+        args: Vec<Rc<SymExpr>>,
+        span: Span,
+    },
+    BinaryExpr {
         op: BinaryOp,
-        left: Box<IRExpr>,
-        right: Box<IRExpr>,
+        left: Rc<SymExpr>,
+        right: Rc<SymExpr>,
+        span: Span,
     },
-    Unary {
+    UnaryExpr {
         op: UnaryOp,
-        expr: Box<IRExpr>,
+        expr: Rc<SymExpr>,
+        span: Span,
     },
-    Literal(String),
-    Identifier(String),
-    FunctionCall {
-        name: String,
-        args: Vec<IRExpr>,
+    Cast {
+        target_type: Type,
+        expr: Rc<SymExpr>,
+        span: Span,
+    },
+    Len {
+        id: String,
+        span: Span,
+    },
+    Error {
+        span: Span,
     },
 }
