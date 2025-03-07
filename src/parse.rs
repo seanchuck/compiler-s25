@@ -1038,7 +1038,7 @@ fn parse_array_field_decl(input: TokenSlice) -> IResult<TokenSlice, AST> {
                 }) = size
                 {
                     let size_value = match lit {
-                        Literal::Int(value) | Literal::HexInt(value) => value, // Handle both cases
+                        Literal::Int(_) | Literal::HexInt(_) => lit.clone(), // Handle both cases
                         _ => {
                             return Err(nom::Err::Error(nom::error::Error::new(
                                 input,
