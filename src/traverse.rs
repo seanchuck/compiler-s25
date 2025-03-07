@@ -659,6 +659,7 @@ fn infer_method_call_type(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: 
                     format_error_message(&method_name, Some(&span), "incorrect number of arguments to method", context)
                 )
                 .expect("Failed to write error message");
+                return None;
             }
 
             for i in 0..cmp::min(args.len(), params.len()) {

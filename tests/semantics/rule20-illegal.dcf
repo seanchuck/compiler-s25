@@ -1,4 +1,0 @@
-void main() {
-    int x;
-    x = int(true); // ❌ `bool` cannot be cast to `int`
-}
