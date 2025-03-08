@@ -201,7 +201,6 @@ pub enum Type {
     Array(Box<Type>),
     Method(Box<Type>),
     Void,
-    Unknown,
 }
 
 impl fmt::Display for Type {
