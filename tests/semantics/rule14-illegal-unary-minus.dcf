@@ -1,6 +1,6 @@
 void main() {
     bool x;
-    x = true;
     int y;
+    x = true;
     y = -x; // NOT ALLOWED, unary minus must be on int or long
 }
