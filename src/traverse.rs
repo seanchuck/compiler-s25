@@ -633,7 +633,7 @@ fn infer_method_call_type(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: 
 
     // rule 10
     match entry {
-        Some(TableEntry::Import { span, .. }) => {
+        Some(TableEntry::Import { .. }) => {
             // rule 5
             for arg in args {
                 let arg_type = infer_expr_type(arg, scope, &span, writer, context);
