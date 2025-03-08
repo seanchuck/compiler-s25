@@ -12,19 +12,6 @@ This semantic chcecker was written by :
     2. Writing functions to check each rule and "injecting"
         them into the construction of the modified AST.
 
-
-TODO: 
-    - Debug / implement rules: 4, 5, 6, 7, 8, 10, 13, 14, 17, 18, 19, 23
-        - After implementing, be sure to run on gradescope to ensure all 
-            legal cases still pass
-    - Clean up error messages
-        - Don't create multiple messages for same error
-        - Test that we can output multiple error messages for single pass
-
-    - For range checking (int, long)
-        - must check for literals: array declaration sizes, etc.
-        - need to fold unary minus (see https://6110-sp25.github.io/phase-2)
-
 */
 
 use core::panic;
@@ -200,7 +187,6 @@ pub fn build_symbol_table(
                         block: _,
                         ref span,
                     } => {
-                        // println!("serint method{}", name);
                         // Insert function into table before processing body
                         if global_scope.borrow_mut().insert(
                             name.clone(),
@@ -268,7 +254,7 @@ pub fn build_method(
             block,
             span,
         } => {
-            // ✅ Create a new scope for this method, with `enclosing_block` set to Method
+            //   Create a new scope for this method, with `enclosing_block` set to Method
             let method_scope = Rc::new(RefCell::new(Scope::add_child(
                 Rc::clone(&parent_scope),
                 Some(EnclosingBlock::Method),
@@ -346,20 +332,20 @@ pub fn build_block(
             statements,
             span,
         } => {
-            // ✅ Detect if this block is inside a `for` or `while`
+            //  Detect if this block is inside a `for` or `while`
             let is_loop_body = matches!(
                 parent_scope.borrow().enclosing_block,
                 Some(EnclosingBlock::Loop)
             );
 
             let enclosing_block = if is_loop_body {
-                Some(EnclosingBlock::Loop) // ✅ Explicitly mark this block as a loop
+                Some(EnclosingBlock::Loop) //   Explicitly mark this block as a loop
             } else {
-                parent_scope.borrow().enclosing_block.clone() // ✅ Inherit from parent
+                parent_scope.borrow().enclosing_block.clone() //   Inherit from parent
             };
 
             let scope = if let Some(overwrite) = overwrite_scope {
-                overwrite // ✅ Overwrite scope if provided
+                overwrite //   Overwrite scope if provided
             } else {
                 Rc::new(RefCell::new(Scope::add_child(
                     Rc::clone(&parent_scope),
@@ -454,7 +440,6 @@ pub fn build_statement(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext
 ) -> SymStatement {
-    // println!("building statement: {:#?}", statement);
     match statement {
         AST::Statement(Statement::Assignment {
             location,
@@ -466,16 +451,20 @@ pub fn build_statement(
                 // Plain variable assignment (x = 3;)
                 AST::Identifier { id, span: id_span } => {
                     check_used_before_decl(id, scope.clone(), span, writer, context);
-                    let entry = scope.borrow().lookup(id).expect("Variable should be declared");
-                
-                    SymStatement::Assignment {
-                        target: SymExpr::Identifier {
-                            entry: entry.clone(),  // ✅ Store full TableEntry info instead of just `id`
-                            span: id_span.clone(),
-                        },
-                        expr: build_expr(expr, Rc::clone(&scope), writer, context),
-                        span: span.clone(),
-                        op: op.clone()
+
+                    if let Some(entry) = scope.borrow().lookup(id) {
+                        SymStatement::Assignment {
+                            target: SymExpr::Identifier {
+                                entry: entry.clone(),
+                                span: id_span.clone(),
+                            },
+                            expr: build_expr(expr, Rc::clone(&scope), writer, context),
+                            span: span.clone(),
+                            op: op.clone()
+                        }
+
+                    } else {
+                        SymStatement::Error { span: span.clone() }
                     }
                 },
 
@@ -512,7 +501,7 @@ pub fn build_statement(
                     method_name: method_name.clone(),
                     args: args
                         .iter()
-                        .map(|arg| build_expr(arg, scope.clone(), writer, context)) // ✅ Use `scope_clone.clone()` here
+                        .map(|arg| build_expr(arg, scope.clone(), writer, context)) //   Use `scope_clone.clone()` here
                         .collect(),
                     span: span.clone(),
                 }
@@ -573,7 +562,7 @@ pub fn build_statement(
             }
 
             let update_expr = match update.as_ref() {
-                AST::Statement(Statement::Assignment { location, expr, .. }) => {
+                AST::Statement(Statement::Assignment { location, .. }) => {
 
                     if let AST::Identifier { .. } = location.as_ref() {
                         build_statement(&update, Rc::clone(&scope), writer, context)
@@ -705,7 +694,6 @@ pub fn build_expr(
             span: span.clone(),
             }
 
-            
         },
 
         AST::Expr(Expr::ArrAccess { id, index, span }) => {            
@@ -727,7 +715,7 @@ pub fn build_expr(
                         SymExpr::Error { span: span.clone() }
                     }
             } else {
-                // ❌ If invalid, return an error node
+                // If invalid, return an error node
                 SymExpr::Error { span: span.clone() }
             }
         }
@@ -754,9 +742,9 @@ pub fn build_expr(
             let scope_clone: Rc<RefCell<Scope>> = Rc::clone(&scope);
             
             // RULE 2: no identifier is used before being declared
-            check_used_before_decl(id, scope.clone(), span, writer, context); // ✅ Immutable borrow ends here
+            check_used_before_decl(id, scope.clone(), span, writer, context); //   Immutable borrow ends here
         
-            let entry = scope_clone.borrow().lookup(id).unwrap(); // ✅ No conflict now
+            let entry = scope_clone.borrow().lookup(id).unwrap();
             SymExpr::Identifier {
                 entry: entry.clone(),
                 span: span.clone(),
@@ -910,26 +898,21 @@ fn check_and_insert_array_field(
     writer: &mut dyn std::io::Write,
     context: &mut SemanticContext,
 ) {
-    eprintln!("Debug: Found array declaration {} with size {:?}", id, size);
 
     // Extract integer value from Literal
     let parsed_size = match size {
         Literal::Int(ref s) | Literal::HexInt(ref s) => {
             let parsed = s.parse::<i32>().ok();
-            eprintln!("Debug: Parsed size {:?} -> {:?}", s, parsed);
             parsed
         }
         _ => {
-            eprintln!("Debug: Invalid array size type for {}", id);
             None
         }
     };
 
     // Check if size is <= 0 or invalid
     if let Some(size_value) = parsed_size {
-        eprintln!("Debug: Checking size_value: {}", size_value);
         if size_value <= 0 {
-            eprintln!("Debug: Error - size is <= 0 for array {}", id);
             writeln!(
                 writer,
                 "{}",
@@ -939,7 +922,6 @@ fn check_and_insert_array_field(
             return; // Exit early, no insertion into scope
         }
     } else {
-        eprintln!("Debug: Error - Could not parse array size for {}", id);
         writeln!(
             writer,
             "{}",
@@ -974,15 +956,10 @@ fn check_and_insert_array_field(
 // ENTRY POINT
 // #################################################
 
-// /// Perform all semantic checks not already performed
-// /// during SymTree construction.
-// pub fn check_semantics(sym_tree: SymProgram, filename: &str, writer: &mut dyn std::io::Write) {
-
-// }
-
 /// Semantically check the given file by parsing it and 
 /// turning the AST into a symbol table tree.
 pub fn semcheck(file: &str, filename: &str, writer: &mut dyn std::io::Write, verbose: bool) {
+    // Parse the input file
     let parse_tree: AST = parse(file, filename, writer, false).expect("Parsing failed");
 
     // Package semantic context
@@ -991,10 +968,10 @@ pub fn semcheck(file: &str, filename: &str, writer: &mut dyn std::io::Write, ver
         error_found: false
     };
 
-    // Build the semantic tree
+    // Build the semantic tree, performing initial semantic checks
     let sym_tree: SymProgram = build_symbol_table(&parse_tree, writer, &mut context);
 
-    // traverse tree
+    // Traverse tree, performing any remaining semantic checks
     traverse_ir(&sym_tree, writer, &mut context);
 
     if verbose {

@@ -76,10 +76,8 @@ impl Scope {
             enclosing_block, // Now tracks both methods and loops
         }
     }
-    
 
     pub fn insert(&mut self, name: String, datatype: TableEntry) -> Option<TableEntry> {
-        println!("Inserting {}, datatype {:?}", name, datatype);
         self.table.insert(name, datatype)
     }
 
