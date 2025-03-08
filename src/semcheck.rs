@@ -149,7 +149,7 @@ pub fn build_symbol_table(
                     AST::FieldDecl {
                         ref typ,
                         ref decls,
-                        ref span,
+                        span: _
                     } => {
                         for decl in decls {
                             match **decl {
@@ -197,7 +197,7 @@ pub fn build_symbol_table(
                         ref return_type,
                         ref name,
                         ref params,
-                        ref block,
+                        block: _,
                         ref span,
                     } => {
                         // println!("serint method{}", name);
@@ -271,7 +271,7 @@ pub fn build_method(
             // ✅ Create a new scope for this method, with `enclosing_block` set to Method
             let method_scope = Rc::new(RefCell::new(Scope::add_child(
                 Rc::clone(&parent_scope),
-                Some(EnclosingBlock::Method(name.clone())),
+                Some(EnclosingBlock::Method),
             )));
             
             // Process method params, and add into method's outer-most scope
@@ -369,7 +369,7 @@ pub fn build_block(
                     AST::FieldDecl {
                         ref typ,
                         ref decls,
-                        ref span,
+                        span: _
                     } => {
                         for decl in decls {
                             match **decl {
@@ -476,9 +476,11 @@ pub fn build_statement(
                 // Array access assignment (x[2] = 5;)
                 AST::Expr(Expr::ArrAccess {
                     id,
-                    index,
-                    span: arr_span,
+                    index: _,
+                    span
                 }) => {
+                    check_used_before_decl(id, scope.clone(), span, writer, context);
+
                     SymStatement::Assignment {
                         target: build_expr(location, Rc::clone(&scope), writer, context),
                         expr: build_expr(expr, Rc::clone(&scope), writer, context),
@@ -497,6 +499,7 @@ pub fn build_statement(
             method_name,
             args,
             span,}) => {
+            check_used_before_decl(&method_name, scope.clone(), span, writer, context);
 
             SymStatement::MethodCall {
             method_name: method_name.clone(),
@@ -684,6 +687,8 @@ pub fn build_expr(
             args,
             span,
         }) => {
+            check_used_before_decl(method_name, scope.clone(), span, writer, context);
+
             SymExpr::MethodCall {
             method_name: method_name.clone(),
             args: args
@@ -807,9 +812,17 @@ fn check_main_exists(methods: &Vec<Box<AST>>, writer: &mut dyn std::io::Write, c
 
     for method in methods {
         match **method {
-            AST::MethodDecl { ref return_type, ref name, ref params, .. } => {
-                if name == "main" && *return_type == Type::Void && params.is_empty() {
+            AST::MethodDecl { ref return_type, ref name, ref params, span, .. } => {
+                if name == "main" {
                     has_main = true;
+
+                    if *return_type != Type::Void {
+                        let error_msg = format_error_message("void", Some(&span), "`main` must return", context);
+                        writeln!(writer, "{}", error_msg).expect("Failed to write error message");
+                    } else if !params.is_empty() {
+                        let error_msg = format_error_message("main", Some(&span), "should not have any parameters: entry point", context);
+                        writeln!(writer, "{}", error_msg).expect("Failed to write error message");
+                    }
                     break;
                 }
             }
@@ -873,93 +886,6 @@ fn check_len_argument(id: &AST, span: &Span, scope: &Scope, writer: &mut dyn std
     }
     false
 }
-
-/// Rule 19
-fn check_in_loop(
-    scope: Rc<RefCell<Scope>>, // Keep `Rc<RefCell<Scope>>` instead of `&Scope`
-    span: &Span,
-    writer: &mut dyn std::io::Write,
-    context: &mut SemanticContext,
-) {
-    if !Scope::is_inside_loop(scope.clone()) { // Correct call
-        writeln!(
-            writer,
-            "{}",
-            format_error_message(
-                "loop control statement",
-                Some(span),
-                "Break and continue statements must be inside a loop.",
-                context
-            )
-        )
-        .expect("Failed to write error message");
-    }
-}
-
-
-/// Rule 23
-/// ✅ Ensures that assignment targets are scalars (not arrays)
-fn check_scalar_assignment(
-    location: &AST,
-    span: &Span,
-    scope: Rc<RefCell<Scope>>,
-    writer: &mut dyn std::io::Write,
-    context: &mut SemanticContext,
-) {
-    match location {
-        // ✅ Look up identifier in scope
-        AST::Identifier { id, .. } => {
-            if let Some(TableEntry::Variable { is_array, .. }) = scope.borrow().lookup(id) {
-                if is_array {
-                    writeln!(
-                        writer,
-                        "{}",
-                        format_error_message(
-                            &format!("variable `{}`", id),
-                            Some(span),
-                            "Assignment target must be a scalar (non-array) variable.",
-                            context
-                        )
-                    )
-                    .expect("Failed to write error message");
-                }
-            } else {
-                writeln!(
-                    writer,
-                    "{}",
-                    format_error_message(
-                        &format!("variable `{}`", id),
-                        Some(span),
-                        "Assignment target is not declared.",
-                        context
-                    )
-                )
-                .expect("Failed to write error message");
-            }
-        }
-
-        // ✅ Array element access (e.g., a[0]) is allowed since it is scalar
-        AST::Expr(Expr::ArrAccess { .. }) => {
-            // No error; array elements are scalar
-        }
-
-        // ❌ Any other expression is invalid as an assignment target
-        _ => {
-            writeln!(
-                writer,
-                "{}",
-                format_error_message(
-                    &format!("{:?}", location),
-                    Some(span),
-                    "Invalid assignment target: must be a scalar variable or array element.",
-                    context
-                )
-            )
-            .expect("Failed to write error message");
-        }
-    }
-}
-
 
 // Array Size Rule
 fn check_and_insert_array_field(

@@ -2,7 +2,7 @@ void bar() {}
 void foo(int x) {}
 
 void main() {
-    bar();
     int a[5];
+    bar();
     foo(a);
 }

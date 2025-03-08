@@ -1,4 +1,4 @@
+import foo;
 void main() {
     foo();
 }
-void foo() {}

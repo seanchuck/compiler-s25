@@ -1,6 +1,6 @@
 void main() {
     int x;
-    x = 2147483647; // legal inside int ramge
     int y;
-    y = x + 2147483648; // illegal addtion of literal too large
+    x = 2147483647; // legal inside int ramge
+    y = x + 2147483648; // illegal addition of literal too large
 }
