@@ -249,28 +249,37 @@ fn check_for(var: &String, init: &SymExpr, condition: &SymExpr, update: &SymStat
 }
 
 // rules 7 and 8
-fn check_return(expr: &Option<SymExpr>, return_type: &Type, in_loop: bool, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_return(expr: &Option<SymExpr>, expected_return_type: &Type, in_loop: bool, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     if expr.is_some() {
-        if *return_type == Type::Void {
+        if *expected_return_type == Type::Void {
             writeln!(
                 writer,
                 "{}",
-                format_error_message(&format!("{}", return_type), Some(&span), "did not expect expression, method returns", context)
+                format_error_message(&format!("{}", expected_return_type), Some(&span), "did not expect expression, method returns", context)
             )
             .expect("Failed to write error message");
         } else {
             let expr_type = infer_expr_type(expr.as_ref().unwrap(), scope, span, writer, context);
 
-            if expr_type.clone().unwrap() != *return_type {
+            if expr_type.clone().unwrap() != *expected_return_type {
                 writeln!(
                     writer,
                     "{}",
-                    format_error_message(&format!("{}", expr_type.unwrap()), Some(&span), &format!("expected return type `{}`, instead found", return_type), context)
+                    format_error_message(&format!("{}", expr_type.unwrap()), Some(&span), &format!("expected return type `{}`, instead found", expected_return_type), context)
                 )
                 .expect("Failed to write error message");
             }
         }
-    }    
+    } else {    // Function actually returns void
+        if *expected_return_type != Type::Void {
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(&format!("{:?}", expr), Some(&span), "expected non-void return and got void", context)
+            )
+            .expect("Failed to write error message");
+        }
+    }
 }
 
 // rule 19
@@ -653,6 +662,7 @@ fn infer_literal_type(value: &Literal, scope: &Scope, span: &Span, writer: &mut 
 fn infer_method_call_type(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Option<Type> {
     let entry = scope.lookup(method_name);
 
+    eprintln!("DEBUG:FINAL {:?}", entry);
     // rule 10
     match entry {
         Some(TableEntry::Import { span, .. }) => {
