@@ -231,7 +231,7 @@ pub fn build_symbol_table(
                         }
                         
                         // Now process the function body
-                        let method = build_method(method, Rc::clone(&global_scope), writer, context);
+                        let method: SymMethod = build_method(method, Rc::clone(&global_scope), writer, context);
 
                         // Store the method body as well
                         method_bodies.insert(method.name.clone(), Rc::new(method));
@@ -301,7 +301,7 @@ pub fn build_method(
 
             // Process method body
             let method_body = match **block {
-                AST::Block { .. } => build_block(block, Rc::clone(&method_scope), writer, context),
+                AST::Block { .. } => build_block(block, Rc::clone(&method_scope), writer, context, Some(Rc::clone(&method_scope))),
                 _ => panic!("Expected method body to be a block"),
             };
 
@@ -331,12 +331,14 @@ pub fn build_method(
 }
 
 
-/// Builds an IR representation of a block
+/// Builds an IR representation of a block. If overwrite scope defined, will use given scope
+/// instead of making a new one
 pub fn build_block(
     block: &AST,
     parent_scope: Rc<RefCell<Scope>>,
     writer: &mut dyn std::io::Write,
-    context: &mut SemanticContext
+    context: &mut SemanticContext,
+    overwrite_scope: Option<Rc<RefCell<Scope>>>
 ) -> SymBlock {
     match block {
         AST::Block {
@@ -356,10 +358,14 @@ pub fn build_block(
                 parent_scope.borrow().enclosing_block.clone() // ✅ Inherit from parent
             };
 
-            let scope = Rc::new(RefCell::new(Scope::add_child(
-                Rc::clone(&parent_scope),
-                enclosing_block,
-            )));
+            let scope = if let Some(overwrite) = overwrite_scope {
+                overwrite // ✅ Overwrite scope if provided
+            } else {
+                Rc::new(RefCell::new(Scope::add_child(
+                    Rc::clone(&parent_scope),
+                    enclosing_block,
+                )))
+            };
 
             let mut sym_statements = Vec::new();
 
@@ -494,21 +500,22 @@ pub fn build_statement(
                 ),
             }
         },
-
+      
         AST::Statement(Statement::MethodCall {
             method_name,
             args,
             span,}) => {
-            check_used_before_decl(&method_name, scope.clone(), span, writer, context);
 
-            SymStatement::MethodCall {
-            method_name: method_name.clone(),
-            args: args
-                .iter()
-                .map(|arg| build_expr(arg, Rc::clone(&scope), writer, context))
-                .collect(),
-            span: span.clone(),
-            }
+                check_used_before_decl(method_name, scope.clone(), span, writer, context);
+
+                SymStatement::MethodCall {
+                    method_name: method_name.clone(),
+                    args: args
+                        .iter()
+                        .map(|arg| build_expr(arg, scope.clone(), writer, context)) // ✅ Use `scope_clone.clone()` here
+                        .collect(),
+                    span: span.clone(),
+                }
         },
 
         AST::Statement(Statement::If {
@@ -519,10 +526,10 @@ pub fn build_statement(
         }) => {
             SymStatement::If {
                 condition: build_expr(condition, Rc::clone(&scope), writer, context),
-                then_block: Rc::new(build_block(then_block, Rc::clone(&scope), writer, context)),
+                then_block: Rc::new(build_block(then_block, Rc::clone(&scope), writer, context, None)),
                 else_block: else_block
                     .as_ref()
-                    .map(|blk| Rc::new(build_block(blk, Rc::clone(&scope), writer, context))),
+                    .map(|blk| Rc::new(build_block(blk, Rc::clone(&scope), writer, context, None))),
                 span: span.clone(),
         }
     }
@@ -535,7 +542,7 @@ pub fn build_statement(
         }) => {
             SymStatement::While {
                 condition: build_expr(condition, Rc::clone(&scope), writer, context),
-                block: Rc::new(build_block(block, Rc::clone(&scope), writer, context)),
+                block: Rc::new(build_block(block, Rc::clone(&scope), writer, context, None)),
                 span: span.clone(),
             }
         },
@@ -569,7 +576,7 @@ pub fn build_statement(
                 AST::Statement(Statement::Assignment { location, expr, .. }) => {
 
                     if let AST::Identifier { .. } = location.as_ref() {
-                        build_expr(expr, Rc::clone(&scope), writer, context)
+                        build_statement(&update, Rc::clone(&scope), writer, context)
                     } else {
                         panic!(
                             "For loop update must be an assignment to an identifier, got: {:#?}",
@@ -587,8 +594,8 @@ pub fn build_statement(
                 var: var.clone(),
                 init: build_expr(init, Rc::clone(&scope), writer, context),
                 condition: build_expr(condition, Rc::clone(&scope), writer, context),
-                update: update_expr,
-                block: Rc::new(build_block(block, Rc::clone(&scope), writer, context)),
+                update: Box::new(update_expr),
+                block: Rc::new(build_block(block, Rc::clone(&scope), writer, context, None)),
                 span: span.clone(),
             }
         }
@@ -697,6 +704,8 @@ pub fn build_expr(
                 .collect(),
             span: span.clone(),
             }
+
+            
         },
 
         AST::Expr(Expr::ArrAccess { id, index, span }) => {            
@@ -741,15 +750,19 @@ pub fn build_expr(
         },
         
         AST::Identifier { ref id, ref span } => {
+            // Clone scope first to avoid overlapping borrows
+            let scope_clone: Rc<RefCell<Scope>> = Rc::clone(&scope);
+            
             // RULE 2: no identifier is used before being declared
-            check_used_before_decl(id, Rc::clone(&scope), span, writer, context);
-
-            let entry = scope.borrow_mut().lookup(id).unwrap();
+            check_used_before_decl(id, scope.clone(), span, writer, context); // ✅ Immutable borrow ends here
+        
+            let entry = scope_clone.borrow().lookup(id).unwrap(); // ✅ No conflict now
             SymExpr::Identifier {
                 entry: entry.clone(),
                 span: span.clone(),
             }
         },
+        
 
         _ => panic!(
             "Error in build_expr: unexpected AST node:\n {:#?}",expr),

@@ -3,6 +3,7 @@
  */
 
 use core::panic;
+use std::any::Any;
 use std::cmp;
 use nom::bytes::is_a;
 
@@ -55,6 +56,7 @@ fn check_statement(statement: &SymStatement, return_type: &Type, in_loop: bool, 
         SymStatement::Return { expr, span } => check_return(expr, return_type, in_loop, scope, span, writer, context),
         SymStatement::Break{ span} => check_break(in_loop, span, writer, context),
         SymStatement::Continue{ span} => check_continue(in_loop, span, writer, context),
+        SymStatement::Error{span} => {},
         _ => panic!("unexpected SymStatement pattern"),
     }
 }
@@ -188,10 +190,14 @@ fn check_while(condition: &SymExpr, block: &Rc<SymBlock>, return_type: &Type, sc
     check_block(&block, return_type, true, writer, context);
 }
 
-fn check_for(var: &String, init: &SymExpr, condition: &SymExpr, update: &SymExpr, block: &Rc<SymBlock>, return_type: &Type, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_for(var: &String, init: &SymExpr, condition: &SymExpr, update: &SymStatement, block: &Rc<SymBlock>, return_type: &Type, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+    // check_statement(init, return_type, in_loop, scope, span, writer, context);
+    // use var and make sure it matches init
+    // build up and use check_assignment 
+    eprintln!("DEBUG2: {:?}", update);
     let init_type = infer_expr_type(init, scope, span, writer, context);
     let cond_type = infer_expr_type(condition, scope, span, writer, context);
-    let update_type = infer_expr_type(update, scope, span, writer, context);
+    
 
     // rule 5
     if init_type.is_some() && init_type == Some(Type::Void) {
@@ -203,14 +209,14 @@ fn check_for(var: &String, init: &SymExpr, condition: &SymExpr, update: &SymExpr
         .expect("Failed to write error message");
     }
 
-    if update_type.is_some() && update_type == Some(Type::Void) {
-        writeln!(
-            writer,
-            "{}",
-            format_error_message(&format!("{}", update_type.unwrap()), Some(&span), "method call in update expression cannot return type", context)
-        )
-        .expect("Failed to write error message");
-    }
+    // if update_type.is_some() && update_type == Some(Type::Void) {
+    //     writeln!(
+    //         writer,
+    //         "{}",
+    //         format_error_message(&format!("{}", update_type.unwrap()), Some(&span), "method call in update expression cannot return type", context)
+    //     )
+    //     .expect("Failed to write error message");
+    // }
 
     // rule 13
     if cond_type.is_some() && cond_type != Some(Type::Bool) {
@@ -222,32 +228,59 @@ fn check_for(var: &String, init: &SymExpr, condition: &SymExpr, update: &SymExpr
         .expect("Failed to write error message");
     }
 
+    // Check the init statement validity
+    if let Some(var_entry) = scope.lookup(var) {
+        let init_statement = SymStatement::Assignment { target: (SymExpr::Identifier { entry: (var_entry), span: (span.clone()) }), expr: (init.clone()), span: (span.clone()), op: (AssignOp::Assign) };
+        check_statement(&init_statement, return_type, false, scope, span, writer, context); // in_loop shouldnt matter here
+    } else {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(&format!("{}", var), Some(&span), "init statement contains undefined variable", context)
+        )
+        .expect("Failed to write error message");
+    }
+
+    // Check update statement for validity
+    check_statement(update, return_type, false, scope, span, writer, context);  // in_loop shouldnt matter in this case
+    
+
+    // 5) Check the loop body.
     check_block(block, return_type, true, writer, context);
 }
 
 // rules 7 and 8
-fn check_return(expr: &Option<SymExpr>, return_type: &Type, in_loop: bool, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_return(expr: &Option<SymExpr>, expected_return_type: &Type, in_loop: bool, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     if expr.is_some() {
-        if *return_type == Type::Void {
+        if *expected_return_type == Type::Void {
             writeln!(
                 writer,
                 "{}",
-                format_error_message(&format!("{}", return_type), Some(&span), "did not expect return expression, method returns", context)
+                format_error_message(&format!("{}", expected_return_type), Some(&span), "did not expect expression, method returns", context)
             )
             .expect("Failed to write error message");
         } else {
             let expr_type = infer_expr_type(expr.as_ref().unwrap(), scope, span, writer, context);
 
-            if expr_type.clone().unwrap() != *return_type {
+            if expr_type.clone().unwrap() != *expected_return_type {
                 writeln!(
                     writer,
                     "{}",
-                    format_error_message(&format!("{}", expr_type.unwrap()), Some(&span), &format!("expected return type `{}`, instead found", return_type), context)
+                    format_error_message(&format!("{}", expr_type.unwrap()), Some(&span), &format!("expected return type `{}`, instead found", expected_return_type), context)
                 )
                 .expect("Failed to write error message");
             }
         }
-    }    
+    } else {    // Function actually returns void
+        if *expected_return_type != Type::Void {
+            writeln!(
+                writer,
+                "{}",
+                format_error_message(&format!("{:?}", expr), Some(&span), "expected non-void return and got void", context)
+            )
+            .expect("Failed to write error message");
+        }
+    }
 }
 
 // rule 19
@@ -284,7 +317,7 @@ fn infer_expr_type(expr: &SymExpr, scope: &Scope, span: &Span, writer: &mut dyn 
         SymExpr::Len { id, span } => infer_len_type(id, scope, span, writer, context),
         SymExpr::Literal { value, span } => infer_literal_type(value, scope, span, writer, context),
         SymExpr::MethodCall { method_name, args, span } => infer_method_call_type(method_name, args, scope, span, writer, context),
-        SymExpr::UnaryExpr { op, expr, span } => infer_unary_expr_type(op, expr, scope, span, writer, context)
+        SymExpr::UnaryExpr { op, expr, span } => infer_unary_expr_type(op, expr, scope, span, writer, context),
     }
 }
 
@@ -631,6 +664,7 @@ fn infer_literal_type(value: &Literal, scope: &Scope, span: &Span, writer: &mut 
 fn infer_method_call_type(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Option<Type> {
     let entry = scope.lookup(method_name);
 
+    eprintln!("DEBUG:FINAL {:?}", entry);
     // rule 10
     match entry {
         Some(TableEntry::Import { .. }) => {

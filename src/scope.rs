@@ -79,6 +79,7 @@ impl Scope {
     
 
     pub fn insert(&mut self, name: String, datatype: TableEntry) -> Option<TableEntry> {
+        println!("Inserting {}, datatype {:?}", name, datatype);
         self.table.insert(name, datatype)
     }
 

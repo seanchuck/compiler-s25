@@ -101,7 +101,7 @@ pub enum SymStatement {
         var: String,
         init: SymExpr,
         condition: SymExpr,
-        update: SymExpr,
+        update: Box<SymStatement>,
         block: Rc<SymBlock>,
         span: Span,
     },
