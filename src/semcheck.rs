@@ -566,7 +566,7 @@ pub fn build_statement(
                 AST::Statement(Statement::Assignment { location, expr, .. }) => {
 
                     if let AST::Identifier { .. } = location.as_ref() {
-                        build_expr(expr, Rc::clone(&scope), writer, context)
+                        build_statement(&update, Rc::clone(&scope), writer, context)
                     } else {
                         panic!(
                             "For loop update must be an assignment to an identifier, got: {:#?}",
@@ -584,7 +584,7 @@ pub fn build_statement(
                 var: var.clone(),
                 init: build_expr(init, Rc::clone(&scope), writer, context),
                 condition: build_expr(condition, Rc::clone(&scope), writer, context),
-                update: update_expr,
+                update: Box::new(update_expr),
                 block: Rc::new(build_block(block, Rc::clone(&scope), writer, context)),
                 span: span.clone(),
             }

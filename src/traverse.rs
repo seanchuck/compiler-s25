@@ -3,6 +3,7 @@
  */
 
 use core::panic;
+use std::any::Any;
 use std::cmp;
 use nom::bytes::is_a;
 
@@ -188,10 +189,14 @@ fn check_while(condition: &SymExpr, block: &Rc<SymBlock>, return_type: &Type, sc
     check_block(&block, return_type, true, writer, context);
 }
 
-fn check_for(var: &String, init: &SymExpr, condition: &SymExpr, update: &SymExpr, block: &Rc<SymBlock>, return_type: &Type, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_for(var: &String, init: &SymExpr, condition: &SymExpr, update: &SymStatement, block: &Rc<SymBlock>, return_type: &Type, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+    // check_statement(init, return_type, in_loop, scope, span, writer, context);
+    // use var and make sure it matches init
+    // build up and use check_assignment 
+    eprintln!("DEBUG2: {:?}", update);
     let init_type = infer_expr_type(init, scope, span, writer, context);
     let cond_type = infer_expr_type(condition, scope, span, writer, context);
-    let update_type = infer_expr_type(update, scope, span, writer, context);
+    
 
     // rule 5
     if init_type.is_some() && init_type == Some(Type::Void) {
@@ -203,14 +208,14 @@ fn check_for(var: &String, init: &SymExpr, condition: &SymExpr, update: &SymExpr
         .expect("Failed to write error message");
     }
 
-    if update_type.is_some() && update_type == Some(Type::Void) {
-        writeln!(
-            writer,
-            "{}",
-            format_error_message(&format!("{}", update_type.unwrap()), Some(&span), "method call in update expression cannot return type", context)
-        )
-        .expect("Failed to write error message");
-    }
+    // if update_type.is_some() && update_type == Some(Type::Void) {
+    //     writeln!(
+    //         writer,
+    //         "{}",
+    //         format_error_message(&format!("{}", update_type.unwrap()), Some(&span), "method call in update expression cannot return type", context)
+    //     )
+    //     .expect("Failed to write error message");
+    // }
 
     // rule 13
     if cond_type.is_some() && cond_type != Some(Type::Bool) {
@@ -222,6 +227,24 @@ fn check_for(var: &String, init: &SymExpr, condition: &SymExpr, update: &SymExpr
         .expect("Failed to write error message");
     }
 
+    // Check the init statement validity
+    if let Some(var_entry) = scope.lookup(var) {
+        let init_statement = SymStatement::Assignment { target: (SymExpr::Identifier { entry: (var_entry), span: (span.clone()) }), expr: (init.clone()), span: (span.clone()), op: (AssignOp::Assign) };
+        check_statement(&init_statement, return_type, false, scope, span, writer, context); // in_loop shouldnt matter here
+    } else {
+        writeln!(
+            writer,
+            "{}",
+            format_error_message(&format!("{}", var), Some(&span), "init statement contains undefined variable", context)
+        )
+        .expect("Failed to write error message");
+    }
+
+    // Check update statement for validity
+    check_statement(update, return_type, false, scope, span, writer, context);  // in_loop shouldnt matter in this case
+    
+
+    // 5) Check the loop body.
     check_block(block, return_type, true, writer, context);
 }
 
