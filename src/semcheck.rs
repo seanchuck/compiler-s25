@@ -504,24 +504,27 @@ pub fn build_statement(
             args,
             span,}) => {
 
-            // if let Some(method_entry) = scope.borrow().lookup(method_name){
+            if let Some(method_entry) = scope.borrow().lookup(method_name) {
+                let scope_clone = Rc::clone(&scope); // ✅ Clone first to avoid borrowing conflicts
+            
                 SymStatement::MethodCall {
                     method_name: method_name.clone(),
                     args: args
                         .iter()
-                        .map(|arg| build_expr(arg, Rc::clone(&scope), writer, context))
+                        .map(|arg| build_expr(arg, scope_clone.clone(), writer, context)) // ✅ Use `scope_clone.clone()` here
                         .collect(),
                     span: span.clone(),
-                    }
-            // } else {
-            //     writeln!(
-            //         writer,
-            //         "{}",
-            //         format_error_message(method_name, Some(span), "method call to undefined method", context)
-            //     )
-            //     .expect("Failed to write output!");
-            //     SymStatement::Error { span: (*span) }
-            // }
+                }
+            } else {
+                writeln!(
+                    writer,
+                    "{}",
+                    format_error_message(method_name, Some(span), "method call to undefined method", context)
+                )
+                .expect("Failed to write output!");
+                SymStatement::Error { span: (*span) }
+            }
+                
         },
 
         AST::Statement(Statement::If {
@@ -700,14 +703,29 @@ pub fn build_expr(
             args,
             span,
         }) => {
-            SymExpr::MethodCall {
-            method_name: method_name.clone(),
-            args: args
-                .iter()
-                .map(|arg| Rc::new(build_expr(arg, Rc::clone(&scope), writer, context)))
-                .collect(),
-            span: span.clone(),
+
+            if let Some(method_entry) = scope.borrow().lookup(method_name) {
+                let scope_clone = Rc::clone(&scope); // ✅ Clone first to avoid borrowing conflicts
+            
+                SymExpr::MethodCall {
+                    method_name: method_name.clone(),
+                    args: args
+                        .iter()
+                        .map(|arg| Rc::new(build_expr(arg, Rc::clone(&scope), writer, context)))
+                        .collect(),
+                    span: span.clone(),
+                    }
+            } else {
+                writeln!(
+                    writer,
+                    "{}",
+                    format_error_message(method_name, Some(span), "method call to undefined method", context)
+                )
+                .expect("Failed to write output!");
+                SymExpr::Error { span: (*span) }
             }
+
+            
         },
 
         AST::Expr(Expr::ArrAccess { id, index, span }) => {            
@@ -752,15 +770,19 @@ pub fn build_expr(
         },
         
         AST::Identifier { ref id, ref span } => {
+            // Clone scope first to avoid overlapping borrows
+            let scope_clone: Rc<RefCell<Scope>> = Rc::clone(&scope);
+            
             // RULE 2: no identifier is used before being declared
-            check_used_before_decl(id, Rc::clone(&scope), span, writer, context);
-
-            let entry = scope.borrow_mut().lookup(id).unwrap();
+            check_used_before_decl(id, scope.clone(), span, writer, context); // ✅ Immutable borrow ends here
+        
+            let entry = scope_clone.borrow().lookup(id).unwrap(); // ✅ No conflict now
             SymExpr::Identifier {
                 entry: entry.clone(),
                 span: span.clone(),
             }
         },
+        
 
         _ => panic!(
             "Error in build_expr: unexpected AST node:\n {:#?}",expr),

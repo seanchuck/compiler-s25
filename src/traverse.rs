@@ -56,6 +56,7 @@ fn check_statement(statement: &SymStatement, return_type: &Type, in_loop: bool, 
         SymStatement::Return { expr, span } => check_return(expr, return_type, in_loop, scope, span, writer, context),
         SymStatement::Break{ span} => check_break(in_loop, span, writer, context),
         SymStatement::Continue{ span} => check_continue(in_loop, span, writer, context),
+        SymStatement::Error{span} => {},
         _ => panic!("unexpected SymStatement pattern"),
     }
 }
@@ -316,7 +317,7 @@ fn infer_expr_type(expr: &SymExpr, scope: &Scope, span: &Span, writer: &mut dyn 
         SymExpr::Len { id, span } => infer_len_type(id, scope, span, writer, context),
         SymExpr::Literal { value, span } => infer_literal_type(value, scope, span, writer, context),
         SymExpr::MethodCall { method_name, args, span } => infer_method_call_type(method_name, args, scope, span, writer, context),
-        SymExpr::UnaryExpr { op, expr, span } => infer_unary_expr_type(op, expr, scope, span, writer, context)
+        SymExpr::UnaryExpr { op, expr, span } => infer_unary_expr_type(op, expr, scope, span, writer, context),
     }
 }
 
