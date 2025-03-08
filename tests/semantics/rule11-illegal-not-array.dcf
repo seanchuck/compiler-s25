@@ -1,4 +1,6 @@
 void main() {
     int a;
-    a[2];   //Not allowed since a isnt an array
+    int b;
+    b = a[2];   //Not allowed since a isnt an array
+    a[4] = 5;
 }

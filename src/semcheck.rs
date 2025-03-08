@@ -479,6 +479,8 @@ pub fn build_statement(
                     index,
                     span: arr_span,
                 }) => {
+                    check_used_before_decl(id, scope.clone(), span, writer, context);
+
                     SymStatement::Assignment {
                         target: build_expr(location, Rc::clone(&scope), writer, context),
                         expr: build_expr(expr, Rc::clone(&scope), writer, context),
@@ -497,6 +499,7 @@ pub fn build_statement(
             method_name,
             args,
             span,}) => {
+            check_used_before_decl(&method_name, scope.clone(), span, writer, context);
 
             SymStatement::MethodCall {
             method_name: method_name.clone(),
@@ -684,6 +687,8 @@ pub fn build_expr(
             args,
             span,
         }) => {
+            check_used_before_decl(method_name, scope.clone(), span, writer, context);
+
             SymExpr::MethodCall {
             method_name: method_name.clone(),
             args: args
@@ -807,9 +812,17 @@ fn check_main_exists(methods: &Vec<Box<AST>>, writer: &mut dyn std::io::Write, c
 
     for method in methods {
         match **method {
-            AST::MethodDecl { ref return_type, ref name, ref params, .. } => {
-                if name == "main" && *return_type == Type::Void && params.is_empty() {
+            AST::MethodDecl { ref return_type, ref name, ref params, span, .. } => {
+                if name == "main" {
                     has_main = true;
+
+                    if *return_type != Type::Void {
+                        let error_msg = format_error_message("void", Some(&span), "`main` must return", context);
+                        writeln!(writer, "{}", error_msg).expect("Failed to write error message");
+                    } else if !params.is_empty() {
+                        let error_msg = format_error_message("main", Some(&span), "should not have any parameters: entry point", context);
+                        writeln!(writer, "{}", error_msg).expect("Failed to write error message");
+                    }
                     break;
                 }
             }

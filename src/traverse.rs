@@ -104,9 +104,9 @@ fn type_check_assignment(expr: &SymExpr, op: &AssignOp, typ: &Type, scope: &Scop
 
 fn check_assignment(target: &SymExpr, expr: &SymExpr, op: &AssignOp, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     match target {
-        SymExpr::Identifier { entry, span } => {
+        SymExpr::Identifier { entry, .. } => {
             match entry {
-                TableEntry::Variable { name, typ, is_array, span } => {
+                TableEntry::Variable { name, typ, is_array, .. } => {
                     // rule 23
                     if *is_array {
                         writeln!(
@@ -119,7 +119,7 @@ fn check_assignment(target: &SymExpr, expr: &SymExpr, op: &AssignOp, scope: &Sco
                         type_check_assignment(expr, op, typ, scope, span, writer, context);
                     }
                 }
-                TableEntry::Import { name, span } => {
+                TableEntry::Import { name, .. } => {
                     writeln!(
                         writer,
                         "{}",
@@ -127,7 +127,7 @@ fn check_assignment(target: &SymExpr, expr: &SymExpr, op: &AssignOp, scope: &Sco
                     )
                     .expect("Failed to write error message");
                 }
-                TableEntry::Method { name, return_type, params, span } => {
+                TableEntry::Method { name, return_type, params, .. } => {
                     writeln!(
                         writer,
                         "{}",
@@ -137,7 +137,7 @@ fn check_assignment(target: &SymExpr, expr: &SymExpr, op: &AssignOp, scope: &Sco
                 }
             }
         }
-        SymExpr::ArrAccess { id, index, span } => {
+        SymExpr::ArrAccess { id, index, .. } => {
             let target_type = infer_arr_access_type(id, index, scope, span, writer, context);
 
             if target_type.is_some() {
@@ -232,7 +232,7 @@ fn check_return(expr: &Option<SymExpr>, return_type: &Type, in_loop: bool, scope
             writeln!(
                 writer,
                 "{}",
-                format_error_message(&format!("{}", return_type), Some(&span), "did not expect expression, method returns", context)
+                format_error_message(&format!("{}", return_type), Some(&span), "did not expect return expression, method returns", context)
             )
             .expect("Failed to write error message");
         } else {
@@ -293,18 +293,18 @@ fn infer_arr_access_type(id: &String, index: &SymExpr, scope: &Scope, span: &Spa
 
     // rule 11
     match entry {
-        Some(TableEntry::Variable { name, typ, is_array, span }) => {
+        Some(TableEntry::Variable { name, typ, is_array, .. }) => {
             match is_array {
                 true => {
                     let index_type = infer_expr_type(index, scope, &span, writer, context);
 
                     match index_type {
                         Some(Type::Int) => Some(typ),
-                        Some(typ) => {
+                        Some(index_typ) => {
                             writeln!(
                                 writer,
                                 "{}",
-                                format_error_message(&format!("{}", typ), Some(&span), "invalid index type", context)
+                                format_error_message(&format!("{}", index_typ), Some(&span), "invalid index type", context)
                             )
                             .expect("Failed to write error message");
 
@@ -325,6 +325,7 @@ fn infer_arr_access_type(id: &String, index: &SymExpr, scope: &Scope, span: &Spa
                 }
             }
         }
+        None => None, // array doesn't exist
         _ => unreachable!()
     }
 }
@@ -650,7 +651,7 @@ fn infer_method_call_type(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: 
             Some(Type::Int)
         }
         
-        Some(TableEntry::Method { name, return_type, params, span }) => {
+        Some(TableEntry::Method { name, return_type, params, .. }) => {
             // rule 4
             if args.len() != params.len() {
                 writeln!(
@@ -677,6 +678,7 @@ fn infer_method_call_type(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: 
 
             Some(return_type)
         }
+        None => None, // method doesn't exist
         _ => {
             writeln!(
                 writer,
