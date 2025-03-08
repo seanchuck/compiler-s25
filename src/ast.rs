@@ -12,7 +12,6 @@ This may lead to BUGS(!) so be sure to check the validity.
 */
 
 use std::fmt;
-
 use crate::token::{Literal, Span};
 
 #[allow(dead_code)]
