@@ -544,11 +544,46 @@ pub fn build_statement(
             block,
             span,
         }) => {
+            let mut var_typ: Type = Type::Int;
+            if let Some(var_entry) = scope.borrow().lookup(var){
+                match var_entry {
+                    TableEntry::Variable { name: _, typ, is_array: _, span } => {
+                        match typ {
+                            Type::Int | Type::Long => {
+                                var_typ = typ;
+                            }
+                            _ => {
+                                writeln!(
+                                    writer,
+                                    "{}",
+                                    format_error_message(var, Some(&span), "For loop variable must be int or long", context)
+                                )
+                                .expect("Failed to write output!");
+                            }
+                        }
+                    }
+                    _ => {
+                        writeln!(
+                            writer,
+                            "{}",
+                            format_error_message(var, Some(span), "For loop variable must be a table entry variable", context)
+                        )
+                        .expect("Failed to write output!");
+                    }
+                }
+            } else {
+                writeln!(
+                    writer,
+                    "{}",
+                    format_error_message(var, Some(span), "For loop variable not defined in scope", context)    // TODO: Check if necessary to check here
+                )
+                .expect("Failed to write output!");
+            }
             if scope.borrow_mut().insert(
                 var.clone(),
                 TableEntry::Variable {
                     name: var.clone(),
-                    typ: Type::Int, // TODO: Determine type dynamically
+                    typ: var_typ, // TODO: Determine type dynamically
                     is_array: false,
                     span: span.clone(),
                 },
