@@ -66,7 +66,7 @@ pub struct SymBlock {
 
 /// IR representation for statements
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SymStatement {
     VarDecl {
         name: String,

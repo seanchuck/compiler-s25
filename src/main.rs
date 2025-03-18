@@ -6,11 +6,13 @@ mod ast;
 mod scope;
 mod symtable;
 mod token;
+mod cfg;
 
 mod parse;
 mod scan;
 mod semcheck;
 mod traverse;
+mod assemble;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
@@ -49,7 +51,7 @@ fn main() {
             semcheck::semcheck(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Assembly => {
-            todo!("assembly");
+            assemble::assemble(&input, &filename, &mut writer, args.debug);
         }
     }
 }

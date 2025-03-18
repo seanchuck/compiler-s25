@@ -993,7 +993,7 @@ fn check_and_insert_array_field(
 
 /// Semantically check the given file by parsing it and 
 /// turning the AST into a symbol table tree.
-pub fn semcheck(file: &str, filename: &str, writer: &mut dyn std::io::Write, verbose: bool) {
+pub fn semcheck(file: &str, filename: &str, writer: &mut dyn std::io::Write, verbose: bool) -> SymProgram {
     // Parse the input file
     let parse_tree: AST = parse(file, filename, writer, false).expect("Parsing failed");
 
@@ -1019,4 +1019,6 @@ pub fn semcheck(file: &str, filename: &str, writer: &mut dyn std::io::Write, ver
     if context.error_found {
         panic!("Semantic check failed.");
     }
+
+    sym_tree
 }
