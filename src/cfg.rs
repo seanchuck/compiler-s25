@@ -1,59 +1,82 @@
-use std::rc::Rc;
+/**
+Control flow graph (CFG) representation.
 
+Consists of basic blocks and directed edges 
+between those basic blocks.
+**/
+
+use std::collections::{BTreeMap, BTreeSet};
+use crate::linear_ir::*;
+
+#[derive(Debug, Clone,)]
+pub struct CFG {
+    // BTreeMap is hash map that allows constant iteration order
+    blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
+    edges: DirectedGraph, // Maps basic block ID to its children in the CFG
+}
 
 #[derive(Debug, Clone)]
-pub struct DestructedNode {
-    begin: Box<BasicBlock>,
-    end: Box<BasicBlock>
+pub struct DirectedGraph {
+    // Maps basic block to vector of children
+    children: BTreeMap<i32, BTreeSet<i32>>
 }
 
 
 #[derive(Debug, Clone)]
 pub struct BasicBlock {
-    instructions: Vec<TAC>,
-    true_next: Option<Box<BasicBlock>>,
-    false_next: Option<Box<BasicBlock>>
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum TAC {
-    Assignment,
-    Operation,
-    Conditional,
-    Nop,
+    // Basic block is just a vector of instructions
+    instructions: Vec<Instruction>,
 }
 
 
-impl DestructedNode {
-    pub fn new() -> Self {
-        let mut start = BasicBlock::new();
-        let end = BasicBlock::new();
-
-        start.true_next = Some(Box::new(end));
 
 
-        DestructedNode {
-            begin: Box::new(start),
-            end: Box::new(end.clone()),
-        }
-    }
-}
+// #[derive(Debug, Clone)]
+// pub struct DestructedNode {
+//     begin: Box<BasicBlock>,
+//     end: Box<BasicBlock>
+// }
 
 
-impl BasicBlock {
-    pub fn new() -> Self {
-        BasicBlock {
-            instructions: vec![],
-            true_next: None,
-            false_next: None,
-        }
-    }
+// #[derive(Debug, Clone, Copy)]
+// pub enum TAC {
+//     Assignment,
+//     Operation,
+//     Conditional,
+//     Nop,
+// }
 
-    pub fn get_condition(&self) -> Option<TAC> {
-        self.instructions.last().and_then(|tac| match tac {
-            TAC::Conditional => Some(TAC::Conditional),
-            _ => None,
-        })
-    }
+
+// impl DestructedNode {
+//     pub fn new() -> Self {
+//         let mut start = BasicBlock::new();
+//         let end = BasicBlock::new();
+
+//         start.true_next = Some(Box::new(end));
+
+
+//         DestructedNode {
+//             begin: Box::new(start),
+//             end: Box::new(end.clone()),
+//         }
+//     }
+// }
+
+
+// impl BasicBlock {
+//     pub fn new() -> Self {
+//         BasicBlock {
+//             instructions: vec![],
+//             true_next: None,
+//             false_next: None,
+//         }
+//     }
+
+//     pub fn get_condition(&self) -> Option<TAC> {
+//         self.instructions.last().and_then(|tac| match tac {
+//             TAC::Conditional => Some(TAC::Conditional),
+//             _ => None,
+//         })
+//     }
     
-}
+// }

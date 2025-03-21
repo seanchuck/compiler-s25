@@ -7,12 +7,14 @@ mod scope;
 mod symtable;
 mod token;
 mod cfg;
+mod linear_ir;
 
 mod parse;
 mod scan;
 mod semcheck;
 mod traverse;
-mod assemble;
+mod buildcfg;
+mod linearize;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
@@ -51,7 +53,8 @@ fn main() {
             semcheck::semcheck(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Assembly => {
-            assemble::assemble(&input, &filename, &mut writer, args.debug);
+            todo!();
+            // assemble::assemble(&input, &filename, &mut writer, args.debug);
         }
     }
 }

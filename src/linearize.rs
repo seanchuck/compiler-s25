@@ -1,16 +1,18 @@
+/*
+Linearize the Parse Tree to create a linear 
+IR that can be used for code generation.
+
+The linear IR is an ordered vector of instructions,
+which follow similarly to the three-address code format.
+*/
+
+use crate::symtable::{SymProgram, SymStatement};
+use crate::linear_ir::Instruction;
 use crate::semcheck::semcheck;
-use crate::ast::*;
-use crate::parse::parse;
-use crate::symtable::*;
-use crate::token::Symbol;
-use crate::cfg::*;
 
 
-
-
-
-fn destruct_statement(statement: SymStatement) -> DestructedNode {
-    DestructedNode::new()
+fn destruct_statement(statement: SymStatement) -> Vec<Instruction> {
+    let mut output: Vec<Instruction> = vec![];
 
     // unary expr
 
@@ -18,18 +20,21 @@ fn destruct_statement(statement: SymStatement) -> DestructedNode {
     //  if left and right both literal/identifier/location: return destructed node
     // otherwise: recurse on non-literal operands
 
+    output
+
 }
 
 
 
-fn destruct_program(program: SymProgram) -> DestructedNode {
+fn destruct_program(program: SymProgram) -> Vec<Instruction> {
     let main = program.methods.get("main").expect("Holy fuck bruh.");
-    let mut output: DestructedNode::new();
-
+    let mut output: Vec<Instruction> = vec![];
 
     // iterate over statements, and destruct
     // update CFG output
     for statement in main.body.statements.clone() {
+
+        // Create IR for all children nodes before creating IR for parent
         let destruct_output = destruct_statement((*statement).clone());
 
     }
@@ -38,7 +43,6 @@ fn destruct_program(program: SymProgram) -> DestructedNode {
 
 
 }
-
 
 
 pub fn assemble(

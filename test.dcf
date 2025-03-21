@@ -1,5 +1,22 @@
 void main(){
     int a;
-    // Obviously too big, and needs to be illegal
-    a = 2147483647;
+    a = 3;
+
+    if (a > 5) {
+        a = 1;
+    } else {
+        a = 9;
+    }
 }
+
+
+// Linear IR rep
+// int a = 3;
+// bool temp = (a > 5)
+// branch (temp, _label_1, _label_2)
+
+// _label_1
+// a = 1;
+
+// _label_2
+// a = 2;
