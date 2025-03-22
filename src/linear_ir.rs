@@ -7,13 +7,13 @@ instructions that are simplified, and TAC.
 */
 
 use crate::ast::Type;
+use crate::token::Literal;
 
 #[allow(dead_code)]
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Operand {
-    Var(String),
-    Const,
-    Temp(String),
+    Id(String),
+    Const(Literal),
 }
 
 #[allow(dead_code)]
@@ -80,6 +80,11 @@ pub enum Instruction {
     // CONDITIONALS
     // t <- X > Y
     Greater {
+        left: Box<Operand>,
+        right: Box<Operand>,
+        dest: Box<Operand>,
+    },
+    Less{
         left: Box<Operand>,
         right: Box<Operand>,
         dest: Box<Operand>,

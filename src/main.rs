@@ -53,8 +53,7 @@ fn main() {
             semcheck::semcheck(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Assembly => {
-            todo!();
-            // assemble::assemble(&input, &filename, &mut writer, args.debug);
+            linearize::assemble(&input, &filename, &mut writer, args.debug);
         }
     }
 }
