@@ -9,7 +9,7 @@ which follow similarly to the three-address code format.
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::scope::TableEntry;
-use crate::symtable::{SymMethod, SymProgram, SymStatement, SymExpr};
+use crate::symtable::{SymBlock, SymExpr, SymMethod, SymProgram, SymStatement};
 use crate::linear_ir::*;
 use crate::semcheck::semcheck;
 use crate::cfg::*;
@@ -167,7 +167,7 @@ fn expr_to_operand(expr: &SymExpr, block: &mut BasicBlock) -> Operand {
 }
 
 
-fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) {
+fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) -> (BasicBlock, Option<BasicBlock>) {
     let mut block: BasicBlock = BasicBlock::new();
 
     match &*statement {
@@ -211,7 +211,8 @@ fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) {
             };
 
             block.add_instruction(instr);
-        }
+            (block, None)
+        },
 
         SymStatement::MethodCall { method_name, args, .. } => {
             let arg_ops: Vec<Operand> = args.iter().map(|arg| expr_to_operand(arg, &mut block)).collect();
@@ -221,17 +222,50 @@ fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) {
                 args: arg_ops,
                 dest: None, // or Some(Box::new(...)) if used as value
             });
-        }
+
+            (block, None)
+        },
+
+        // SymStatement::If { condition, then_block, else_block, .. } => {
+        //     destruct_block(cfg, then_block);
+
+        //     if let Some(false_block) = else_block {
+        //         destruct_block(cfg, false_block);
+        //     }
+
+
+        // }
 
         _ => {
-            println!("Statement not handled in destruct_statement: {:?}", statement);
+            panic!("Failed to destruct statement!");
         }
     }
 
+
+
+
+
     // For now just use block ID 0 (you'll likely want to generate these dynamically) // TODO!!!
-    cfg.add_block(0, block);
+    // For now, these are single-statement blocks
+    // cfg.add_block(0, block);
     // TODO ADD EDGE FOr the block
 }
+
+
+// fn short_circuit(condition: &Rc<SymExpr>) -> CFG {
+//     let mut condition_cfg = CFG::new();
+
+//     condition_cfg
+
+// }
+
+
+// fn destruct_block(cfg: &mut CFG, block: &Rc<SymBlock>) {
+//     for statement in block.statements.clone() {
+//         destruct_statement(cfg, statement);
+//     }
+// }
+
 
 
 fn destruct_method(method: &Rc<SymMethod>) -> CFG {
