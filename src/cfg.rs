@@ -28,6 +28,46 @@ pub struct BasicBlock {
     instructions: Vec<Instruction>,
 }
 
+impl CFG {
+    pub fn new() -> CFG {
+        CFG {
+            blocks: BTreeMap::new(),
+            edges: DirectedGraph {
+                children: BTreeMap::new(),
+            },
+        }
+    }
+
+    /// Add a basic block with a given ID
+    pub fn add_block(&mut self, id: i32, block: BasicBlock) {
+        self.blocks.insert(id, block);
+        self.edges.children.entry(id).or_insert_with(BTreeSet::new);
+    }
+
+    /// Add a child block to a parent block
+    pub fn add_edge(&mut self, parent_id: i32, child_id: i32) {
+        self.edges.children
+            .entry(parent_id)
+            .or_insert_with(BTreeSet::new)
+            .insert(child_id);
+    }
+
+    /// Get children of a block
+    pub fn get_children(&self, block_id: i32) -> Option<&BTreeSet<i32>> {
+        self.edges.children.get(&block_id)
+    }
+}
+
+impl BasicBlock {
+    pub fn new() -> BasicBlock {
+        BasicBlock { instructions: Vec::new()}
+    }
+
+    pub fn add_instruction(&mut self, instruction: Instruction) {
+        self.instructions.push(instruction);
+    }
+}
+
 
 
 
