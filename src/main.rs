@@ -15,11 +15,12 @@ mod semcheck;
 mod traverse;
 mod buildcfg;
 mod linearize;
+mod codegen;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
         Some(path) => Box::new(std::fs::File::create(path.as_path()).unwrap()),
-        None => Box::new(std::io::stdout()),
+        None => Box::new(std::io::stdout()), // Writes to stdout by default
     }
 }
 
@@ -28,6 +29,7 @@ fn main() {
     let input = std::fs::read_to_string(&args.input).expect("Filename is incorrect.");
 
     // Use writeln!(writer, "template string") to write to stdout ot file.
+    // Automatically ties the writer to output file, if specified
     let mut writer = get_writer(&args.output);
     let filename = args.input.to_string_lossy().to_string();
 
@@ -53,7 +55,7 @@ fn main() {
             semcheck::semcheck(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Assembly => {
-            linearize::assemble(&input, &filename, &mut writer, args.debug);
+            codegen::generate_assembly(&input, &filename, &mut writer, args.debug);
         }
     }
 }
