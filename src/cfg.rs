@@ -8,7 +8,7 @@ between those basic blocks.
 use std::collections::{BTreeMap, BTreeSet};
 use crate::linear_ir::*;
 
-#[derive(Debug, Clone,)]
+#[derive(Debug, Clone)]
 pub struct CFG {
     // BTreeMap is hash map that allows constant iteration order
     blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
@@ -26,6 +26,7 @@ pub struct DirectedGraph {
 pub struct BasicBlock {
     // Basic block is just a vector of instructions
     instructions: Vec<Instruction>,
+    id: i32
 }
 
 impl CFG {
@@ -39,9 +40,9 @@ impl CFG {
     }
 
     /// Add a basic block with a given ID
-    pub fn add_block(&mut self, id: i32, block: BasicBlock) {
-        self.blocks.insert(id, block);
-        self.edges.children.entry(id).or_insert_with(BTreeSet::new);
+    pub fn add_block(&mut self, block: &BasicBlock) {
+        self.blocks.insert(block.get_id(), block.clone());
+        self.edges.children.entry(block.get_id()).or_insert_with(BTreeSet::new);
     }
 
     /// Add a child block to a parent block
@@ -56,15 +57,20 @@ impl CFG {
     pub fn get_children(&self, block_id: i32) -> Option<&BTreeSet<i32>> {
         self.edges.children.get(&block_id)
     }
+
 }
 
 impl BasicBlock {
-    pub fn new() -> BasicBlock {
-        BasicBlock { instructions: Vec::new()}
+    pub fn new(id: i32) -> BasicBlock {
+        BasicBlock { instructions: Vec::new(), id}
     }
 
     pub fn add_instruction(&mut self, instruction: Instruction) {
         self.instructions.push(instruction);
+    }
+
+    pub fn get_id(&self) -> i32 {
+        self.id
     }
 }
 
