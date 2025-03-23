@@ -6,6 +6,7 @@ Who adds a basic block to the CFG?
     - In general, parent destructor recursively calls another method
     and receives (begin, end). Parent should add those to the CFG,
     and everything else should be added recursively by callee.
+    - Or: just follow every BasicBlock::New with a cfg.add_block()
 
 **/
 
@@ -56,7 +57,7 @@ fn expr_to_operand(expr: &SymExpr, block: &mut BasicBlock) -> Operand {
 
         SymExpr::Literal { value, .. } => Operand::Const(value.clone()),
 
-        SymExpr::ArrAccess { id, index, span } => {
+        SymExpr::ArrAccess { id, index, .. } => {
             // Load the array into a temp and then return the temp's operand
             let temp_arr_val = Operand::Id(fresh_temp());
 
@@ -162,29 +163,12 @@ fn expr_to_operand(expr: &SymExpr, block: &mut BasicBlock) -> Operand {
                     right: Box::new(right_operand),
                     dest: Box::new(result.clone()),
                 },
-
-                // TODO: short-circuit conditionals
-                // And & Or are special because can diverge control flow
-                BinaryOp::And => {
-                    // // Assumes these are recursively linked properly
-                    // let mut left_block = expr_to_operand(left, block);
-                    // let mut right_block = expr_to_operand(right, block);
-
-                    // let mut right_block = BasicBlock::new(next_bblock_id());
-
-                    // left_block.add_instruction(left_operand);
-
-                    // match left {
-                    //     SymExpr::Literal { value, span } => todo!(),
-                    //     SymExpr::Identifier { entry, span } => todo!(),
-                    //     SymExpr::MethodCall { method_name, args, span } => todo!(),
-                    //     SymExpr::BinaryExpr { op, left, right, span } => todo!(),
-                    //     SymExpr::UnaryExpr { op, expr, span } => todo!(),
-                    //     _=>{}
-                    // }
-
-                    panic!("lol");
-                }
+                // Short-circuiting handled elsewhere
+                BinaryOp::And => Instruction::And {
+                    left: Box::new(left_operand),
+                    right: Box::new(right_operand),
+                    dest: Box::new(result.clone()),
+                },
                 BinaryOp::Or => Instruction::Or {
                     left: Box::new(left_operand),
                     right: Box::new(right_operand),
@@ -208,12 +192,12 @@ fn expr_to_operand(expr: &SymExpr, block: &mut BasicBlock) -> Operand {
 /// only if the statement spans multiple basic blocks.
 fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) -> (BasicBlock, BasicBlock) {
     // For now, destruct_statement will have responsibility to add any blocks to the CFG
-    let mut bblock: BasicBlock = BasicBlock::new(next_bblock_id());
 
     match &*statement {
         SymStatement::Assignment {
             target, expr, op, ..
         } => {
+            let mut bblock: BasicBlock = BasicBlock::new(next_bblock_id());
             let dest = expr_to_operand(target, &mut bblock);
 
             // Expr could be two things, a literal/identifier, in which its just returned as the operand.
@@ -261,6 +245,7 @@ fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) -> (BasicBlock
         SymStatement::MethodCall {
             method_name, args, ..
         } => {
+            let mut bblock: BasicBlock = BasicBlock::new(next_bblock_id());
             let arg_ops: Vec<Operand> = args
                 .iter()
                 .map(|arg| expr_to_operand(arg, &mut bblock))
@@ -284,55 +269,23 @@ fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) -> (BasicBlock
             ..
         } => {
             // TODO: hope is that recursion will add all intermediate blocks, is this true?
-            // let (cond_begin, cond_end) = short_circuit(condition);
             let (true_begin, true_end) = destruct_block(cfg, then_block);
-
             let (false_begin, false_end) = match else_block {
                 Some(unwrapped_else) => destruct_block(cfg, unwrapped_else),
                 None => {
                     // If there is no else, it is essentially a nop
                     let mut nop_bblock = BasicBlock::new(next_bblock_id());
                     nop_bblock.add_instruction(Instruction::Nop);
+                    cfg.add_block(&nop_bblock);
+
                     (nop_bblock.clone(), nop_bblock)
-                    // cfg.add_block(&nop_bblock);
                 }
             };
 
-            short_circuit(cfg, condition, true_begin, false_begin);
+            return short_circuit(cfg, condition, &true_begin, &true_end, &false_begin, &false_end);
 
-            // TODO: converge with nop block
-
-            // cfg.add_block(&cond_begin);
-            // cfg.add_block(&cond_end);
-            // cfg.add_block(&then_begin);
-            // cfg.add_block(&then_end);
-
-            // cfg.add_edge(cond_end.get_id(), then_begin.get_id());
-
-            panic!();
-
-            // if else_block.is_some() {
-            //     let (else_begin, else_end) = destruct_block(cfg, &else_block.clone().unwrap());
-            //     cfg.add_edge(cond_end.get_id(), else_begin.get_id());
-
-            //     // Converge the true and false bblocks with a nop
-            //     let mut nop_bblock = BasicBlock::new(next_bblock_id());
-            //     nop_bblock.add_instruction(Instruction::Nop);
-            //     cfg.add_block(&nop_bblock);
-
-            //     cfg.add_edge(then_end.get_id(), nop_bblock.get_id());
-            //     cfg.add_edge(else_end.get_id(), nop_bblock.get_id());
-
-            //     (cond_begin, nop_bblock)
-            // } else {
-            //     cfg.add_edge(cond_end.get_id(), then_end.get_id());
-            //     (cond_begin, then_end)
-            // }
-        }
-
-        _ => {
-            panic!("Failed to destruct statement: Unexpected statement type");
-        }
+        },
+        _ => { panic!("Failed to destruct statement: Unexpected statement type"); }
     }
 }
 
@@ -341,30 +294,46 @@ fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) -> (BasicBlock
 fn short_circuit(
     cfg: &mut CFG,
     condition: &SymExpr,
-    true_block: BasicBlock,
-    false_block: BasicBlock,
+    true_begin: &BasicBlock,
+    true_end: &BasicBlock,
+    false_begin: &BasicBlock,
+    false_end: &BasicBlock,
 ) -> (BasicBlock, BasicBlock) {
-    // let bblock = BasicBlock::new(next_bblock_id());
-
     match condition {
         // No short-circuiting necessary
         SymExpr::Identifier { entry, .. } => match &*entry {
             TableEntry::Variable { name, .. } => {
                 let mut bblock = BasicBlock::new(next_bblock_id());
+                cfg.add_block(&bblock);
                 let instr = Instruction::CJmp {
                     condition: (Box::new(Operand::Id(name.clone()))),
                     label: ("placeholder").to_string(),
                 };
                 bblock.add_instruction(instr);
 
-                return (bblock.clone(), bblock);
+                // Diverge
+                cfg.add_edge(bblock.get_id(), true_begin.get_id());
+                cfg.add_edge(bblock.get_id(), false_begin.get_id());
+
+                // Converge
+                let mut nop_bblock = BasicBlock::new(next_bblock_id());
+                nop_bblock.add_instruction(Instruction::Nop);
+                cfg.add_block(&nop_bblock);
+
+                cfg.add_edge(true_end.get_id(), nop_bblock.get_id());
+                cfg.add_edge(false_end.get_id(), nop_bblock.get_id());
+
+                return (bblock, nop_bblock);
             }
             _ => { panic!("Short-circuiting undefined for Method or Import"); }
         },
+
         SymExpr::Literal { .. }
         | SymExpr::MethodCall { .. } 
         | SymExpr::ArrAccess { .. } => {
             let mut bblock = BasicBlock::new(next_bblock_id());
+            cfg.add_block(&bblock);
+
             let operand = expr_to_operand(condition, &mut bblock);
 
             let instr = Instruction::CJmp {
@@ -373,15 +342,27 @@ fn short_circuit(
             };
             bblock.add_instruction(instr);
 
-            return (bblock.clone(), bblock);
+            // Diverge
+            cfg.add_edge(bblock.get_id(), true_begin.get_id());
+            cfg.add_edge(bblock.get_id(), false_begin.get_id());
+
+            // Converge 
+            let mut nop_bblock = BasicBlock::new(next_bblock_id());
+            nop_bblock.add_instruction(Instruction::Nop);
+            cfg.add_block(&nop_bblock);
+
+            cfg.add_edge(true_end.get_id(), nop_bblock.get_id());
+            cfg.add_edge(false_end.get_id(), nop_bblock.get_id());
+
+            return (bblock, nop_bblock);
         },
 
-        // Short-circuiting required for all below
+        // Short-circuiting required
         SymExpr::UnaryExpr { op, expr, .. } => {
             match op {
                 UnaryOp::Not => {
                     // Introduce "Not" by flipping true and false blocks
-                    return short_circuit(cfg, expr, false_block, true_block);
+                    return short_circuit(cfg, expr, false_begin, false_end, true_begin, true_end);
                 }
                 _=> { panic!("Short-circuiting undefined for neg!"); }
             }
@@ -395,14 +376,16 @@ fn short_circuit(
                 BinaryOp::And => {
                     // If left succeeds, enter right; demonic
                     (right_begin, right_end) =
-                        short_circuit(cfg, &right, true_block, false_block.clone());
-                    (left_begin, left_end) = short_circuit(cfg, &left, right_begin, false_block);
+                        short_circuit(cfg, &right, true_begin, true_end, false_begin, false_end);
+                    (left_begin, left_end) = 
+                        short_circuit(cfg, &left, &right_begin, &right_end, false_begin, false_end);
                 }
                 BinaryOp::Or => {
                     // If left fails, enter right; angelic
                     (right_begin, right_end) =
-                        short_circuit(cfg, &right, true_block.clone(), false_block);
-                    (left_begin, left_end) = short_circuit(cfg, &left, true_block, right_begin);
+                        short_circuit(cfg, &right, true_begin, true_end, false_begin, false_end);
+                    (left_begin, left_end) = 
+                        short_circuit(cfg, &left, true_begin, true_end, &right_begin, &right_end);
                 }
                 _ => { panic!("Short-circuiting only allowed on BinaryOp::AND or BinaryOp::OR") }
             }
@@ -450,6 +433,7 @@ fn destruct_block(cfg: &mut CFG, block: &Rc<SymBlock>) -> (BasicBlock, BasicBloc
         // so we return nop block
         let bblock_id = next_bblock_id();
         let mut nop_bblock = BasicBlock::new(bblock_id);
+        cfg.add_block(&nop_bblock);
 
         nop_bblock.add_instruction(Instruction::Nop);
         (nop_bblock.clone(), nop_bblock)
@@ -462,6 +446,7 @@ fn destruct_method(method: &Rc<SymMethod>) -> CFG {
 
     for statement in method.body.statements.clone() {
         destruct_statement(&mut method_cfg, statement);
+        // TODO: link the blocks together
     }
 
     method_cfg
