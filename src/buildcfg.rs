@@ -18,7 +18,7 @@ use crate::linear_ir::*;
 use crate::scope::TableEntry;
 use crate::semcheck::semcheck;
 use crate::symtable::{SymBlock, SymExpr, SymMethod, SymProgram, SymStatement};
-
+use crate::token::Literal;
 
 // Initialize a counter for naming temps and indexing basic blocks
 thread_local! {
@@ -180,9 +180,24 @@ fn expr_to_operand(expr: &SymExpr, block: &mut BasicBlock) -> Operand {
             result
         }
 
-        // SymExpr::UnaryExpr { op, expr, span } => {
+        SymExpr::UnaryExpr { op, expr, .. } => {
+            let result = Operand::Id(fresh_temp());
+            let right_operand = expr_to_operand(expr, block);
 
-        // }
+            let instruction: Instruction = match op {
+                UnaryOp::Neg => Instruction::Subtract { 
+                    left: Box::new(Operand::Const(Literal::Int("0".to_string()))), 
+                    right: Box::new(right_operand), 
+                    dest: Box::new(result.clone()) 
+                },
+                UnaryOp::Not => todo!(),
+            };
+
+            block.add_instruction(instruction);
+            result
+        }
+
+        // SynExpr::Cast
         _ => Operand::Id(fresh_temp()),
     }
 }
