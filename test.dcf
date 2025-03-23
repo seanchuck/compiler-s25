@@ -1,12 +1,16 @@
 void main(){
     int a;
+    bool t, f;
     a = 3;
+    t = true;
+    f = false;
 
-    if (a > 5) {
+    if (t || f) {
         a = 1;
     } else {
         a = 9;
     }
+    a = 15;
 }
 
 // Linear IR rep

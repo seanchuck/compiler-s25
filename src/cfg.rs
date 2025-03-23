@@ -41,7 +41,7 @@ impl CFG {
 
     /// Add a basic block with a given ID
     pub fn add_block(&mut self, block: &BasicBlock) {
-        self.blocks.insert(block.get_id(), block.clone());
+        self.blocks.insert(block.get_id(), block.clone()); // TODO: clone causes weird interactions
         self.edges.children.entry(block.get_id()).or_insert_with(BTreeSet::new);
     }
 

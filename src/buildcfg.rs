@@ -8,10 +8,12 @@ Who adds a basic block to the CFG?
     and everything else should be added recursively by callee.
     - Or: just follow every BasicBlock::New with a cfg.add_block()
 
+Weird thing:
+    - need to add instruction to block before adding it to the 
+    cfg
+
 **/
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
-use core::panic;
 use crate::ast::*;
 use crate::cfg::*;
 use crate::linear_ir::*;
@@ -19,6 +21,9 @@ use crate::scope::TableEntry;
 use crate::semcheck::semcheck;
 use crate::symtable::{SymBlock, SymExpr, SymMethod, SymProgram, SymStatement};
 use crate::token::Literal;
+use core::panic;
+use std::iter::Cycle;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 // Initialize a counter for naming temps and indexing basic blocks
 thread_local! {
@@ -185,10 +190,10 @@ fn expr_to_operand(expr: &SymExpr, block: &mut BasicBlock) -> Operand {
             let right_operand = expr_to_operand(expr, block);
 
             let instruction: Instruction = match op {
-                UnaryOp::Neg => Instruction::Subtract { 
-                    left: Box::new(Operand::Const(Literal::Int("0".to_string()))), 
-                    right: Box::new(right_operand), 
-                    dest: Box::new(result.clone()) 
+                UnaryOp::Neg => Instruction::Subtract {
+                    left: Box::new(Operand::Const(Literal::Int("0".to_string()))),
+                    right: Box::new(right_operand),
+                    dest: Box::new(result.clone()),
                 },
                 UnaryOp::Not => todo!(),
             };
@@ -209,6 +214,13 @@ fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) -> (BasicBlock
     // For now, destruct_statement will have responsibility to add any blocks to the CFG
 
     match &*statement {
+        SymStatement::VarDecl { .. } => {
+            let mut nop_bblock: BasicBlock = BasicBlock::new(next_bblock_id());
+            nop_bblock.add_instruction(Instruction::Nop);
+            cfg.add_block(&nop_bblock); // must add_block *after* adding instruction
+
+            (nop_bblock.clone(), nop_bblock)
+        }
         SymStatement::Assignment {
             target, expr, op, ..
         } => {
@@ -256,7 +268,6 @@ fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) -> (BasicBlock
             (bblock.clone(), bblock) // TODO: verify this is ok. Since we add and index bblocks
                                      // from CFG using bblock id, I think it should be fine.
         }
-
         SymStatement::MethodCall {
             method_name, args, ..
         } => {
@@ -275,8 +286,6 @@ fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) -> (BasicBlock
             cfg.add_block(&bblock);
             (bblock.clone(), bblock)
         }
-
-        // Must handle short-circuiting conditionals
         SymStatement::If {
             condition,
             then_block,
@@ -296,16 +305,41 @@ fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) -> (BasicBlock
                     (nop_bblock.clone(), nop_bblock)
                 }
             };
+            
 
-            return short_circuit(cfg, condition, &true_begin, &true_end, &false_begin, &false_end);
+            return short_circuit(
+                cfg,
+                condition,
+                &true_begin,
+                &true_end,
+                &false_begin,
+                &false_end,
+            );
 
-        },
-        _ => { panic!("Failed to destruct statement: Unexpected statement type"); }
+        }
+        _ => {
+            panic!("unexpected statement: {:#?}", statement)
+        } // SymStatement::While {
+          //     condition,
+          //     block,
+          //     span,
+          // } => todo!(),
+          // SymStatement::For {
+          //     var,
+          //     init,
+          //     condition,
+          //     update,
+          //     block,
+          //     span,
+          // } => todo!(),
+          // SymStatement::Return { expr, span } => todo!(),
+          // SymStatement::Break { span } => todo!(),
+          // SymStatement::Continue { span } => todo!(),
+          // SymStatement::Error { span } => todo!(),
     }
 }
 
-
-// TODO: add blocks to CFG where necessary. 
+// TODO: add blocks to CFG where necessary.
 fn short_circuit(
     cfg: &mut CFG,
     condition: &SymExpr,
@@ -319,12 +353,12 @@ fn short_circuit(
         SymExpr::Identifier { entry, .. } => match &*entry {
             TableEntry::Variable { name, .. } => {
                 let mut bblock = BasicBlock::new(next_bblock_id());
-                cfg.add_block(&bblock);
                 let instr = Instruction::CJmp {
                     condition: (Box::new(Operand::Id(name.clone()))),
                     label: ("placeholder").to_string(),
                 };
                 bblock.add_instruction(instr);
+                cfg.add_block(&bblock);
 
                 // Diverge
                 cfg.add_edge(bblock.get_id(), true_begin.get_id());
@@ -340,14 +374,13 @@ fn short_circuit(
 
                 return (bblock, nop_bblock);
             }
-            _ => { panic!("Short-circuiting undefined for Method or Import"); }
+            _ => {
+                panic!("Short-circuiting undefined for Method or Import");
+            }
         },
 
-        SymExpr::Literal { .. }
-        | SymExpr::MethodCall { .. } 
-        | SymExpr::ArrAccess { .. } => {
+        SymExpr::Literal { .. } | SymExpr::MethodCall { .. } | SymExpr::ArrAccess { .. } => {
             let mut bblock = BasicBlock::new(next_bblock_id());
-            cfg.add_block(&bblock);
 
             let operand = expr_to_operand(condition, &mut bblock);
 
@@ -356,12 +389,13 @@ fn short_circuit(
                 label: ("placeholder".to_string()),
             };
             bblock.add_instruction(instr);
+            cfg.add_block(&bblock);
 
             // Diverge
             cfg.add_edge(bblock.get_id(), true_begin.get_id());
             cfg.add_edge(bblock.get_id(), false_begin.get_id());
 
-            // Converge 
+            // Converge
             let mut nop_bblock = BasicBlock::new(next_bblock_id());
             nop_bblock.add_instruction(Instruction::Nop);
             cfg.add_block(&nop_bblock);
@@ -370,7 +404,7 @@ fn short_circuit(
             cfg.add_edge(false_end.get_id(), nop_bblock.get_id());
 
             return (bblock, nop_bblock);
-        },
+        }
 
         // Short-circuiting required
         SymExpr::UnaryExpr { op, expr, .. } => {
@@ -379,33 +413,71 @@ fn short_circuit(
                     // Introduce "Not" by flipping true and false blocks
                     return short_circuit(cfg, expr, false_begin, false_end, true_begin, true_end);
                 }
-                _=> { panic!("Short-circuiting undefined for neg!"); }
+                _ => {
+                    panic!("Short-circuiting undefined for neg!");
+                }
             }
-        },
+        }
         SymExpr::BinaryExpr {
-            op, left, right, .. } => {
+            op, left, right, ..
+        } => {
             let (left_begin, left_end): (BasicBlock, BasicBlock);
             let (right_begin, right_end): (BasicBlock, BasicBlock);
 
             match op {
+                // No short-circuiting
+                BinaryOp::Less
+                | BinaryOp::Greater
+                | BinaryOp::LessEqual
+                | BinaryOp::GreaterEqual
+                | BinaryOp::Equal
+                | BinaryOp::NotEqual => {
+                    let mut bblock = BasicBlock::new(next_bblock_id());
+                    let operand = expr_to_operand(condition, &mut bblock);
+                    
+                    let instr = Instruction::CJmp {
+                        condition: Box::new(operand),
+                        label: ("placeholder".to_string()),
+                    };
+                    bblock.add_instruction(instr);
+                    cfg.add_block(&bblock);
+
+                    // Diverge
+                    cfg.add_edge(bblock.get_id(), true_begin.get_id());
+                    cfg.add_edge(bblock.get_id(), false_begin.get_id());
+
+                    // Converge
+                    let mut nop_bblock = BasicBlock::new(next_bblock_id());
+                    nop_bblock.add_instruction(Instruction::Nop);
+                    cfg.add_block(&nop_bblock);
+
+                    cfg.add_edge(true_end.get_id(), nop_bblock.get_id());
+                    cfg.add_edge(false_end.get_id(), nop_bblock.get_id());
+
+                    return (bblock, nop_bblock);
+                }
+
+                // Short-circuiting!
                 BinaryOp::And => {
                     // If left succeeds, enter right; demonic
                     (right_begin, right_end) =
                         short_circuit(cfg, &right, true_begin, true_end, false_begin, false_end);
-                    (left_begin, left_end) = 
+                    (left_begin, left_end) =
                         short_circuit(cfg, &left, &right_begin, &right_end, false_begin, false_end);
                 }
                 BinaryOp::Or => {
                     // If left fails, enter right; angelic
                     (right_begin, right_end) =
                         short_circuit(cfg, &right, true_begin, true_end, false_begin, false_end);
-                    (left_begin, left_end) = 
+                    (left_begin, left_end) =
                         short_circuit(cfg, &left, true_begin, true_end, &right_begin, &right_end);
                 }
-                _ => { panic!("Short-circuiting only allowed on BinaryOp::AND or BinaryOp::OR") }
+                _ => {
+                    panic!("Short-circuit received non-boolean operation: {:#?}", op);
+                }
             }
 
-            // Converge short-circuiting with a nop block
+            // Converge short-circuiting with a nop block for And, Or
             let mut nop_bblock = BasicBlock::new(next_bblock_id());
             nop_bblock.add_instruction(Instruction::Nop);
             cfg.add_block(&nop_bblock);
@@ -414,11 +486,15 @@ fn short_circuit(
             cfg.add_edge(right_end.get_id(), nop_bblock.get_id());
 
             return (left_begin, nop_bblock);
-        },
-        _ => { panic!("Short-circuiting not defined for expression {:?}", condition); }
+        }
+        _ => {
+            panic!(
+                "Short-circuiting not defined for expression {:?}",
+                condition
+            );
+        }
     }
 }
-
 
 fn destruct_block(cfg: &mut CFG, block: &Rc<SymBlock>) -> (BasicBlock, BasicBlock) {
     let mut begin_bblock: Option<BasicBlock> = None;
@@ -448,9 +524,10 @@ fn destruct_block(cfg: &mut CFG, block: &Rc<SymBlock>) -> (BasicBlock, BasicBloc
         // so we return nop block
         let bblock_id = next_bblock_id();
         let mut nop_bblock = BasicBlock::new(bblock_id);
-        cfg.add_block(&nop_bblock);
 
         nop_bblock.add_instruction(Instruction::Nop);
+        cfg.add_block(&nop_bblock);
+
         (nop_bblock.clone(), nop_bblock)
     }
 }
@@ -493,5 +570,7 @@ pub fn build_cfg(
 
     // Generate a CFG for each method
     let method_cfgs: HashMap<String, CFG> = destruct_program(sym_tree);
+
+    println!("{:#?}", method_cfgs);
     method_cfgs
 }
