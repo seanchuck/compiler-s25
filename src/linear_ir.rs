@@ -58,7 +58,7 @@ pub enum Instruction {
     },
 
     // UNARY OPERATIONS
-    // t <- X + Y
+    // t <- !X
     Neg {
         expr: Box<Operand>,
         dest: Box<Operand>,
@@ -118,11 +118,12 @@ pub enum Instruction {
         dest: Option<Box<Operand>>,
     },
     UJmp { // unconditonal jump
-        label: String,
+        id: i32, // ID of basic block to jump to
     },
-    CJmp { // conditional jump
+    Branch { // conditional jump
         condition: Box<Operand>,
-        label: String,
+        true_target: i32, // ID of basic block to jump to if condition is true
+        false_target: i32 // ID of basic block to jump to if condition is false
     },
     Ret {
         value: Option<Box<Operand>>,
@@ -137,9 +138,6 @@ pub enum Instruction {
     Assign {
         src: Box<Operand>,
         dest: Box<Operand>,
-    },
-    Label {
-        name: String,
     },
     Nop,
 }
