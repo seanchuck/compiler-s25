@@ -36,6 +36,11 @@ impl CFG {
     pub fn add_block(&mut self, block: &BasicBlock) {
         self.blocks.insert(block.get_id(), block.clone());
     }
+
+    /// Get basic blocks
+    pub fn get_blocks(self) -> BTreeMap<i32, BasicBlock> {
+        self.blocks.clone()
+    }
 }
 
 impl BasicBlock {
@@ -49,5 +54,9 @@ impl BasicBlock {
 
     pub fn get_id(&self) -> i32 {
         self.id
+    }
+
+    pub fn get_instructions(self) -> Vec<Instruction> {
+        self.instructions
     }
 }

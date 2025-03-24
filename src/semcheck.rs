@@ -1010,9 +1010,9 @@ pub fn semcheck(file: &str, filename: &str, writer: &mut dyn std::io::Write, ver
     traverse_ir(&sym_tree, writer, &mut context);
 
     if verbose {
-        println!("Successfully built symbol table!");
-        println!("=================SYMBOL TABLE====================");
-        print_symtree(&sym_tree);
+        // println!("Successfully built symbol table!");
+        // println!("=================SYMBOL TABLE====================");
+        // print_symtree(&sym_tree);
     }
 
     // Panic if any semantic errors were found

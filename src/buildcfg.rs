@@ -11,13 +11,12 @@ Who adds a basic block to the CFG?
 **/
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
-use core::panic;
 use crate::ast::*;
 use crate::cfg::*;
 use crate::linear_ir::*;
 use crate::scope::TableEntry;
 use crate::semcheck::semcheck;
-use crate::symtable::{SymBlock, SymExpr, SymMethod, SymProgram, SymStatement};
+use crate::symtable::{SymExpr, SymMethod, SymProgram, SymStatement};
 use crate::token::Literal;
 
 // Initialize a counter for naming temps and indexing basic blocks
@@ -37,16 +36,17 @@ fn fresh_temp() -> String {
     })
 }
 
-// Returns a new id for the next basic block
+/// Returns a new id for the next basic block
 fn next_bblock_id() -> i32 {
     BBLOCK_COUNTER.with(|counter| {
         let mut count = counter.borrow_mut();
+        let val = *count;
         *count += 1;
-        *count as i32
+        val as i32
     })
 }
 
-// Reset temp variable counter and basic block counters to 0
+/// Reset temp variable counter and basic block counters to 0
 fn reset_counters() {
     TEMP_COUNTER.with(|counter| {
         let mut count = counter.borrow_mut();
@@ -122,6 +122,10 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block: &mut BasicBlock) 
                     let mut next_true_block = BasicBlock::new(next_bblock_id());
                     let mut next_false_block = BasicBlock::new(next_bblock_id());
                     let next_block = BasicBlock::new(next_bblock_id());
+
+                    cfg.add_block(&next_true_block);
+                    cfg.add_block(&next_false_block);
+                    cfg.add_block(&next_block);
 
                     // if condition is true, set dest = 1 and jump to next_block
                     next_true_block.add_instruction(Instruction::Assign { 
@@ -283,12 +287,14 @@ fn build_cond(cfg: &mut CFG, expr: &SymExpr, mut cur_block: &mut BasicBlock, nex
             match op {
                 BinaryOp::And => {
                     let mut left_true_block = BasicBlock::new(next_bblock_id());
+                    cfg.add_block(&left_true_block);
                     build_cond(cfg, left, cur_block, &left_true_block, next_false_block);
                     // RHS is only evaluated if LHS is true
                     build_cond(cfg, right, &mut left_true_block, next_true_block, next_false_block);
                 }
                 BinaryOp::Or => {
                     let mut left_false_block = BasicBlock::new(next_bblock_id());
+                    cfg.add_block(&left_false_block);
                     build_cond(cfg, left, cur_block, next_true_block, &left_false_block);
                     // RHS is only evaluated if LHS is false
                     build_cond(cfg, right, &mut left_false_block, next_true_block, next_false_block);
@@ -418,11 +424,14 @@ fn destruct_statement(cfg: &mut CFG, mut cur_block: &mut BasicBlock, statement: 
             ..
         } => {
             let mut body_block = BasicBlock::new(next_bblock_id()); // the block that starts the body
+            cfg.add_block(&body_block);
             let next_block: BasicBlock; // the block after the whole if
             
             if else_block.is_some() {
                 let mut else_body_block = BasicBlock::new(next_bblock_id());
                 next_block = BasicBlock::new(next_bblock_id());
+                cfg.add_block(&else_body_block);
+                cfg.add_block(&next_block);
                 build_cond(cfg, condition, cur_block, &body_block, &else_body_block);
 
                 for statement in then_block.statements.clone() {
@@ -438,6 +447,7 @@ fn destruct_statement(cfg: &mut CFG, mut cur_block: &mut BasicBlock, statement: 
                 body_block.add_instruction(Instruction::UJmp { id: next_block.get_id() });
             } else {
                 next_block = BasicBlock::new(next_bblock_id());
+                cfg.add_block(&next_block);
                 build_cond(cfg, condition, cur_block, &body_block, &next_block);
 
                 for statement in then_block.statements.clone() {
@@ -454,6 +464,9 @@ fn destruct_statement(cfg: &mut CFG, mut cur_block: &mut BasicBlock, statement: 
             let mut header_block = BasicBlock::new(header_id); // the block that evaluates the loop condition
             let mut body_block = BasicBlock::new(next_bblock_id()); // the block that starts the body
             let next_block = BasicBlock::new(next_bblock_id()); // the block after the whole loop
+            cfg.add_block(&header_block);
+            cfg.add_block(&body_block);
+            cfg.add_block(&next_block);
 
             cur_block.add_instruction(Instruction::UJmp { id: header_block.get_id() });
 
@@ -475,6 +488,9 @@ fn destruct_statement(cfg: &mut CFG, mut cur_block: &mut BasicBlock, statement: 
             let mut header_block = BasicBlock::new(header_id); // the block that evaluates the loop condition
             let mut body_block = BasicBlock::new(next_bblock_id()); // the block that starts the body
             let next_block = BasicBlock::new(next_bblock_id()); // the block after the whole loop
+            cfg.add_block(&header_block);
+            cfg.add_block(&body_block);
+            cfg.add_block(&next_block);
 
             // evaluate the for_init
             let lhs = Operand::Id(var.clone());

@@ -2,7 +2,7 @@
 Token data structures for scanner.
 */
 
-use std::ops::Deref;
+use std::{fmt, ops::Deref};
 
 /// Span keep track of line information
 /// to throw more specific errors.
@@ -114,6 +114,20 @@ pub enum Literal {
     HexInt(String),
     HexLong(String),
     Bool(bool),
+}
+
+impl fmt::Display for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Literal::Char(c) => write!(f, "'{}'", c),
+            Literal::String(s) => write!(f, "\"{}\"", s),
+            Literal::Int(x) => write!(f, "{}", x),
+            Literal::Long(x) => write!(f, "{}L", x),
+            Literal::HexInt(x) => write!(f, "0x{}", x),
+            Literal::HexLong(x) => write!(f, "0x{}L", x),
+            Literal::Bool(b) => write!(f, "{}", b)
+        }
+    }
 }
 
 /// A public wrapper around a slice of `Token`s to enable custom trait implementations.

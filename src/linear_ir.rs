@@ -6,6 +6,8 @@ Similar to the AST.rs file, but includes
 instructions that are simplified, and TAC.
 */
 
+use std::fmt;
+
 use crate::ast::Type;
 use crate::token::Literal;
 
@@ -14,6 +16,15 @@ use crate::token::Literal;
 pub enum Operand {
     Id(String),
     Const(Literal),
+}
+
+impl fmt::Display for Operand {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Operand::Const(lit) => write!(f, "{}", lit),
+            Operand::Id(name) => write!(f, "{}", name)
+        }
+    }
 }
 
 #[allow(dead_code)]
