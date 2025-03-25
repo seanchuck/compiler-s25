@@ -69,19 +69,15 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
         SymExpr::Literal { value, .. } => (cur_block_id, Operand::Const(value.clone())),
 
         SymExpr::ArrAccess { id, index, .. } => {
-            // Load the array element into a temp and then return the temp's operand
-            let temp_arr_val = Operand::Id(fresh_temp());
+            // load array element into a temp
+            let array_element = Operand::Id(fresh_temp());
 
             // array index can be an expression
             let (next_block_id, index_operand) = destruct_expr(cfg, index, cur_block_id);
 
-            cfg.add_instruction_to_block(next_block_id, Instruction::ArrAccess {
-                array: Box::new(Operand::Id(id.clone())),
-                index: Box::new(index_operand),
-                dest: Box::new(temp_arr_val.clone()),
-            });
+            cfg.add_instruction_to_block(next_block_id, Instruction::Load { src: ArrayElement{ id: id.to_string(), index: index_operand }, dest: array_element.clone() });
 
-            (next_block_id, temp_arr_val)
+            (next_block_id, array_element)
         }
 
         SymExpr::MethodCall {
@@ -91,7 +87,7 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
             let mut arg_ops: Vec<Operand> = Vec::new();
             for arg in args {
                 let arg_op;
-                (cur_block_id, arg_op) = destruct_expr(cfg, expr, cur_block_id);
+                (cur_block_id, arg_op) = destruct_expr(cfg, arg, cur_block_id);
                 arg_ops.push(arg_op);
             }
 
@@ -100,7 +96,7 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
             cfg.add_instruction_to_block(cur_block_id, Instruction::MethodCall {
                 name: method_name.clone(),
                 args: arg_ops,
-                dest: Some(Box::new(temp_method_result.clone())),
+                dest: Some(temp_method_result.clone()),
             });
 
             (cur_block_id, temp_method_result)
@@ -113,8 +109,8 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
                 // short-circuiting (from recitation 6)
                 BinaryOp::And | BinaryOp::Or => {
                     let dest = Operand::Id(fresh_temp());
-                    let mut next_true_block = BasicBlock::new(next_bblock_id());
-                    let mut next_false_block = BasicBlock::new(next_bblock_id());
+                    let next_true_block = BasicBlock::new(next_bblock_id());
+                    let next_false_block = BasicBlock::new(next_bblock_id());
                     let next_block = BasicBlock::new(next_bblock_id());
 
                     cfg.add_block(&next_true_block);
@@ -123,15 +119,15 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
 
                     // if condition is true, set dest = 1 and jump to next_block
                     cfg.add_instruction_to_block(next_true_block.get_id(), Instruction::Assign { 
-                        src: Box::new(Operand::Const(Literal::Int("1".to_string()))),
-                        dest: Box::new(dest.clone()) 
+                        src: Operand::Const(Literal::Int("1".to_string())),
+                        dest: dest.clone() 
                     });
                     cfg.add_instruction_to_block(next_true_block.get_id(), Instruction::UJmp { id: next_block.get_id() });
 
                     // if condition is false, set dest = 0 and jump to next_block
                     cfg.add_instruction_to_block(next_false_block.get_id(), Instruction::Assign { 
-                        src: Box::new(Operand::Const(Literal::Int("0".to_string()))),
-                        dest: Box::new(dest.clone()) 
+                        src: Operand::Const(Literal::Int("0".to_string())),
+                        dest: dest.clone() 
                     });
                     cfg.add_instruction_to_block(next_false_block.get_id(), Instruction::UJmp { id: next_block.get_id() });
 
@@ -155,59 +151,59 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
 
                     let instruction: Instruction = match op {
                         BinaryOp::Add => Instruction::Add {
-                            left: Box::new(left_operand),
-                            right: Box::new(right_operand),
-                            dest: Box::new(result.clone()),
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
                         },
                         BinaryOp::Subtract => Instruction::Subtract {
-                            left: Box::new(left_operand),
-                            right: Box::new(right_operand),
-                            dest: Box::new(result.clone()),
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
                         },
                         BinaryOp::Multiply => Instruction::Multiply {
-                            left: Box::new(left_operand),
-                            right: Box::new(right_operand),
-                            dest: Box::new(result.clone()),
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
                         },
                         BinaryOp::Divide => Instruction::Divide {
-                            left: Box::new(left_operand),
-                            right: Box::new(right_operand),
-                            dest: Box::new(result.clone()),
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
                         },
                         BinaryOp::Modulo => Instruction::Modulo {
-                            left: Box::new(left_operand),
-                            right: Box::new(right_operand),
-                            dest: Box::new(result.clone()),
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
                         },
                         BinaryOp::Less => Instruction::Less {
-                            left: Box::new(left_operand),
-                            right: Box::new(right_operand),
-                            dest: Box::new(result.clone()),
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
                         },
                         BinaryOp::Greater => Instruction::Greater {
-                            left: Box::new(left_operand),
-                            right: Box::new(right_operand),
-                            dest: Box::new(result.clone()),
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
                         },
                         BinaryOp::LessEqual => Instruction::LessEqual {
-                            left: Box::new(left_operand),
-                            right: Box::new(right_operand),
-                            dest: Box::new(result.clone()),
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
                         },
                         BinaryOp::GreaterEqual => Instruction::GreaterEqual {
-                            left: Box::new(left_operand),
-                            right: Box::new(right_operand),
-                            dest: Box::new(result.clone()),
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
                         },
                         BinaryOp::Equal => Instruction::Equal {
-                            left: Box::new(left_operand),
-                            right: Box::new(right_operand),
-                            dest: Box::new(result.clone()),
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
                         },
                         BinaryOp::NotEqual => Instruction::NotEqual {
-                            left: Box::new(left_operand),
-                            right: Box::new(right_operand),
-                            dest: Box::new(result.clone()),
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
                         },
                         _ => unreachable!()
                     };
@@ -226,13 +222,13 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
 
             let instruction: Instruction = match op {
                 UnaryOp::Neg => Instruction::Subtract { 
-                    left: Box::new(Operand::Const(Literal::Int("0".to_string()))), 
-                    right: Box::new(operand), 
-                    dest: Box::new(result.clone())
+                    left: Operand::Const(Literal::Int("0".to_string())), 
+                    right: operand, 
+                    dest: result.clone()
                 },
                 UnaryOp::Not => Instruction::Not {
-                    expr: Box::new(operand),
-                    dest: Box::new(result.clone())
+                    expr: operand,
+                    dest: result.clone()
                 },
             };
 
@@ -247,8 +243,8 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
             (cur_block_id, operand) = destruct_expr(cfg, expr, cur_block_id);
 
             let instruction = Instruction::Cast { 
-                expr: Box::new(operand), 
-                dest: Box::new(result.clone()), 
+                expr: operand, 
+                dest: result.clone(), 
                 target_type: target_type.clone()
             };
 
@@ -257,14 +253,13 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
             (cur_block_id, result)
         }
 
-        SymExpr::Len { id, span } => {
+        SymExpr::Len { id, .. } => {
             let result = Operand::Id(fresh_temp());
-            let operand: Operand;
-            (cur_block_id, operand) = destruct_expr(cfg, expr, cur_block_id);
+            let operand: Operand = Operand::Id(id.to_string());
 
             let instruction = Instruction::Len { 
-                expr: Box::new(operand), 
-                dest: Box::new(result.clone()), 
+                expr: operand, 
+                dest: result.clone(), 
             };
 
             cfg.add_instruction_to_block(cur_block_id, instruction);
@@ -282,17 +277,17 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
 /// next_false_block is the block to jump to if the condition is false
 fn build_cond(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, next_true_block_id: i32, next_false_block_id: i32) {
     match expr {
-        SymExpr::BinaryExpr { op, left, right, span } => {
+        SymExpr::BinaryExpr { op, left, right, .. } => {
             match op {
                 BinaryOp::And => {
-                    let mut left_true_block = BasicBlock::new(next_bblock_id());
+                    let left_true_block = BasicBlock::new(next_bblock_id());
                     cfg.add_block(&left_true_block);
                     build_cond(cfg, left, cur_block_id, left_true_block.get_id(), next_false_block_id);
                     // RHS is only evaluated if LHS is true
                     build_cond(cfg, right, left_true_block.get_id(), next_true_block_id, next_false_block_id);
                 }
                 BinaryOp::Or => {
-                    let mut left_false_block = BasicBlock::new(next_bblock_id());
+                    let left_false_block = BasicBlock::new(next_bblock_id());
                     cfg.add_block(&left_false_block);
                     build_cond(cfg, left, cur_block_id, next_true_block_id, left_false_block.get_id());
                     // RHS is only evaluated if LHS is false
@@ -303,14 +298,14 @@ fn build_cond(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, next_true_bl
                     (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id);
 
                     cfg.add_instruction_to_block(cur_block_id, Instruction::Branch { 
-                        condition: Box::new(dest), 
+                        condition: dest, 
                         true_target: next_true_block_id, 
                         false_target: next_false_block_id
                     });
                 }
             }
         }
-        SymExpr::UnaryExpr { op, expr, span } => {
+        SymExpr::UnaryExpr { op, expr, .. } => {
             match op {
                 UnaryOp::Not => {
                     // just swap the true and false blocks
@@ -321,7 +316,7 @@ fn build_cond(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, next_true_bl
                     (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id);
 
                     cfg.add_instruction_to_block(cur_block_id, Instruction::Branch { 
-                        condition: Box::new(dest), 
+                        condition: dest, 
                         true_target: next_true_block_id, 
                         false_target: next_false_block_id
                     });
@@ -332,7 +327,7 @@ fn build_cond(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, next_true_bl
             let dest: Operand;
             (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id);
             cfg.add_instruction_to_block(cur_block_id, Instruction::Branch { 
-                condition: Box::new(dest), 
+                condition: dest, 
                 true_target: next_true_block_id, 
                 false_target: next_false_block_id
             });
@@ -355,43 +350,122 @@ fn destruct_statement(cfg: &mut CFG, mut cur_block_id: i32, statement: &SymState
         SymStatement::Assignment {
             target, expr, op, ..
         } => {
-            let (_, dest) = destruct_expr(cfg, target, cur_block_id); // should just be an identifer
             let rhs: Operand;
             (cur_block_id, rhs) = destruct_expr(cfg, expr, cur_block_id);
 
-            let instr = match op {
-                AssignOp::Assign => Instruction::Assign {
-                    src: Box::new(rhs),
-                    dest: Box::new(dest.clone()),
-                },
-                AssignOp::PlusAssign => Instruction::Add {
-                    left: Box::new(dest.clone()),
-                    right: Box::new(rhs),
-                    dest: Box::new(dest.clone()),
-                },
-                AssignOp::MinusAssign => Instruction::Subtract {
-                    left: Box::new(dest.clone()),
-                    right: Box::new(rhs),
-                    dest: Box::new(dest.clone()),
-                },
-                AssignOp::MultiplyAssign => Instruction::Multiply {
-                    left: Box::new(dest.clone()),
-                    right: Box::new(rhs),
-                    dest: Box::new(dest.clone()),
-                },
-                AssignOp::DivideAssign => Instruction::Divide {
-                    left: Box::new(dest.clone()),
-                    right: Box::new(rhs),
-                    dest: Box::new(dest.clone()),
-                },
-                AssignOp::ModuloAssign => Instruction::Modulo {
-                    left: Box::new(dest.clone()),
-                    right: Box::new(rhs),
-                    dest: Box::new(dest.clone()),
-                },
-            };
+            // dest can either be an identifier or array element
+            match target {
+                SymExpr::ArrAccess { id, index, .. } => {
+                    let index_op: Operand;
+                    (cur_block_id, index_op) = destruct_expr(cfg, index, cur_block_id);
 
-            cfg.add_instruction_to_block(cur_block_id, instr);
+                    let array_element = ArrayElement { id: id.to_string(), index: index_op };
+
+                    match op {
+                        AssignOp::Assign => {
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Store { src: rhs, dest: array_element });
+                        }
+                        AssignOp::PlusAssign => {
+                            // load array element into a new temp
+                            let array_element_temp = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Load { src: array_element.clone(), dest: array_element_temp.clone() });
+
+                            // add array element to rhs
+                            let new_rhs = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Add { left: array_element_temp, right: rhs, dest: new_rhs.clone() });
+
+                            // store back into array element
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Store { src: new_rhs, dest: array_element });
+                        }
+                        AssignOp::MinusAssign => {
+                            // load array element into a new temp
+                            let array_element_temp = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Load { src: array_element.clone(), dest: array_element_temp.clone() });
+
+                            // subtract rhs from array element
+                            let new_rhs = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Subtract { left: array_element_temp, right: rhs, dest: new_rhs.clone() });
+
+                            // store back into array element
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Store { src: new_rhs, dest: array_element });
+                        }
+                        AssignOp::MultiplyAssign => {
+                            // load array element into a new temp
+                            let array_element_temp = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Load { src: array_element.clone(), dest: array_element_temp.clone() });
+
+                            // multiply array element by rhs
+                            let new_rhs = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Multiply { left: array_element_temp, right: rhs, dest: new_rhs.clone() });
+
+                            // store back into array element
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Store { src: new_rhs, dest: array_element });
+                        }
+                        AssignOp::DivideAssign => {
+                            // load array element into a new temp
+                            let array_element_temp = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Load { src: array_element.clone(), dest: array_element_temp.clone() });
+
+                            // divide array element by rhs
+                            let new_rhs = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Divide { left: array_element_temp, right: rhs, dest: new_rhs.clone() });
+
+                            // store back into array element
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Store { src: new_rhs, dest: array_element });
+                        }
+                        AssignOp::ModuloAssign => {
+                            // load array element into a new temp
+                            let array_element_temp = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Load { src: array_element.clone(), dest: array_element_temp.clone() });
+
+                            // modulo array element by rhs
+                            let new_rhs = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Modulo { left: array_element_temp, right: rhs, dest: new_rhs.clone() });
+
+                            // store back into array element
+                            cfg.add_instruction_to_block(cur_block_id, Instruction::Store { src: new_rhs, dest: array_element });
+                        }
+                    }
+                }
+                SymExpr::Identifier { .. } => {
+                    let (_, dest) = destruct_expr(cfg, target, cur_block_id);
+
+                    let instr = match op {
+                        AssignOp::Assign => Instruction::Assign {
+                            src: rhs,
+                            dest: dest.clone(),
+                        },
+                        AssignOp::PlusAssign => Instruction::Add {
+                            left: dest.clone(),
+                            right: rhs,
+                            dest: dest.clone(),
+                        },
+                        AssignOp::MinusAssign => Instruction::Subtract {
+                            left: dest.clone(),
+                            right: rhs,
+                            dest: dest.clone(),
+                        },
+                        AssignOp::MultiplyAssign => Instruction::Multiply {
+                            left: dest.clone(),
+                            right: rhs,
+                            dest: dest.clone(),
+                        },
+                        AssignOp::DivideAssign => Instruction::Divide {
+                            left: dest.clone(),
+                            right: rhs,
+                            dest: dest.clone(),
+                        },
+                        AssignOp::ModuloAssign => Instruction::Modulo {
+                            left: dest.clone(),
+                            right: rhs,
+                            dest: dest.clone(),
+                        },
+                    };
+        
+                    cfg.add_instruction_to_block(cur_block_id, instr);
+                }
+                _ => unreachable!()
+            }
 
             cur_block_id
         }
@@ -422,13 +496,13 @@ fn destruct_statement(cfg: &mut CFG, mut cur_block_id: i32, statement: &SymState
             else_block,
             ..
         } => {
-            let mut body_block = &BasicBlock::new(next_bblock_id()); // the block that starts the body
+            let body_block = &BasicBlock::new(next_bblock_id()); // the block that starts the body
             let mut body_block_id = body_block.get_id();
             cfg.add_block(&body_block);
             let next_block: BasicBlock; // the block after the whole if
             
             if else_block.is_some() {
-                let mut else_body_block = &BasicBlock::new(next_bblock_id());
+                let else_body_block = &BasicBlock::new(next_bblock_id());
                 let mut else_body_block_id = else_body_block.get_id();
                 cfg.add_block(&else_body_block);
 
@@ -464,11 +538,11 @@ fn destruct_statement(cfg: &mut CFG, mut cur_block_id: i32, statement: &SymState
             cfg.add_block(&next_block);
             next_block.get_id()
         },
-        SymStatement::While { condition, block, span } => {
+        SymStatement::While { condition, block, .. } => {
             let header_id = next_bblock_id();
-            let mut header_block = BasicBlock::new(header_id); // the block that evaluates the loop condition
+            let header_block = BasicBlock::new(header_id); // the block that evaluates the loop condition
             let mut body_id = next_bblock_id();
-            let mut body_block = &BasicBlock::new(body_id); // the block that starts the body
+            let body_block = &BasicBlock::new(body_id); // the block that starts the body
             let next_block = BasicBlock::new(next_bblock_id()); // the block after the whole loop
             cfg.add_block(&header_block);
             cfg.add_block(&body_block);
@@ -491,9 +565,9 @@ fn destruct_statement(cfg: &mut CFG, mut cur_block_id: i32, statement: &SymState
         }
         SymStatement::For { var, init, condition, update, block, .. } => {
             let header_id = next_bblock_id();
-            let mut header_block = BasicBlock::new(header_id); // the block that evaluates the loop condition
+            let header_block = BasicBlock::new(header_id); // the block that evaluates the loop condition
             let mut body_id = next_bblock_id();
-            let mut body_block = &BasicBlock::new(body_id); // the block that starts the body
+            let body_block = &BasicBlock::new(body_id); // the block that starts the body
             let next_block = BasicBlock::new(next_bblock_id()); // the block after the whole loop
             cfg.add_block(&header_block);
             cfg.add_block(&body_block);
@@ -504,8 +578,8 @@ fn destruct_statement(cfg: &mut CFG, mut cur_block_id: i32, statement: &SymState
             let rhs: Operand;
             (cur_block_id, rhs) = destruct_expr(cfg, init, cur_block_id);
             cfg.add_instruction_to_block(cur_block_id, Instruction::Assign {
-                src: Box::new(rhs),
-                dest: Box::new(lhs),
+                src: rhs,
+                dest: lhs,
             });
             cfg.add_instruction_to_block(cur_block_id, Instruction::UJmp { id: header_block.get_id() });
 
@@ -541,7 +615,7 @@ fn destruct_statement(cfg: &mut CFG, mut cur_block_id: i32, statement: &SymState
             if expr.is_some() {
                 let operand: Operand;
                 (cur_block_id, operand) = destruct_expr(cfg, &expr.clone().unwrap(), cur_block_id);
-                cfg.add_instruction_to_block(cur_block_id, Instruction::Ret { value: Some(Box::new(operand)) });
+                cfg.add_instruction_to_block(cur_block_id, Instruction::Ret { value: Some(operand) });
             } else {
                 cfg.add_instruction_to_block(cur_block_id, Instruction::Ret { value: None });
             }

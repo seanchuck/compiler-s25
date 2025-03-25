@@ -7,7 +7,7 @@ Generate x86 code from the Control flow graph.
 use crate::{buildcfg::build_cfg, cfg::CFG, linear_ir::Instruction};
 
 fn print_cfg(method_cfgs: HashMap<String, CFG>) {
-    println!("==================== CFG =======================");
+    println!("\n==================== CFG =======================");
 
     for (method_name, cfg) in method_cfgs {
         println!("\n{method_name}:");
@@ -19,7 +19,7 @@ fn print_cfg(method_cfgs: HashMap<String, CFG>) {
                 match insn {
                     Instruction::Add { left, right, dest } => { println!("        {dest} <- {left} + {right}"); }
                     // Instruction::And { left, right, dest } => { println!("        {dest} <- {left} && {right}"); }
-                    Instruction::ArrAccess { array, index, dest } => { println!("        {dest} <- {array}[{index}]"); }
+                    // Instruction::ArrAccess { array, index, dest } => { println!("        {dest} <- {array}[{index}]"); }
                     Instruction::Assign { src, dest } => { println!("        {dest} <- {src}"); }
                     Instruction::Branch { condition, true_target, false_target } => { println!("        branch {condition}, {true_target}, {false_target}"); }
                     Instruction::Cast { expr, dest, target_type } => { println!("        {dest} <- {target_type}({expr})"); }
@@ -55,6 +55,8 @@ fn print_cfg(method_cfgs: HashMap<String, CFG>) {
                     }
                     Instruction::Subtract { left, right, dest } => { println!("        {dest} <- {left} - {right}"); }
                     Instruction::UJmp { id } => { println!("        jmp {id}"); }
+                    Instruction::Load { src, dest } => { println!("        {dest} <- load {src}"); }
+                    Instruction::Store { src, dest } => { println!("        store {dest} <- {src}"); }
                 }
             }
         }

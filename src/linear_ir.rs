@@ -21,8 +21,20 @@ impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Operand::Const(lit) => write!(f, "{}", lit),
-            Operand::Id(name) => write!(f, "{}", name)
+            Operand::Id(name) => write!(f, "{}", name),
         }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct ArrayElement {
+    pub id: String,
+    pub index: Operand
+}
+
+impl fmt::Display for ArrayElement {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}[{}]", self.id, self.index)
     }
 }
 
@@ -31,29 +43,29 @@ pub enum Instruction {
     // BINARY OPERATIONS
     // t <- X + Y
     Add {
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
+        left: Operand,
+        right: Operand,
+        dest: Operand,
     },
     Subtract {
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
+        left: Operand,
+        right: Operand,
+        dest: Operand,
     },
     Multiply {
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
+        left: Operand,
+        right: Operand,
+        dest: Operand,
     },
     Divide {
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
+        left: Operand,
+        right: Operand,
+        dest: Operand,
     },
     Modulo {
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
+        left: Operand,
+        right: Operand,
+        dest: Operand,
     },
     // And and Or not needed because of short-circuiting
     // And {
@@ -75,50 +87,50 @@ pub enum Instruction {
     //     dest: Box<Operand>,
     // },
     Not {
-        expr: Box<Operand>,
-        dest: Box<Operand>,
+        expr: Operand,
+        dest: Operand,
     },
     Cast {
-        expr: Box<Operand>,
-        dest: Box<Operand>,
+        expr: Operand,
+        dest: Operand,
         target_type: Type,
     },
     Len {
-        expr: Box<Operand>,
-        dest: Box<Operand>,
+        expr: Operand,
+        dest: Operand,
     },
 
     // CONDITIONALS
     // t <- X > Y
     Greater {
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
+        left: Operand,
+        right: Operand,
+        dest: Operand,
     },
     Less{
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
+        left: Operand,
+        right: Operand,
+        dest: Operand,
     },
     LessEqual {
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
+        left: Operand,
+        right: Operand,
+        dest: Operand,
     },
     GreaterEqual {
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
+        left: Operand,
+        right: Operand,
+        dest: Operand,
     },
     Equal {
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
+        left: Operand,
+        right: Operand,
+        dest: Operand,
     },
     NotEqual {
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
+        left: Operand,
+        right: Operand,
+        dest: Operand,
     },
 
     // CONTROL FLOW 
@@ -126,31 +138,41 @@ pub enum Instruction {
         name: String,
         args: Vec<Operand>, // Does not completely follow TAC as 
                             // method call can have many arguments
-        dest: Option<Box<Operand>>,
+        dest: Option<Operand>,
     },
     UJmp { // unconditonal jump
         id: i32, // ID of basic block to jump to
     },
     Branch { // conditional jump
-        condition: Box<Operand>,
+        condition: Operand,
         true_target: i32, // ID of basic block to jump to if condition is true
         false_target: i32 // ID of basic block to jump to if condition is false
     },
     Ret {
-        value: Option<Box<Operand>>,
+        value: Option<Operand>,
     },
 
     // SPECIAL
-    ArrAccess {
-        array: Box<Operand>,
-        index: Box<Operand>,
-        dest: Box<Operand>,
-    },
+    // ArrAccess {
+    //     array: Box<Operand>,
+    //     index: Box<Operand>,
+    //     dest: Box<Operand>,
+    // },
     Assign {
-        src: Box<Operand>,
-        dest: Box<Operand>,
+        src: Operand,
+        dest: Operand,
     },
     // Nop,
+
+    // MEMORY
+    Load {
+        src: ArrayElement,
+        dest: Operand
+    },
+    Store {
+        src: Operand,
+        dest: ArrayElement
+    }
 }
 
 
