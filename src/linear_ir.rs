@@ -11,7 +11,6 @@ use std::fmt;
 use crate::ast::Type;
 use crate::token::Literal;
 
-#[allow(dead_code)]
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Operand {
     Id(String),
@@ -27,7 +26,6 @@ impl fmt::Display for Operand {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Instruction {
     // BINARY OPERATIONS
@@ -57,23 +55,25 @@ pub enum Instruction {
         right: Box<Operand>,
         dest: Box<Operand>,
     },
-    And { // Make sure to short-circuit!
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
-    },
-    Or { // Make sure to short-circuit!
-        left: Box<Operand>,
-        right: Box<Operand>,
-        dest: Box<Operand>,
-    },
+    // And and Or not needed because of short-circuiting
+    // And {
+    //     left: Box<Operand>,
+    //     right: Box<Operand>,
+    //     dest: Box<Operand>,
+    // },
+    // Or {
+    //     left: Box<Operand>,
+    //     right: Box<Operand>,
+    //     dest: Box<Operand>,
+    // },
 
     // UNARY OPERATIONS
     // t <- !X
-    Neg {
-        expr: Box<Operand>,
-        dest: Box<Operand>,
-    },
+    // Neg not needed; replaced by subtraction from 0
+    // Neg {
+    //     expr: Box<Operand>,
+    //     dest: Box<Operand>,
+    // },
     Not {
         expr: Box<Operand>,
         dest: Box<Operand>,
@@ -150,7 +150,7 @@ pub enum Instruction {
         src: Box<Operand>,
         dest: Box<Operand>,
     },
-    Nop,
+    // Nop,
 }
 
 

@@ -7,6 +7,8 @@ Generate x86 code from the Control flow graph.
 use crate::{buildcfg::build_cfg, cfg::CFG, linear_ir::Instruction};
 
 fn print_cfg(method_cfgs: HashMap<String, CFG>) {
+    println!("==================== CFG =======================");
+
     for (method_name, cfg) in method_cfgs {
         println!("\n{method_name}:");
 
@@ -16,7 +18,7 @@ fn print_cfg(method_cfgs: HashMap<String, CFG>) {
             for insn in block.get_instructions() {
                 match insn {
                     Instruction::Add { left, right, dest } => { println!("        {dest} <- {left} + {right}"); }
-                    Instruction::And { left, right, dest } => { println!("        {dest} <- {left} && {right}"); }
+                    // Instruction::And { left, right, dest } => { println!("        {dest} <- {left} && {right}"); }
                     Instruction::ArrAccess { array, index, dest } => { println!("        {dest} <- {array}[{index}]"); }
                     Instruction::Assign { src, dest } => { println!("        {dest} <- {src}"); }
                     Instruction::Branch { condition, true_target, false_target } => { println!("        branch {condition}, {true_target}, {false_target}"); }
@@ -38,12 +40,19 @@ fn print_cfg(method_cfgs: HashMap<String, CFG>) {
                     }
                     Instruction::Modulo { left, right, dest } => { println!("        {dest} <- {left} % {right}"); }
                     Instruction::Multiply { left, right, dest } => { println!("        {dest} <- {left} * {right}"); }
-                    Instruction::Neg { expr, dest } => { println!("        {dest} <- -{expr}"); }
-                    Instruction::Nop => { println!("        nop"); }
+                    // Instruction::Neg { expr, dest } => { println!("        {dest} <- -{expr}"); }
+                    // Instruction::Nop => { println!("        nop"); }
                     Instruction::Not { expr, dest } => { println!("        {dest} <- !{expr}"); }
                     Instruction::NotEqual { left, right, dest } => { println!("        {dest} <- {left} != {right}"); }
-                    Instruction::Or { left, right, dest } => { println!("        {dest} <- {left} || {right}"); }
-                    Instruction::Ret { value } => { println!("        ret"); }
+                    // Instruction::Or { left, right, dest } => { println!("        {dest} <- {left} || {right}"); }
+                    Instruction::Ret { value } => { 
+                        if value.is_some() {
+                            let val_str = value.unwrap();
+                            println!("        ret {val_str}"); 
+                        } else {
+                            println!("        ret"); 
+                        }
+                    }
                     Instruction::Subtract { left, right, dest } => { println!("        {dest} <- {left} - {right}"); }
                     Instruction::UJmp { id } => { println!("        jmp {id}"); }
                 }
