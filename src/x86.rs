@@ -32,7 +32,6 @@ impl fmt::Display for X86Instr {
 }
 
 
-
 /// Data structure to keep track of stack
 /// offsets for variables.
 #[allow(dead_code)]
