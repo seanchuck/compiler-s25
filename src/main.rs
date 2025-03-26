@@ -7,14 +7,14 @@ mod scope;
 mod symtable;
 mod token;
 mod cfg;
-mod linear_ir;
+mod tac;
+mod x86;
 
 mod parse;
 mod scan;
 mod semcheck;
 mod traverse;
 mod buildcfg;
-mod linearize;
 mod codegen;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {

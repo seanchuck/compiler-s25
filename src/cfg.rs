@@ -1,128 +1,90 @@
 /**
-Control flow graph (CFG) representation.
+ Control flow graph (CFG) representation.
+ 
+ Consists of basic blocks and directed edges
+ between those basic blocks.
+ **/
+ use std::collections::BTreeMap;
+ use crate::tac::*;
 
-Consists of basic blocks and directed edges 
-between those basic blocks.
-**/
-
-use std::collections::{BTreeMap, BTreeSet};
-use crate::linear_ir::*;
 
 #[derive(Debug, Clone)]
 pub struct CFG {
     // BTreeMap is hash map that allows constant iteration order
-    blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
-    edges: DirectedGraph, // Maps basic block ID to its children in the CFG
+    // entry block has ID 0
+    pub blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
+                                       // no need to store edges because basic blocks end with a jump/branch instruction
 }
-
-#[derive(Debug, Clone)]
-pub struct DirectedGraph {
-    // Maps basic block to vector of children
-    children: BTreeMap<i32, BTreeSet<i32>>
-}
-
 
 #[derive(Debug, Clone)]
 pub struct BasicBlock {
     // Basic block is just a vector of instructions
     instructions: Vec<Instruction>,
-    id: i32
+    id: i32,
+    _label: Option<String>, // TODO: can add meaningful labels to each BB instead of referring to them by ID
+}
+
+#[derive(Debug, Clone)]
+pub struct Loop {
+    pub break_to: i32,    // ID of basic block following the loop
+    pub continue_to: i32, // ID of loop's header basic block
 }
 
 impl CFG {
     pub fn new() -> CFG {
         CFG {
             blocks: BTreeMap::new(),
-            edges: DirectedGraph {
-                children: BTreeMap::new(),
-            },
         }
+    }
+
+    /// Get all basic blocks
+    pub fn get_blocks(self) -> BTreeMap<i32, BasicBlock> {
+        self.blocks
+    }
+
+    /// Get basic block with ID
+    fn get_block_with_id(&mut self, id: i32) -> &mut BasicBlock {
+        let block = self.blocks.get_mut(&id);
+        if block.is_none() {
+            panic!("block with id {id} does not exist");
+        }
+        block.unwrap()
     }
 
     /// Add a basic block with a given ID
     pub fn add_block(&mut self, block: &BasicBlock) {
-        self.blocks.insert(block.get_id(), block.clone()); // TODO: clone causes weird interactions
-        self.edges.children.entry(block.get_id()).or_insert_with(BTreeSet::new);
+        self.blocks.insert(block.get_id(), block.clone());
     }
 
-    /// Add a child block to a parent block
-    pub fn add_edge(&mut self, parent_id: i32, child_id: i32) {
-        self.edges.children
-            .entry(parent_id)
-            .or_insert_with(BTreeSet::new)
-            .insert(child_id);
+    /// Add instruction to block with ID
+    pub fn add_instruction_to_block(&mut self, id: i32, instruction: Instruction) {
+        if id == -1 {
+            return; // do nothing, because this is an unreachable block
+        } else {
+            let block = self.get_block_with_id(id);
+            block.add_instruction(instruction);
+        }
     }
-
-    /// Get children of a block
-    pub fn get_children(&self, block_id: i32) -> Option<&BTreeSet<i32>> {
-        self.edges.children.get(&block_id)
-    }
-
 }
 
 impl BasicBlock {
     pub fn new(id: i32) -> BasicBlock {
-        BasicBlock { instructions: Vec::new(), id}
-    }
-
-    pub fn add_instruction(&mut self, instruction: Instruction) {
-        self.instructions.push(instruction);
+        BasicBlock {
+            instructions: Vec::new(),
+            id,
+            _label: None,
+        }
     }
 
     pub fn get_id(&self) -> i32 {
         self.id
     }
+
+    pub fn get_instructions(self) -> Vec<Instruction> {
+        self.instructions
+    }
+
+    fn add_instruction(&mut self, instruction: Instruction) {
+        self.instructions.push(instruction);
+    }
 }
-
-
-
-
-// #[derive(Debug, Clone)]
-// pub struct DestructedNode {
-//     begin: Box<BasicBlock>,
-//     end: Box<BasicBlock>
-// }
-
-
-// #[derive(Debug, Clone, Copy)]
-// pub enum TAC {
-//     Assignment,
-//     Operation,
-//     Conditional,
-//     Nop,
-// }
-
-
-// impl DestructedNode {
-//     pub fn new() -> Self {
-//         let mut start = BasicBlock::new();
-//         let end = BasicBlock::new();
-
-//         start.true_next = Some(Box::new(end));
-
-
-//         DestructedNode {
-//             begin: Box::new(start),
-//             end: Box::new(end.clone()),
-//         }
-//     }
-// }
-
-
-// impl BasicBlock {
-//     pub fn new() -> Self {
-//         BasicBlock {
-//             instructions: vec![],
-//             true_next: None,
-//             false_next: None,
-//         }
-//     }
-
-//     pub fn get_condition(&self) -> Option<TAC> {
-//         self.instructions.last().and_then(|tac| match tac {
-//             TAC::Conditional => Some(TAC::Conditional),
-//             _ => None,
-//         })
-//     }
-    
-// }

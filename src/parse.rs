@@ -1267,7 +1267,6 @@ pub fn parse(
         }
 
         // Print parse error message
-        // TODO: make error messages better
         Err(_parse_error) => {
             if let Some((first_token, last_token)) = tokens.first().zip(tokens.last()) {
                 let first_span = extract_span_from_token(first_token);

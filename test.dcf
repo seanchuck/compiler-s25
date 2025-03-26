@@ -1,16 +1,20 @@
-void main(){
-    int a;
-    bool t, f;
-    a = 3;
+
+void main() {
+    bool t, f, m;
+    int j;
     t = true;
     f = false;
+    m = false;
 
-    if (t || f) {
-        a = 1;
+
+    if (t && f || m) {
+        j = 999999999;
     } else {
-        a = 9;
+        j = 1;
     }
-    a = 15;
+
+    j = 500;
+
 }
 
 // Linear IR rep

@@ -1,29 +1,19 @@
 /**
 Construct a control flow graph (CFG) from the
 symbol table IR.
-
-Who adds a basic block to the CFG?
-    - In general, parent destructor recursively calls another method
-    and receives (begin, end). Parent should add those to the CFG,
-    and everything else should be added recursively by callee.
-    - Or: just follow every BasicBlock::New with a cfg.add_block()
-
-Weird thing:
-    - need to add instruction to block before adding it to the 
-    cfg
-
 **/
-
 use crate::ast::*;
 use crate::cfg::*;
-use crate::linear_ir::*;
+use crate::tac::*;
 use crate::scope::TableEntry;
 use crate::semcheck::semcheck;
-use crate::symtable::{SymBlock, SymExpr, SymMethod, SymProgram, SymStatement};
+use crate::symtable::{SymExpr, SymMethod, SymProgram, SymStatement};
 use crate::token::Literal;
-use core::panic;
-use std::iter::Cycle;
+
+
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+const UNREACHABLE_BLOCK: i32 = -1; // id for an unreachable block
 
 // Initialize a counter for naming temps and indexing basic blocks
 thread_local! {
@@ -42,520 +32,884 @@ fn fresh_temp() -> String {
     })
 }
 
-// Returns a new id for the next basic block
+/// Returns a new id for the next basic block
 fn next_bblock_id() -> i32 {
     BBLOCK_COUNTER.with(|counter| {
         let mut count = counter.borrow_mut();
+        let val = *count;
         *count += 1;
-        *count as i32
+        val as i32
     })
 }
 
-/// Helper to convert literal or identifier expressions into operands
-fn expr_to_operand(expr: &SymExpr, block: &mut BasicBlock) -> Operand {
+/// Reset temp variable counter and basic block counters to 0
+fn reset_counters() {
+    TEMP_COUNTER.with(|counter| {
+        let mut count = counter.borrow_mut();
+        *count = 0;
+    });
+    BBLOCK_COUNTER.with(|counter| {
+        let mut count = counter.borrow_mut();
+        *count = 0;
+    });
+}
+
+/// Helper to convert literal or identifier expressions into operands.
+/// The expression's evaluation starts at the end of cur_block.
+/// Returns the block at the end of expr's evaluation, and the Operand
+/// that holds its result.
+fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, Operand) {
     match expr {
-        SymExpr::Identifier { entry, .. } => match &*entry {
-                        TableEntry::Variable { name, .. } => Operand::Id(name.clone()),
-                        TableEntry::Method { name, .. } => Operand::Id(name.clone()),
-                        TableEntry::Import { name, .. } => Operand::Id(name.clone()),
-            },
-        SymExpr::Literal { value, .. } => Operand::Const(value.clone()),
+        SymExpr::Literal { value, .. } => (cur_block_id, Operand::Const(value.clone())),
+
+        SymExpr::Identifier { entry, .. } => match entry {
+            TableEntry::Variable { name, .. } => (cur_block_id, Operand::Id(name.clone())),
+            TableEntry::Method { name, .. } => (cur_block_id, Operand::Id(name.clone())),
+            TableEntry::Import { name, .. } => (cur_block_id, Operand::Id(name.clone())),
+        },
+
         SymExpr::ArrAccess { id, index, .. } => {
-                // Load the array into a temp and then return the temp's operand
-                let temp_arr_val = Operand::Id(fresh_temp());
+            // load array element into a temp
+            let array_element = Operand::Id(fresh_temp());
 
-                let index_operand = match index.as_ref() {
-                    SymExpr::Literal { value, .. } => Operand::Const(value.clone()),
-                    _ => panic!("Expected literal in array index"),
-                };
+            // array index can be an expression
+            let (next_block_id, index_operand) = destruct_expr(cfg, index, cur_block_id);
 
-                block.add_instruction(Instruction::ArrAccess {
-                    array: Box::new(Operand::Id(id.clone())),
-                    index: Box::new(index_operand),
-                    dest: Box::new(temp_arr_val.clone()),
-                });
+            cfg.add_instruction_to_block(
+                next_block_id,
+                Instruction::Load {
+                    src: ArrayElement {
+                        id: id.to_string(),
+                        index: index_operand,
+                    },
+                    dest: array_element.clone(),
+                },
+            );
 
-                temp_arr_val
-            }
+            (next_block_id, array_element)
+        }
+
         SymExpr::MethodCall {
-                method_name, args, ..
-            } => {
-                let arg_ops: Vec<Operand> = args
-                    .iter()
-                    .map(|arg| match &**arg {
-                        SymExpr::Identifier { entry, .. } => match &*entry {
-                            TableEntry::Variable { name, .. } => Operand::Id(name.clone()),
-                            _ => panic!("Expected a variable identifier in method call arguments"),
-                        },
-                        _ => panic!("Expected only Identifier in method call arguments"),
-                    })
-                    .collect();
+            method_name, args, ..
+        } => {
+            // arguments can be expressions
+            let mut arg_ops: Vec<Operand> = Vec::new();
+            for arg in args {
+                let arg_op;
+                (cur_block_id, arg_op) = destruct_expr(cfg, arg, cur_block_id);
+                arg_ops.push(arg_op);
+            }
 
-                let temp_method_result = Operand::Id(fresh_temp());
+            let temp_method_result = Operand::Id(fresh_temp());
 
-                block.add_instruction(Instruction::MethodCall {
+            cfg.add_instruction_to_block(
+                cur_block_id,
+                Instruction::MethodCall {
                     name: method_name.clone(),
                     args: arg_ops,
-                    dest: Some(Box::new(temp_method_result.clone())),
-                });
+                    dest: Some(temp_method_result.clone()),
+                },
+            );
 
-                temp_method_result
-            }
-        SymExpr::BinaryExpr {
-                op, left, right, ..
-            } => {
-                let left_operand = expr_to_operand(left, block);
-                let right_operand = expr_to_operand(right, block);
-                let result = Operand::Id(fresh_temp());
-
-                let instruction: Instruction = match op {
-                    BinaryOp::Add => Instruction::Add {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    BinaryOp::Subtract => Instruction::Subtract {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    BinaryOp::Multiply => Instruction::Multiply {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    BinaryOp::Divide => Instruction::Divide {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    BinaryOp::Modulo => Instruction::Modulo {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    BinaryOp::Less => Instruction::Less {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    BinaryOp::Greater => Instruction::Greater {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    BinaryOp::LessEqual => Instruction::LessEqual {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    BinaryOp::GreaterEqual => Instruction::GreaterEqual {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    BinaryOp::Equal => Instruction::Equal {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    BinaryOp::NotEqual => Instruction::NotEqual {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    // Short-circuiting handled elsewhere
-                    BinaryOp::And => Instruction::And {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    BinaryOp::Or => Instruction::Or {
-                        left: Box::new(left_operand),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                };
-
-                block.add_instruction(instruction);
-                result
-            }
-        SymExpr::UnaryExpr { op, expr, .. } => {
-                let result = Operand::Id(fresh_temp());
-                let right_operand = expr_to_operand(expr, block);
-
-                let instruction: Instruction = match op {
-                    UnaryOp::Neg => Instruction::Subtract {
-                        left: Box::new(Operand::Const(Literal::Int("0".to_string()))),
-                        right: Box::new(right_operand),
-                        dest: Box::new(result.clone()),
-                    },
-                    UnaryOp::Not => todo!(),
-                };
-
-                block.add_instruction(instruction);
-                result
-            }
-        SymExpr::Cast { target_type, expr, span } => todo!(),
-        SymExpr::Len { id, span } => todo!(),
-        // SymExpr::Error { span } => todo!(),
-        _=> { panic!("Unexpected expression node!") }
-    }
-}
-
-
-/// Destruct a statement into basic blocks and add them to the method CFG.
-/// Returns the (begin_bblock, end_bblock), where end_bblock is some
-/// only if the statement spans multiple basic blocks.
-fn destruct_statement(cfg: &mut CFG, statement: Rc<SymStatement>) -> (BasicBlock, BasicBlock) {
-    // Any bblocks this function creates, it should add to the CFG
-    match &*statement {
-        SymStatement::VarDecl { .. } => {
-                        let mut nop_bblock: BasicBlock = BasicBlock::new(next_bblock_id());
-                        nop_bblock.add_instruction(Instruction::Nop);
-                        cfg.add_block(&nop_bblock); // must add_block *after* adding instruction
-        
-                        (nop_bblock.clone(), nop_bblock)
-            }
-        SymStatement::Assignment {
-                target, expr, op, ..
-            } => {
-                let mut bblock: BasicBlock = BasicBlock::new(next_bblock_id());
-                let dest = expr_to_operand(target, &mut bblock);
-
-                // Expr could be two things, a literal/identifier, in which its just returned as the operand.
-                // If expr requires more computation and is
-                let rhs_op = expr_to_operand(expr, &mut bblock);
-
-                let instr = match op {
-                    AssignOp::Assign => Instruction::Assign {
-                        src: Box::new(rhs_op),
-                        dest: Box::new(dest.clone()),
-                    },
-                    AssignOp::PlusAssign => Instruction::Add {
-                        left: Box::new(dest.clone()),
-                        right: Box::new(rhs_op),
-                        dest: Box::new(dest.clone()),
-                    },
-                    AssignOp::MinusAssign => Instruction::Subtract {
-                        left: Box::new(dest.clone()),
-                        right: Box::new(rhs_op),
-                        dest: Box::new(dest.clone()),
-                    },
-                    AssignOp::MultiplyAssign => Instruction::Multiply {
-                        left: Box::new(dest.clone()),
-                        right: Box::new(rhs_op),
-                        dest: Box::new(dest.clone()),
-                    },
-                    AssignOp::DivideAssign => Instruction::Divide {
-                        left: Box::new(dest.clone()),
-                        right: Box::new(rhs_op),
-                        dest: Box::new(dest.clone()),
-                    },
-                    AssignOp::ModuloAssign => Instruction::Modulo {
-                        left: Box::new(dest.clone()),
-                        right: Box::new(rhs_op),
-                        dest: Box::new(dest.clone()),
-                    },
-                };
-
-                bblock.add_instruction(instr);
-                cfg.add_block(&bblock);
-                (bblock.clone(), bblock) // TODO: verify this is ok. Since we add and index bblocks
-                                         // from CFG using bblock id, I think it should be fine.
-            }
-        SymStatement::MethodCall {
-                method_name, args, ..
-            } => {
-                let mut bblock: BasicBlock = BasicBlock::new(next_bblock_id());
-                let arg_ops: Vec<Operand> = args
-                    .iter()
-                    .map(|arg| expr_to_operand(arg, &mut bblock))
-                    .collect();
-
-                bblock.add_instruction(Instruction::MethodCall {
-                    name: method_name.clone(),
-                    args: arg_ops,
-                    dest: None, // or Some(Box::new(...)) if used as value
-                });
-
-                cfg.add_block(&bblock);
-                (bblock.clone(), bblock)
-            }
-        SymStatement::If {
-                condition,
-                then_block,
-                else_block,
-                ..
-            } => {
-                // TODO: hope is that recursion will add all intermediate blocks, is this true?
-                let (true_begin, true_end) = destruct_block(cfg, then_block);
-                let (false_begin, false_end) = match else_block {
-                    Some(unwrapped_else) => destruct_block(cfg, unwrapped_else),
-                    None => {
-                        // If there is no else, it is essentially a nop else block
-                        let mut nop_bblock = BasicBlock::new(next_bblock_id());
-                        nop_bblock.add_instruction(Instruction::Nop);
-                        cfg.add_block(&nop_bblock);
-
-                        (nop_bblock.clone(), nop_bblock)
-                    }
-                };
-            
-                return short_circuit(
-                    cfg,
-                    condition,
-                    &true_begin,
-                    &true_end,
-                    &false_begin,
-                    &false_end,
-                );
-            }
-        // TODO: finish statements
-        SymStatement::For { var, init, condition, update, block, span } => {
-            // do an assignment with var and init
-            // shortcircuit the condition and jump false to after 
-            // destruct the block
-            // do the update
-            // route back to the short-circuit condition
-            todo!()
-        },
-        SymStatement::While { condition, block, span } => todo!(),
-        SymStatement::Return { expr, span } => todo!(),
-        SymStatement::Break { span } => todo!(),
-        SymStatement::Continue { span } => todo!(),
-        SymStatement::Error { span } => todo!(),
-        _=> { panic!("Unexpected statement!"); }
-    }
-}
-
-// TODO: add blocks to CFG where necessary.
-fn short_circuit(
-    cfg: &mut CFG,
-    condition: &SymExpr,
-    true_begin: &BasicBlock,
-    true_end: &BasicBlock,
-    false_begin: &BasicBlock,
-    false_end: &BasicBlock,
-) -> (BasicBlock, BasicBlock) {
-    match condition {
-        // No short-circuiting necessary
-        SymExpr::Identifier { entry, .. } => match &*entry {
-            TableEntry::Variable { name, .. } => {
-                let mut bblock = BasicBlock::new(next_bblock_id());
-                let instr = Instruction::CJmp {
-                    condition: (Box::new(Operand::Id(name.clone()))),
-                    label: ("placeholder").to_string(),
-                };
-                bblock.add_instruction(instr);
-                cfg.add_block(&bblock);
-
-                // Diverge
-                cfg.add_edge(bblock.get_id(), true_begin.get_id());
-                cfg.add_edge(bblock.get_id(), false_begin.get_id());
-
-                // Converge
-                let mut nop_bblock = BasicBlock::new(next_bblock_id());
-                nop_bblock.add_instruction(Instruction::Nop);
-                cfg.add_block(&nop_bblock);
-
-                cfg.add_edge(true_end.get_id(), nop_bblock.get_id());
-                cfg.add_edge(false_end.get_id(), nop_bblock.get_id());
-
-                return (bblock, nop_bblock);
-            }
-            _ => {
-                panic!("Short-circuiting undefined for Method or Import");
-            }
-        },
-
-        SymExpr::Literal { .. } | SymExpr::MethodCall { .. } | SymExpr::ArrAccess { .. } => {
-            let mut bblock = BasicBlock::new(next_bblock_id());
-
-            let operand = expr_to_operand(condition, &mut bblock);
-
-            let instr = Instruction::CJmp {
-                condition: Box::new(operand),
-                label: ("placeholder".to_string()),
-            };
-            bblock.add_instruction(instr);
-            cfg.add_block(&bblock);
-
-            // Diverge
-            cfg.add_edge(bblock.get_id(), true_begin.get_id());
-            cfg.add_edge(bblock.get_id(), false_begin.get_id());
-
-            // Converge
-            let mut nop_bblock = BasicBlock::new(next_bblock_id());
-            nop_bblock.add_instruction(Instruction::Nop);
-            cfg.add_block(&nop_bblock);
-
-            cfg.add_edge(true_end.get_id(), nop_bblock.get_id());
-            cfg.add_edge(false_end.get_id(), nop_bblock.get_id());
-
-            return (bblock, nop_bblock);
+            (cur_block_id, temp_method_result)
         }
 
-        // Short-circuiting required
-        SymExpr::UnaryExpr { op, expr, .. } => {
-            match op {
-                UnaryOp::Not => {
-                    // Introduce "Not" by flipping true and false blocks
-                    return short_circuit(cfg, expr, false_begin, false_end, true_begin, true_end);
-                }
-                _ => {
-                    panic!("Short-circuiting undefined for neg!");
-                }
-            }
-        }
         SymExpr::BinaryExpr {
             op, left, right, ..
         } => {
-            let (left_begin, left_end): (BasicBlock, BasicBlock);
-            let (right_begin, right_end): (BasicBlock, BasicBlock);
-
             match op {
-                // No short-circuiting
-                BinaryOp::Less
-                | BinaryOp::Greater
-                | BinaryOp::LessEqual
-                | BinaryOp::GreaterEqual
-                | BinaryOp::Equal
-                | BinaryOp::NotEqual => {
-                    let mut bblock = BasicBlock::new(next_bblock_id());
-                    let operand = expr_to_operand(condition, &mut bblock);
-                    
-                    let instr = Instruction::CJmp {
-                        condition: Box::new(operand),
-                        label: ("placeholder".to_string()),
-                    };
-                    bblock.add_instruction(instr);
-                    cfg.add_block(&bblock);
+                // short-circuiting (from recitation 6)
+                BinaryOp::And | BinaryOp::Or => {
+                    let dest = Operand::Id(fresh_temp());
+                    let next_true_block = BasicBlock::new(next_bblock_id());
+                    let next_false_block = BasicBlock::new(next_bblock_id());
+                    let next_block = BasicBlock::new(next_bblock_id());
 
-                    // Diverge
-                    cfg.add_edge(bblock.get_id(), true_begin.get_id());
-                    cfg.add_edge(bblock.get_id(), false_begin.get_id());
+                    cfg.add_block(&next_true_block);
+                    cfg.add_block(&next_false_block);
+                    cfg.add_block(&next_block);
 
-                    // Converge
-                    let mut nop_bblock = BasicBlock::new(next_bblock_id());
-                    nop_bblock.add_instruction(Instruction::Nop);
-                    cfg.add_block(&nop_bblock);
+                    // if condition is true, set dest = 1 and jump to next_block
+                    cfg.add_instruction_to_block(
+                        next_true_block.get_id(),
+                        Instruction::Assign {
+                            src: Operand::Const(Literal::Int("1".to_string())),
+                            dest: dest.clone(),
+                        },
+                    );
+                    cfg.add_instruction_to_block(
+                        next_true_block.get_id(),
+                        Instruction::UJmp {
+                            id: next_block.get_id(),
+                        },
+                    );
 
-                    cfg.add_edge(true_end.get_id(), nop_bblock.get_id());
-                    cfg.add_edge(false_end.get_id(), nop_bblock.get_id());
+                    // if condition is false, set dest = 0 and jump to next_block
+                    cfg.add_instruction_to_block(
+                        next_false_block.get_id(),
+                        Instruction::Assign {
+                            src: Operand::Const(Literal::Int("0".to_string())),
+                            dest: dest.clone(),
+                        },
+                    );
+                    cfg.add_instruction_to_block(
+                        next_false_block.get_id(),
+                        Instruction::UJmp {
+                            id: next_block.get_id(),
+                        },
+                    );
 
-                    return (bblock, nop_bblock);
-                }
+                    build_cond(
+                        cfg,
+                        expr,
+                        cur_block_id,
+                        next_true_block.get_id(),
+                        next_false_block.get_id(),
+                    );
 
-                // Short-circuiting!
-                BinaryOp::And => {
-                    // If left succeeds, enter right; demonic
-                    (right_begin, right_end) =
-                        short_circuit(cfg, &right, true_begin, true_end, false_begin, false_end);
-                    (left_begin, left_end) =
-                        short_circuit(cfg, &left, &right_begin, &right_end, false_begin, false_end);
-                }
-                BinaryOp::Or => {
-                    // If left fails, enter right; angelic
-                    (right_begin, right_end) =
-                        short_circuit(cfg, &right, true_begin, true_end, false_begin, false_end);
-                    (left_begin, left_end) =
-                        short_circuit(cfg, &left, true_begin, true_end, &right_begin, &right_end);
+                    return (next_block.get_id(), dest);
                 }
                 _ => {
-                    panic!("Short-circuit received non-boolean operation: {:#?}", op);
+                    let left_operand: Operand;
+                    let right_operand: Operand;
+                    (cur_block_id, left_operand) = destruct_expr(cfg, left, cur_block_id);
+                    (cur_block_id, right_operand) = destruct_expr(cfg, right, cur_block_id);
+
+                    let result = Operand::Id(fresh_temp());
+
+                    let instruction: Instruction = match op {
+                        BinaryOp::Add => Instruction::Add {
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
+                        },
+                        BinaryOp::Subtract => Instruction::Subtract {
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
+                        },
+                        BinaryOp::Multiply => Instruction::Multiply {
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
+                        },
+                        BinaryOp::Divide => Instruction::Divide {
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
+                        },
+                        BinaryOp::Modulo => Instruction::Modulo {
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
+                        },
+                        BinaryOp::Less => Instruction::Less {
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
+                        },
+                        BinaryOp::Greater => Instruction::Greater {
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
+                        },
+                        BinaryOp::LessEqual => Instruction::LessEqual {
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
+                        },
+                        BinaryOp::GreaterEqual => Instruction::GreaterEqual {
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
+                        },
+                        BinaryOp::Equal => Instruction::Equal {
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
+                        },
+                        BinaryOp::NotEqual => Instruction::NotEqual {
+                            left: left_operand,
+                            right: right_operand,
+                            dest: result.clone(),
+                        },
+                        _ => unreachable!(),
+                    };
+
+                    cfg.add_instruction_to_block(cur_block_id, instruction);
+
+                    (cur_block_id, result)
                 }
             }
-
-            // Converge short-circuiting with a nop block for And, Or
-            let mut nop_bblock = BasicBlock::new(next_bblock_id());
-            nop_bblock.add_instruction(Instruction::Nop);
-            cfg.add_block(&nop_bblock);
-
-            cfg.add_edge(left_end.get_id(), nop_bblock.get_id());
-            cfg.add_edge(right_end.get_id(), nop_bblock.get_id());
-
-            return (left_begin, nop_bblock);
         }
+
+        SymExpr::UnaryExpr { op, expr, .. } => {
+            let result = Operand::Id(fresh_temp());
+            let operand: Operand;
+            (cur_block_id, operand) = destruct_expr(cfg, expr, cur_block_id);
+
+            let instruction: Instruction = match op {
+                UnaryOp::Neg => Instruction::Subtract {
+                    left: Operand::Const(Literal::Int("0".to_string())),
+                    right: operand,
+                    dest: result.clone(),
+                },
+                UnaryOp::Not => Instruction::Not {
+                    expr: operand,
+                    dest: result.clone(),
+                },
+            };
+
+            cfg.add_instruction_to_block(cur_block_id, instruction);
+
+            (cur_block_id, result)
+        }
+
+        SymExpr::Cast {
+            target_type, expr, ..
+        } => {
+            let result = Operand::Id(fresh_temp());
+            let operand: Operand;
+            (cur_block_id, operand) = destruct_expr(cfg, expr, cur_block_id);
+
+            let instruction = Instruction::Cast {
+                expr: operand,
+                dest: result.clone(),
+                target_type: target_type.clone(),
+            };
+
+            cfg.add_instruction_to_block(cur_block_id, instruction);
+
+            (cur_block_id, result)
+        }
+
+        SymExpr::Len { id, .. } => {
+            let result = Operand::Id(fresh_temp());
+            let operand: Operand = Operand::Id(id.to_string());
+
+            let instruction = Instruction::Len {
+                expr: operand,
+                dest: result.clone(),
+            };
+
+            cfg.add_instruction_to_block(cur_block_id, instruction);
+
+            (cur_block_id, result)
+        }
+
+        _ => unreachable!(),
+    }
+}
+
+
+/// Build the CFG for a conditional expression starting at cur_block.
+/// Implements short-circuiting.
+/// next_true_block is the block to jump to if the condition is true
+/// next_false_block is the block to jump to if the condition is false
+fn build_cond(
+    cfg: &mut CFG,
+    expr: &SymExpr,
+    mut cur_block_id: i32,
+    next_true_block_id: i32,
+    next_false_block_id: i32,
+) {
+    match expr {
+        SymExpr::BinaryExpr {
+            op, left, right, ..
+        } => {
+            match op {
+                BinaryOp::And => {
+                    let left_true_block = BasicBlock::new(next_bblock_id());
+                    cfg.add_block(&left_true_block);
+                    build_cond(
+                        cfg,
+                        left,
+                        cur_block_id,
+                        left_true_block.get_id(),
+                        next_false_block_id,
+                    );
+                    // RHS is only evaluated if LHS is true
+                    build_cond(
+                        cfg,
+                        right,
+                        left_true_block.get_id(),
+                        next_true_block_id,
+                        next_false_block_id,
+                    );
+                },
+
+                BinaryOp::Or => {
+                    let left_false_block = BasicBlock::new(next_bblock_id());
+                    cfg.add_block(&left_false_block);
+                    build_cond(
+                        cfg,
+                        left,
+                        cur_block_id,
+                        next_true_block_id,
+                        left_false_block.get_id(),
+                    );
+                    // RHS is only evaluated if LHS is false
+                    build_cond(
+                        cfg,
+                        right,
+                        left_false_block.get_id(),
+                        next_true_block_id,
+                        next_false_block_id,
+                    );
+                },
+
+                // No short-circuiting necessary
+                _ => {
+                    let dest: Operand;
+                    (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id);
+
+                    cfg.add_instruction_to_block(
+                        cur_block_id,
+                        Instruction::Branch {
+                            condition: dest,
+                            true_target: next_true_block_id,
+                            false_target: next_false_block_id,
+                        },
+                    );
+                }
+            }
+        }
+
+        SymExpr::UnaryExpr { op, expr, .. } => {
+            match op {
+                UnaryOp::Not => {
+                    // just swap the true and false blocks
+                    build_cond(
+                        cfg,
+                        expr,
+                        cur_block_id,
+                        next_false_block_id,
+                        next_true_block_id,
+                    );
+                }
+
+                _ => {
+                    let dest: Operand;
+                    (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id);
+
+                    cfg.add_instruction_to_block(
+                        cur_block_id,
+                        Instruction::Branch {
+                            condition: dest,
+                            true_target: next_true_block_id,
+                            false_target: next_false_block_id,
+                        },
+                    );
+                }
+            }
+        },
+
         _ => {
-            panic!(
-                "Short-circuiting not defined for expression {:?}",
-                condition
+            let dest: Operand;
+            (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id);
+            cfg.add_instruction_to_block(
+                cur_block_id,
+                Instruction::Branch {
+                    condition: dest,
+                    true_target: next_true_block_id,
+                    false_target: next_false_block_id,
+                },
             );
         }
     }
 }
 
-fn destruct_block(cfg: &mut CFG, block: &Rc<SymBlock>) -> (BasicBlock, BasicBlock) {
-    let mut begin_bblock: Option<BasicBlock> = None;
-    let mut end_bblock: Option<BasicBlock> = None;
 
-    // Iteratively destruct statements, linking them as you go
-    for statement in block.statements.clone() {
-        let (begin_stmt, end_stmt) = destruct_statement(cfg, statement);
+/// Destruct a statement starting at cur_block into basic blocks and add them to the method CFG.
+/// Returns the basic block at the end of the statement.
+fn destruct_statement(
+    cfg: &mut CFG,
+    mut cur_block_id: i32,
+    statement: &SymStatement,
+    cur_loop: Option<&Loop>,
+) -> i32 {
+    match &*statement {
+        SymStatement::Assignment {
+            target, expr, op, ..
+        } => {
+            let rhs: Operand;
+            (cur_block_id, rhs) = destruct_expr(cfg, expr, cur_block_id);
 
-        if begin_bblock.is_none() {
-            // Assumes these blocks were already added to CFG by destruct_statement
-            begin_bblock = Some(begin_stmt.clone());
-            end_bblock = Some(begin_stmt);
+            // dest can either be an identifier or array element
+            match target {
+                SymExpr::ArrAccess { id, index, .. } => {
+                    let index_op: Operand;
+                    (cur_block_id, index_op) = destruct_expr(cfg, index, cur_block_id);
+
+                    let array_element = ArrayElement {
+                        id: id.to_string(),
+                        index: index_op,
+                    };
+
+                    match op {
+                        AssignOp::Assign => {
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Store {
+                                    src: rhs,
+                                    dest: array_element,
+                                },
+                            );
+                        }
+                        AssignOp::PlusAssign => {
+                            // load array element into a new temp
+                            let array_element_temp = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Load {
+                                    src: array_element.clone(),
+                                    dest: array_element_temp.clone(),
+                                },
+                            );
+
+                            // add array element to rhs
+                            let new_rhs = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Add {
+                                    left: array_element_temp,
+                                    right: rhs,
+                                    dest: new_rhs.clone(),
+                                },
+                            );
+
+                            // store back into array element
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Store {
+                                    src: new_rhs,
+                                    dest: array_element,
+                                },
+                            );
+                        }
+                        AssignOp::MinusAssign => {
+                            // load array element into a new temp
+                            let array_element_temp = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Load {
+                                    src: array_element.clone(),
+                                    dest: array_element_temp.clone(),
+                                },
+                            );
+
+                            // subtract rhs from array element
+                            let new_rhs = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Subtract {
+                                    left: array_element_temp,
+                                    right: rhs,
+                                    dest: new_rhs.clone(),
+                                },
+                            );
+
+                            // store back into array element
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Store {
+                                    src: new_rhs,
+                                    dest: array_element,
+                                },
+                            );
+                        }
+                        AssignOp::MultiplyAssign => {
+                            // load array element into a new temp
+                            let array_element_temp = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Load {
+                                    src: array_element.clone(),
+                                    dest: array_element_temp.clone(),
+                                },
+                            );
+
+                            // multiply array element by rhs
+                            let new_rhs = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Multiply {
+                                    left: array_element_temp,
+                                    right: rhs,
+                                    dest: new_rhs.clone(),
+                                },
+                            );
+
+                            // store back into array element
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Store {
+                                    src: new_rhs,
+                                    dest: array_element,
+                                },
+                            );
+                        }
+                        AssignOp::DivideAssign => {
+                            // load array element into a new temp
+                            let array_element_temp = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Load {
+                                    src: array_element.clone(),
+                                    dest: array_element_temp.clone(),
+                                },
+                            );
+
+                            // divide array element by rhs
+                            let new_rhs = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Divide {
+                                    left: array_element_temp,
+                                    right: rhs,
+                                    dest: new_rhs.clone(),
+                                },
+                            );
+
+                            // store back into array element
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Store {
+                                    src: new_rhs,
+                                    dest: array_element,
+                                },
+                            );
+                        }
+                        AssignOp::ModuloAssign => {
+                            // load array element into a new temp
+                            let array_element_temp = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Load {
+                                    src: array_element.clone(),
+                                    dest: array_element_temp.clone(),
+                                },
+                            );
+
+                            // modulo array element by rhs
+                            let new_rhs = Operand::Id(fresh_temp());
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Modulo {
+                                    left: array_element_temp,
+                                    right: rhs,
+                                    dest: new_rhs.clone(),
+                                },
+                            );
+
+                            // store back into array element
+                            cfg.add_instruction_to_block(
+                                cur_block_id,
+                                Instruction::Store {
+                                    src: new_rhs,
+                                    dest: array_element,
+                                },
+                            );
+                        }
+                    }
+                }
+                SymExpr::Identifier { .. } => {
+                    let (_, dest) = destruct_expr(cfg, target, cur_block_id);
+
+                    let instr = match op {
+                        AssignOp::Assign => Instruction::Assign {
+                            src: rhs,
+                            dest: dest.clone(),
+                        },
+                        AssignOp::PlusAssign => Instruction::Add {
+                            left: dest.clone(),
+                            right: rhs,
+                            dest: dest.clone(),
+                        },
+                        AssignOp::MinusAssign => Instruction::Subtract {
+                            left: dest.clone(),
+                            right: rhs,
+                            dest: dest.clone(),
+                        },
+                        AssignOp::MultiplyAssign => Instruction::Multiply {
+                            left: dest.clone(),
+                            right: rhs,
+                            dest: dest.clone(),
+                        },
+                        AssignOp::DivideAssign => Instruction::Divide {
+                            left: dest.clone(),
+                            right: rhs,
+                            dest: dest.clone(),
+                        },
+                        AssignOp::ModuloAssign => Instruction::Modulo {
+                            left: dest.clone(),
+                            right: rhs,
+                            dest: dest.clone(),
+                        },
+                    };
+
+                    cfg.add_instruction_to_block(cur_block_id, instr);
+                }
+                _ => unreachable!(),
+            }
+
+            cur_block_id
         }
 
-        // Link blocks: end of prev is parent to start of next
-        cfg.add_edge(end_bblock.unwrap().get_id(), end_stmt.get_id());
+        SymStatement::MethodCall {
+            method_name, args, ..
+        } => {
+            // arguments can be expressions
+            let mut arg_ops: Vec<Operand> = Vec::new();
+            for arg in args {
+                let arg_op;
+                (cur_block_id, arg_op) = destruct_expr(cfg, arg, cur_block_id);
+                arg_ops.push(arg_op);
+            }
 
-        // Update end_bblock of the block we are destructing
-        end_bblock = Some(end_stmt);
-    }
+            cfg.add_instruction_to_block(
+                cur_block_id,
+                Instruction::MethodCall {
+                    name: method_name.clone(),
+                    args: arg_ops,
+                    dest: None,
+                },
+            );
 
-    if begin_bblock.is_some() {
-        (begin_bblock.unwrap(), end_bblock.unwrap())
-    } else {
-        // Weird case where block has no statements inside of it,
-        // so we return nop block
-        let bblock_id = next_bblock_id();
-        let mut nop_bblock = BasicBlock::new(bblock_id);
+            cur_block_id
+        }
 
-        nop_bblock.add_instruction(Instruction::Nop);
-        cfg.add_block(&nop_bblock);
+        SymStatement::If {
+            condition,
+            then_block,
+            else_block,
+            ..
+        } => {
+            let body_block = &BasicBlock::new(next_bblock_id()); // the block that starts the body
+            let mut body_block_id = body_block.get_id();
+            cfg.add_block(&body_block);
+            let next_block: BasicBlock; // the block after the whole if
 
-        (nop_bblock.clone(), nop_bblock)
+            if else_block.is_some() {
+                let else_body_block = &BasicBlock::new(next_bblock_id());
+                let mut else_body_block_id = else_body_block.get_id();
+                cfg.add_block(&else_body_block);
+
+                next_block = BasicBlock::new(next_bblock_id());
+
+                build_cond(
+                    cfg,
+                    condition,
+                    cur_block_id,
+                    body_block_id,
+                    else_body_block_id,
+                );
+
+                for statement in &then_block.statements {
+                    body_block_id = destruct_statement(cfg, body_block_id, &statement, cur_loop);
+                }
+
+                // jump to next block
+                cfg.add_instruction_to_block(
+                    body_block_id,
+                    Instruction::UJmp {
+                        id: next_block.get_id(),
+                    },
+                );
+
+                // same for else body if we have one
+                for statement in &else_block.clone().unwrap().statements {
+                    else_body_block_id =
+                        destruct_statement(cfg, else_body_block_id, statement, cur_loop);
+                }
+                cfg.add_instruction_to_block(
+                    else_body_block_id,
+                    Instruction::UJmp {
+                        id: next_block.get_id(),
+                    },
+                );
+            } else {
+                next_block = BasicBlock::new(next_bblock_id());
+
+                build_cond(
+                    cfg,
+                    condition,
+                    cur_block_id,
+                    body_block_id,
+                    next_block.get_id(),
+                );
+
+                for statement in &then_block.statements {
+                    body_block_id = destruct_statement(cfg, body_block_id, statement, cur_loop);
+                }
+
+                // jump to next block
+                cfg.add_instruction_to_block(
+                    body_block_id,
+                    Instruction::UJmp {
+                        id: next_block.get_id(),
+                    },
+                );
+            }
+
+            cfg.add_block(&next_block);
+            next_block.get_id()
+        }
+        SymStatement::While {
+            condition, block, ..
+        } => {
+            let header_id = next_bblock_id();
+            let header_block = BasicBlock::new(header_id); // the block that evaluates the loop condition
+            let mut body_id = next_bblock_id();
+            let body_block = &BasicBlock::new(body_id); // the block that starts the body
+            let next_block = BasicBlock::new(next_bblock_id()); // the block after the whole loop
+            cfg.add_block(&header_block);
+            cfg.add_block(&body_block);
+            cfg.add_block(&next_block);
+
+            cfg.add_instruction_to_block(
+                cur_block_id,
+                Instruction::UJmp {
+                    id: header_block.get_id(),
+                },
+            );
+
+            build_cond(cfg, condition, header_id, body_id, next_block.get_id());
+
+            let next_loop = Loop {
+                break_to: next_block.get_id(),
+                continue_to: header_id,
+            };
+
+            for statement in &block.statements {
+                body_id = destruct_statement(cfg, body_id, statement, Some(&next_loop));
+            }
+
+            // jump back to header block after the body
+            cfg.add_instruction_to_block(body_id, Instruction::UJmp { id: header_id });
+
+            next_block.get_id()
+        }
+        SymStatement::For {
+            var,
+            init,
+            condition,
+            update,
+            block,
+            ..
+        } => {
+            let header_id = next_bblock_id();
+            let header_block = BasicBlock::new(header_id); // the block that evaluates the loop condition
+            let mut body_id = next_bblock_id();
+            let body_block = &BasicBlock::new(body_id); // the block that starts the body
+            let next_block = BasicBlock::new(next_bblock_id()); // the block after the whole loop
+            cfg.add_block(&header_block);
+            cfg.add_block(&body_block);
+            cfg.add_block(&next_block);
+
+            // evaluate the for_init
+            let lhs = Operand::Id(var.clone());
+            let rhs: Operand;
+            (cur_block_id, rhs) = destruct_expr(cfg, init, cur_block_id);
+            cfg.add_instruction_to_block(
+                cur_block_id,
+                Instruction::Assign {
+                    src: rhs,
+                    dest: lhs,
+                },
+            );
+            cfg.add_instruction_to_block(
+                cur_block_id,
+                Instruction::UJmp {
+                    id: header_block.get_id(),
+                },
+            );
+
+            build_cond(cfg, condition, header_id, body_id, next_block.get_id());
+
+            let next_loop = Loop {
+                break_to: next_block.get_id(),
+                continue_to: header_id,
+            };
+
+            for statement in &block.statements {
+                body_id = destruct_statement(cfg, body_id, statement, Some(&next_loop));
+            }
+
+            // execute the for_update
+            body_id = destruct_statement(cfg, body_id, update, Some(&next_loop));
+
+            // jump back to header block after the body
+            cfg.add_instruction_to_block(body_id, Instruction::UJmp { id: header_id });
+
+            next_block.get_id()
+        }
+        SymStatement::Break { .. } => {
+            cfg.add_instruction_to_block(
+                cur_block_id,
+                Instruction::UJmp {
+                    id: cur_loop.unwrap().break_to,
+                },
+            );
+
+            // code after the break within this statement is unreachable
+            UNREACHABLE_BLOCK
+        }
+        SymStatement::Continue { .. } => {
+            cfg.add_instruction_to_block(
+                cur_block_id,
+                Instruction::UJmp {
+                    id: cur_loop.clone().unwrap().continue_to,
+                },
+            );
+
+            // code after the continue within this statement is unreachable
+            UNREACHABLE_BLOCK
+        }
+        SymStatement::Return { expr, .. } => {
+            if expr.is_some() {
+                let operand: Operand;
+                (cur_block_id, operand) = destruct_expr(cfg, &expr.clone().unwrap(), cur_block_id);
+                cfg.add_instruction_to_block(
+                    cur_block_id,
+                    Instruction::Ret {
+                        value: Some(operand),
+                    },
+                );
+            } else {
+                cfg.add_instruction_to_block(cur_block_id, Instruction::Ret { value: None });
+            }
+
+            // code after the return within this statement is unreachable
+            UNREACHABLE_BLOCK
+        }
+        SymStatement::VarDecl { .. } => {
+            // no need to do anything; default values are undefined
+            cur_block_id
+        }
+        _ => unreachable!(),
     }
 }
 
 /// Destruct a method AST node into basic blocks
 fn destruct_method(method: &Rc<SymMethod>) -> CFG {
-    let mut method_cfg = CFG::new();
-    let mut begin_bblock: Option<BasicBlock> = None;
-    let mut end_bblock: Option<BasicBlock> = None;
+    // reset counters for each CFG
+    reset_counters();
 
+    let mut method_cfg = CFG::new();
+
+    let mut cur_block_id = next_bblock_id(); // should be 0
+    let entry_block = BasicBlock::new(cur_block_id);
+    method_cfg.add_block(&entry_block);
 
     for statement in method.body.statements.clone() {
-        let (begin_stmt, end_stmt) = destruct_statement(&mut method_cfg, statement);
-
-        // Link the blocks together
-        if begin_bblock.is_none() {
-            begin_bblock = Some(begin_stmt.clone());
-            end_bblock = Some(begin_stmt);
-        }
-
-        // Link blocks: end of prev is parent to start of next
-        method_cfg.add_edge(end_bblock.unwrap().get_id(), end_stmt.get_id());
-
-        // Update end_bblock of the block we are destructing
-        end_bblock = Some(end_stmt);
-    }
-
-    // TODO: necessary?
-    if begin_bblock.is_none() {
-        let mut nop_bblock = BasicBlock::new(next_bblock_id());
-        nop_bblock.add_instruction(Instruction::Nop);
-        method_cfg.add_block(&nop_bblock);
+        cur_block_id = destruct_statement(&mut method_cfg, cur_block_id, &statement, None);
     }
 
     method_cfg
 }
 
-/// Destruct a program AST node into a hashmap of CFGs for each method
+/// Destruct a program AST node into basic blocks
 fn destruct_program(program: SymProgram) -> HashMap<String, CFG> {
     let mut method_cfgs: HashMap<String, CFG> = HashMap::new(); // Hash map to map method names to associated CFG
 
@@ -566,6 +920,7 @@ fn destruct_program(program: SymProgram) -> HashMap<String, CFG> {
 
     method_cfgs
 }
+
 
 /// Build the CFG from the symbol table IR.
 /// The outmap is a map between (method_name, method_cfg).
@@ -581,7 +936,5 @@ pub fn build_cfg(
 
     // Generate a CFG for each method
     let method_cfgs: HashMap<String, CFG> = destruct_program(sym_tree);
-
-    println!("{:#?}", method_cfgs);
     method_cfgs
 }

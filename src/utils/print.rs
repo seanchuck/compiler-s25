@@ -1,91 +1,70 @@
-// use crate::ast::*;
-// use std::fmt::Write;
-// use std::fs::File;
-// use std::io::Write as ioWrite;
+use crate::cfg::*;
+use crate::tac::*;
 use crate::scope::*;
 use crate::symtable::*;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
-/// --> run `dot -Tpng ast.dot -o ast.png` to generate the png file.
-/// and visualize tree with GraphViz.
-// pub fn save_dot_file(ast: &AST, filename: &str) {
-//     println!("saving.....");
-//     let dot_representation = ast.to_dot();
-//     let mut file = File::create(filename).expect("Unable to create file");
-//     file.write_all(dot_representation.as_bytes())
-//         .expect("Unable to write file");
-// }
 
-// /// Implementation of the AST to allow tree visualization with GraphViz
-// /// The parser will save the file to `parse_ast.dot` if --debug is passed
-// impl AST {
-//     pub fn to_dot(&self) -> String {
-//         let mut output = String::from("digraph AST {\n");
-//         let mut counter = 0;
-//         fn generate_dot(
-//             node: &AST,
-//             parent: Option<usize>,
-//             counter: &mut usize,
-//             output: &mut String,
-//         ) -> usize {
-//             let node_id = *counter;
-//             *counter += 1;
-//             let label = match node {
-//                 AST::Program { .. } => "Program",
-//                 AST::ImportDecl { id } => &format!("Import: {}", id),
-//                 AST::FieldDecl { typ, .. } => &format!("FieldDecl: {:?}", typ),
-//                 AST::ArrayFieldDecl { id, size } => &format!("ArrayFieldDecl: {}[{}]", id, size),
-//                 AST::MethodDecl { name, .. } => &format!("Method: {}", name),
-//                 AST::Block { .. } => "Block",
-//                 AST::Statement(_) => "Statement",
-//                 AST::Expr(_) => "Expr",
-//                 AST::Identifier(name) => &format!("Identifier: {}", name),
-//                 AST::Type(typ) => &format!("Type: {:?}", typ),
-//             };
+/// Pretty-print the CFG
+pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
+    println!("\n==================== CFG =======================");
 
-//             writeln!(output, "    {} [label=\"{}\"];", node_id, label).unwrap();
+    for (method_name, cfg) in method_cfgs {
+        println!("\n{method_name}:");
 
-//             if let Some(parent_id) = parent {
-//                 writeln!(output, "    {} -> {};", parent_id, node_id).unwrap();
-//             }
+        for (id, block) in cfg.clone().get_blocks() {
+            println!("    {id}:");
 
-//             match node {
-//                 AST::Program {
-//                     imports,
-//                     fields,
-//                     methods,
-//                 } => {
-//                     for child in imports.iter().chain(fields).chain(methods) {
-//                         generate_dot(child, Some(node_id), counter, output);
-//                     }
-//                 }
-//                 AST::FieldDecl { decls, .. } => {
-//                     for child in decls {
-//                         generate_dot(child, Some(node_id), counter, output);
-//                     }
-//                 }
-//                 AST::MethodDecl { block, .. } => {
-//                     generate_dot(block, Some(node_id), counter, output);
-//                 }
-//                 AST::Block {
-//                     field_decls,
-//                     statements,
-//                 } => {
-//                     for child in field_decls.iter().chain(statements) {
-//                         generate_dot(child, Some(node_id), counter, output);
-//                     }
-//                 }
-//                 _ => {}
-//             }
-//             node_id
-//         }
+            for insn in block.get_instructions() {
+                match insn {
+                    Instruction::Add { left, right, dest } => { println!("        {dest} <- {left} + {right}"); }
+                    // Instruction::And { left, right, dest } => { println!("        {dest} <- {left} && {right}"); }
+                    // Instruction::ArrAccess { array, index, dest } => { println!("        {dest} <- {array}[{index}]"); }
+                    Instruction::Assign { src, dest } => { println!("        {dest} <- {src}"); }
+                    Instruction::Branch { condition, true_target, false_target } => { println!("        branch {condition}, {true_target}, {false_target}"); }
+                    Instruction::Cast { expr, dest, target_type } => { println!("        {dest} <- {target_type}({expr})"); }
+                    Instruction::Divide { left, right, dest } => { println!("        {dest} <- {left} / {right}"); }
+                    Instruction::Equal { left, right, dest } => { println!("        {dest} <- {left} == {right}"); }
+                    Instruction::Greater { left, right, dest } => { println!("        {dest} <- {left} > {right}"); }
+                    Instruction::GreaterEqual { left, right, dest } => { println!("        {dest} <- {left} >= {right}"); }
+                    Instruction::Len { expr, dest } => { println!("        {dest} <- len({expr})"); }
+                    Instruction::Less { left, right, dest } => { println!("        {dest} <- {left} < {right}"); }
+                    Instruction::LessEqual { left, right, dest } => { println!("        {dest} <- {left} <= {right}"); }
+                    Instruction::MethodCall { name, args, dest } => { 
+                        let args_string = args.iter().map(|op| op.to_string()).collect::<Vec<_>>().join(", ");
+                        if dest.is_some() { 
+                            let dest_string = dest.unwrap();
+                            println!("        {dest_string} <- {name}({args_string})"); 
+                        }
+                        else { println!("        {name}({args_string})"); }
+                    }
+                    Instruction::Modulo { left, right, dest } => { println!("        {dest} <- {left} % {right}"); }
+                    Instruction::Multiply { left, right, dest } => { println!("        {dest} <- {left} * {right}"); }
+                    // Instruction::Neg { expr, dest } => { println!("        {dest} <- -{expr}"); }
+                    // Instruction::Nop => { println!("        nop"); }
+                    Instruction::Not { expr, dest } => { println!("        {dest} <- !{expr}"); }
+                    Instruction::NotEqual { left, right, dest } => { println!("        {dest} <- {left} != {right}"); }
+                    // Instruction::Or { left, right, dest } => { println!("        {dest} <- {left} || {right}"); }
+                    Instruction::Ret { value } => { 
+                        if value.is_some() {
+                            let val_str = value.unwrap();
+                            println!("        ret {val_str}"); 
+                        } else {
+                            println!("        ret"); 
+                        }
+                    }
+                    Instruction::Subtract { left, right, dest } => { println!("        {dest} <- {left} - {right}"); }
+                    Instruction::UJmp { id } => { println!("        jmp {id}"); }
+                    Instruction::Load { src, dest } => { println!("        {dest} <- load {src}"); }
+                    Instruction::Store { src, dest } => { println!("        store {dest} <- {src}"); }
+                }
+            }
+        }
+    }
+}
 
-//         generate_dot(self, None, &mut counter, &mut output);
-//         output.push_str("}}\n");
-//         output
-//     }
-// }
 
 // #################################################
 // PRETTY PRINT SYMBOL TABLE TREE
