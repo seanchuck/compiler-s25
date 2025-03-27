@@ -14,6 +14,7 @@ use std::fmt;
 pub enum Operand {
     Id(String),
     Const(Literal),
+    Argument(usize) // position of the argument
 }
 
 impl fmt::Display for Operand {
@@ -21,6 +22,7 @@ impl fmt::Display for Operand {
         match self {
             Operand::Const(lit) => write!(f, "{}", lit),
             Operand::Id(name) => write!(f, "{}", name),
+            Operand::Argument(pos) => write!(f, "arg{}", pos)
         }
     }
 }

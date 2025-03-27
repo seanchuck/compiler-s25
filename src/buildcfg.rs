@@ -9,8 +9,6 @@ use crate::scope::TableEntry;
 use crate::semcheck::semcheck;
 use crate::symtable::{SymExpr, SymMethod, SymProgram, SymStatement};
 use crate::token::Literal;
-
-
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 const UNREACHABLE_BLOCK: i32 = -1; // id for an unreachable block
@@ -54,18 +52,49 @@ fn reset_counters() {
     });
 }
 
+struct Loop {
+    break_to: i32,    // ID of basic block following the loop
+    continue_to: i32, // ID of loop's header basic block
+}
+
+#[derive(Clone)]
+struct Scope {
+    parent: Option<Box<Scope>>,
+    local_to_temp: HashMap<String, String> // maps local variable to temp variable
+}
+
+impl Scope {
+    /// Returns the temp variable associated to this local variable
+    fn lookup(&self, local: String) -> String {
+        if let Some(temp) = self.local_to_temp.get(&local) {
+            temp.to_string()
+        } else if let Some(parent) = &self.parent {
+            parent.lookup(local)
+        } else {
+            // assume it is in the global scope
+            local
+        }
+    }
+
+    /// Add a new local variable to the scope
+    fn add_local(&mut self, local: String, temp: String) {
+        self.local_to_temp.insert(local, temp);
+    }
+}
+
 /// Helper to convert literal or identifier expressions into operands.
 /// The expression's evaluation starts at the end of cur_block.
 /// Returns the block at the end of expr's evaluation, and the Operand
 /// that holds its result.
-fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, Operand) {
+fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &Scope) -> (i32, Operand) {
     match expr {
         SymExpr::Literal { value, .. } => (cur_block_id, Operand::Const(value.clone())),
 
         SymExpr::Identifier { entry, .. } => match entry {
-            TableEntry::Variable { name, .. } => (cur_block_id, Operand::Id(name.clone())),
-            TableEntry::Method { name, .. } => (cur_block_id, Operand::Id(name.clone())),
-            TableEntry::Import { name, .. } => (cur_block_id, Operand::Id(name.clone())),
+            TableEntry::Variable { name, .. } => (cur_block_id, Operand::Id(scope.lookup(name.to_string()))),
+            _ => unreachable!()
+            // TableEntry::Method { name, .. } => (cur_block_id, Operand::Id(name.clone())),
+            // TableEntry::Import { name, .. } => (cur_block_id, Operand::Id(name.clone())),
         },
 
         SymExpr::ArrAccess { id, index, .. } => {
@@ -73,7 +102,7 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
             let array_element = Operand::Id(fresh_temp());
 
             // array index can be an expression
-            let (next_block_id, index_operand) = destruct_expr(cfg, index, cur_block_id);
+            let (next_block_id, index_operand) = destruct_expr(cfg, index, cur_block_id, scope);
 
             cfg.add_instruction_to_block(
                 next_block_id,
@@ -96,7 +125,7 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
             let mut arg_ops: Vec<Operand> = Vec::new();
             for arg in args {
                 let arg_op;
-                (cur_block_id, arg_op) = destruct_expr(cfg, arg, cur_block_id);
+                (cur_block_id, arg_op) = destruct_expr(cfg, arg, cur_block_id, scope);
                 arg_ops.push(arg_op);
             }
 
@@ -165,6 +194,7 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
                         cur_block_id,
                         next_true_block.get_id(),
                         next_false_block.get_id(),
+                        scope
                     );
 
                     return (next_block.get_id(), dest);
@@ -172,8 +202,8 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
                 _ => {
                     let left_operand: Operand;
                     let right_operand: Operand;
-                    (cur_block_id, left_operand) = destruct_expr(cfg, left, cur_block_id);
-                    (cur_block_id, right_operand) = destruct_expr(cfg, right, cur_block_id);
+                    (cur_block_id, left_operand) = destruct_expr(cfg, left, cur_block_id, scope);
+                    (cur_block_id, right_operand) = destruct_expr(cfg, right, cur_block_id, scope);
 
                     let result = Operand::Id(fresh_temp());
 
@@ -246,7 +276,7 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
         SymExpr::UnaryExpr { op, expr, .. } => {
             let result = Operand::Id(fresh_temp());
             let operand: Operand;
-            (cur_block_id, operand) = destruct_expr(cfg, expr, cur_block_id);
+            (cur_block_id, operand) = destruct_expr(cfg, expr, cur_block_id, scope);
 
             let instruction: Instruction = match op {
                 UnaryOp::Neg => Instruction::Subtract {
@@ -270,7 +300,7 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32) -> (i32, 
         } => {
             let result = Operand::Id(fresh_temp());
             let operand: Operand;
-            (cur_block_id, operand) = destruct_expr(cfg, expr, cur_block_id);
+            (cur_block_id, operand) = destruct_expr(cfg, expr, cur_block_id, scope);
 
             let instruction = Instruction::Cast {
                 expr: operand,
@@ -312,6 +342,7 @@ fn build_cond(
     mut cur_block_id: i32,
     next_true_block_id: i32,
     next_false_block_id: i32,
+    scope: &Scope
 ) {
     match expr {
         SymExpr::BinaryExpr {
@@ -327,6 +358,7 @@ fn build_cond(
                         cur_block_id,
                         left_true_block.get_id(),
                         next_false_block_id,
+                        scope
                     );
                     // RHS is only evaluated if LHS is true
                     build_cond(
@@ -335,6 +367,7 @@ fn build_cond(
                         left_true_block.get_id(),
                         next_true_block_id,
                         next_false_block_id,
+                        scope
                     );
                 },
 
@@ -347,6 +380,7 @@ fn build_cond(
                         cur_block_id,
                         next_true_block_id,
                         left_false_block.get_id(),
+                        scope
                     );
                     // RHS is only evaluated if LHS is false
                     build_cond(
@@ -355,13 +389,14 @@ fn build_cond(
                         left_false_block.get_id(),
                         next_true_block_id,
                         next_false_block_id,
+                        scope
                     );
                 },
 
                 // No short-circuiting necessary
                 _ => {
                     let dest: Operand;
-                    (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id);
+                    (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id, scope);
 
                     cfg.add_instruction_to_block(
                         cur_block_id,
@@ -385,12 +420,13 @@ fn build_cond(
                         cur_block_id,
                         next_false_block_id,
                         next_true_block_id,
+                        scope
                     );
                 }
 
                 _ => {
                     let dest: Operand;
-                    (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id);
+                    (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id, scope);
 
                     cfg.add_instruction_to_block(
                         cur_block_id,
@@ -406,7 +442,7 @@ fn build_cond(
 
         _ => {
             let dest: Operand;
-            (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id);
+            (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id, scope);
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::Branch {
@@ -427,19 +463,20 @@ fn destruct_statement(
     mut cur_block_id: i32,
     statement: &SymStatement,
     cur_loop: Option<&Loop>,
+    scope: &mut Scope
 ) -> i32 {
     match &*statement {
         SymStatement::Assignment {
             target, expr, op, ..
         } => {
             let rhs: Operand;
-            (cur_block_id, rhs) = destruct_expr(cfg, expr, cur_block_id);
+            (cur_block_id, rhs) = destruct_expr(cfg, expr, cur_block_id, scope);
 
             // dest can either be an identifier or array element
             match target {
                 SymExpr::ArrAccess { id, index, .. } => {
                     let index_op: Operand;
-                    (cur_block_id, index_op) = destruct_expr(cfg, index, cur_block_id);
+                    (cur_block_id, index_op) = destruct_expr(cfg, index, cur_block_id, scope);
 
                     let array_element = ArrayElement {
                         id: id.to_string(),
@@ -614,7 +651,7 @@ fn destruct_statement(
                     }
                 }
                 SymExpr::Identifier { .. } => {
-                    let (_, dest) = destruct_expr(cfg, target, cur_block_id);
+                    let (_, dest) = destruct_expr(cfg, target, cur_block_id, scope);
 
                     let instr = match op {
                         AssignOp::Assign => Instruction::Assign {
@@ -663,7 +700,7 @@ fn destruct_statement(
             let mut arg_ops: Vec<Operand> = Vec::new();
             for arg in args {
                 let arg_op;
-                (cur_block_id, arg_op) = destruct_expr(cfg, arg, cur_block_id);
+                (cur_block_id, arg_op) = destruct_expr(cfg, arg, cur_block_id, scope);
                 arg_ops.push(arg_op);
             }
 
@@ -690,6 +727,8 @@ fn destruct_statement(
             cfg.add_block(&body_block);
             let next_block: BasicBlock; // the block after the whole if
 
+            let mut if_scope = Scope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
+
             if else_block.is_some() {
                 let else_body_block = &BasicBlock::new(next_bblock_id());
                 let mut else_body_block_id = else_body_block.get_id();
@@ -697,16 +736,19 @@ fn destruct_statement(
 
                 next_block = BasicBlock::new(next_bblock_id());
 
+                let mut else_scope = Scope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
+
                 build_cond(
                     cfg,
                     condition,
                     cur_block_id,
                     body_block_id,
                     else_body_block_id,
+                    scope
                 );
 
                 for statement in &then_block.statements {
-                    body_block_id = destruct_statement(cfg, body_block_id, &statement, cur_loop);
+                    body_block_id = destruct_statement(cfg, body_block_id, &statement, cur_loop, &mut if_scope);
                 }
 
                 // jump to next block
@@ -720,7 +762,7 @@ fn destruct_statement(
                 // same for else body if we have one
                 for statement in &else_block.clone().unwrap().statements {
                     else_body_block_id =
-                        destruct_statement(cfg, else_body_block_id, statement, cur_loop);
+                        destruct_statement(cfg, else_body_block_id, statement, cur_loop, &mut else_scope);
                 }
                 cfg.add_instruction_to_block(
                     else_body_block_id,
@@ -737,10 +779,11 @@ fn destruct_statement(
                     cur_block_id,
                     body_block_id,
                     next_block.get_id(),
+                    scope
                 );
 
                 for statement in &then_block.statements {
-                    body_block_id = destruct_statement(cfg, body_block_id, statement, cur_loop);
+                    body_block_id = destruct_statement(cfg, body_block_id, statement, cur_loop, &mut if_scope);
                 }
 
                 // jump to next block
@@ -774,15 +817,17 @@ fn destruct_statement(
                 },
             );
 
-            build_cond(cfg, condition, header_id, body_id, next_block.get_id());
+            build_cond(cfg, condition, header_id, body_id, next_block.get_id(), scope);
 
             let next_loop = Loop {
                 break_to: next_block.get_id(),
                 continue_to: header_id,
             };
 
+            let mut new_scope = Scope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
+
             for statement in &block.statements {
-                body_id = destruct_statement(cfg, body_id, statement, Some(&next_loop));
+                body_id = destruct_statement(cfg, body_id, statement, Some(&next_loop), &mut new_scope);
             }
 
             // jump back to header block after the body
@@ -810,7 +855,7 @@ fn destruct_statement(
             // evaluate the for_init
             let lhs = Operand::Id(var.clone());
             let rhs: Operand;
-            (cur_block_id, rhs) = destruct_expr(cfg, init, cur_block_id);
+            (cur_block_id, rhs) = destruct_expr(cfg, init, cur_block_id, scope);
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::Assign {
@@ -825,19 +870,21 @@ fn destruct_statement(
                 },
             );
 
-            build_cond(cfg, condition, header_id, body_id, next_block.get_id());
+            build_cond(cfg, condition, header_id, body_id, next_block.get_id(), scope);
 
             let next_loop = Loop {
                 break_to: next_block.get_id(),
                 continue_to: header_id,
             };
 
+            let mut new_scope = Scope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
+
             for statement in &block.statements {
-                body_id = destruct_statement(cfg, body_id, statement, Some(&next_loop));
+                body_id = destruct_statement(cfg, body_id, statement, Some(&next_loop), &mut new_scope);
             }
 
             // execute the for_update
-            body_id = destruct_statement(cfg, body_id, update, Some(&next_loop));
+            body_id = destruct_statement(cfg, body_id, update, Some(&next_loop), scope);
 
             // jump back to header block after the body
             cfg.add_instruction_to_block(body_id, Instruction::UJmp { id: header_id });
@@ -869,7 +916,7 @@ fn destruct_statement(
         SymStatement::Return { expr, .. } => {
             if expr.is_some() {
                 let operand: Operand;
-                (cur_block_id, operand) = destruct_expr(cfg, &expr.clone().unwrap(), cur_block_id);
+                (cur_block_id, operand) = destruct_expr(cfg, &expr.clone().unwrap(), cur_block_id, scope);
                 cfg.add_instruction_to_block(
                     cur_block_id,
                     Instruction::Ret {
@@ -883,8 +930,9 @@ fn destruct_statement(
             // code after the return within this statement is unreachable
             UNREACHABLE_BLOCK
         }
-        SymStatement::VarDecl { .. } => {
-            // no need to do anything; default values are undefined
+        SymStatement::VarDecl { name, .. } => {
+            // create new temp variable for this local variable, and add it to the scope
+            scope.add_local(name.to_string(), fresh_temp());
             cur_block_id
         }
         _ => unreachable!(),
@@ -898,12 +946,21 @@ fn destruct_method(method: &Rc<SymMethod>) -> CFG {
 
     let mut method_cfg = CFG::new();
 
+    let mut scope: Scope = Scope { parent: None, local_to_temp: HashMap::new() };
+
     let mut cur_block_id = next_bblock_id(); // should be 0
     let entry_block = BasicBlock::new(cur_block_id);
     method_cfg.add_block(&entry_block);
 
+    // add parameters to method scope
+    for (pos, (_, name, _)) in method.params.iter().enumerate() {
+        let temp = fresh_temp();
+        scope.add_local(name.to_string(), temp.clone());
+        method_cfg.add_instruction_to_block(cur_block_id, Instruction::Assign { src: Operand::Argument(pos), dest: Operand::Id(temp) });
+    }
+
     for statement in method.body.statements.clone() {
-        cur_block_id = destruct_statement(&mut method_cfg, cur_block_id, &statement, None);
+        cur_block_id = destruct_statement(&mut method_cfg, cur_block_id, &statement, None, &mut scope);
     }
 
     method_cfg

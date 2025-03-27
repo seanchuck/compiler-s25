@@ -24,12 +24,6 @@ pub struct BasicBlock {
     _label: Option<String>, // TODO: can add meaningful labels to each BB instead of referring to them by ID
 }
 
-#[derive(Debug, Clone)]
-pub struct Loop {
-    pub break_to: i32,    // ID of basic block following the loop
-    pub continue_to: i32, // ID of loop's header basic block
-}
-
 impl CFG {
     pub fn new() -> CFG {
         CFG {
