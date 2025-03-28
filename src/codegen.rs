@@ -64,7 +64,7 @@ pub fn generate_assembly(
 ) {
 
     // Generate the method CFGS
-    let method_cfgs: HashMap<String, CFG> = build_cfg(file, filename, writer, debug);
+    let (method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
     if debug {
         print_cfg(&method_cfgs);
     }

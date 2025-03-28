@@ -37,7 +37,7 @@ pub enum TableEntry {
     Variable {
         name: String,
         typ: Type,
-        is_array: bool,
+        length: Option<i32>, // if array
         span: Span,
     },
     Method {

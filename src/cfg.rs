@@ -20,8 +20,12 @@ pub struct CFG {
 pub struct BasicBlock {
     // Basic block is just a vector of instructions
     instructions: Vec<Instruction>,
-    id: i32,
-    _label: Option<String>, // TODO: can add meaningful labels to each BB instead of referring to them by ID
+    id: i32, // TODO: can add meaningful labels to each BB instead of referring to them by ID
+}
+
+pub struct Global {
+    pub name: String, 
+    pub size: i32 // bytes
 }
 
 impl CFG {
@@ -65,8 +69,7 @@ impl BasicBlock {
     pub fn new(id: i32) -> BasicBlock {
         BasicBlock {
             instructions: Vec::new(),
-            id,
-            _label: None,
+            id
         }
     }
 

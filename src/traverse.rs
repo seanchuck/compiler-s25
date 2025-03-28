@@ -99,9 +99,9 @@ fn check_assignment(target: &SymExpr, expr: &SymExpr, op: &AssignOp, scope: &Sco
     match target {
         SymExpr::Identifier { entry, .. } => {
             match entry {
-                TableEntry::Variable { name, typ, is_array, .. } => {
+                TableEntry::Variable { name, typ, length, .. } => {
                     // rule 23
-                    if *is_array {
+                    if length.is_some() {
                         writeln!(
                             writer,
                             "{}",
@@ -306,9 +306,9 @@ fn infer_arr_access_type(id: &String, index: &SymExpr, scope: &Scope, span: &Spa
 
     // rule 11
     match entry {
-        Some(TableEntry::Variable { name, typ, is_array, .. }) => {
-            match is_array {
-                true => {
+        Some(TableEntry::Variable { name, typ, length, .. }) => {
+            match length {
+                Some(_) => {
                     let index_type = infer_expr_type(index, scope, writer, context);
 
                     match index_type {
@@ -326,7 +326,7 @@ fn infer_arr_access_type(id: &String, index: &SymExpr, scope: &Scope, span: &Spa
                         None => None // assume an error has already been printed
                     }
                 }
-                false => {
+                None => {
                     writeln!(
                         writer,
                         "{}",
@@ -535,10 +535,10 @@ fn infer_cast_type(target_type: &Type, expr: &SymExpr, scope: &Scope, span: &Spa
 
 fn infer_id_type(entry: &TableEntry) -> Option<Type> {
     match entry {
-        TableEntry::Variable { typ, is_array, .. } => {
-            match is_array {
-                true => Some(Type::Array(Box::new(typ.clone()))),
-                false => Some(typ.clone())
+        TableEntry::Variable { typ, length, .. } => {
+            match length {
+                Some(_) => Some(Type::Array(Box::new(typ.clone()))),
+                None => Some(typ.clone())
             }
         }
         TableEntry::Method { return_type, .. } => Some(Type::Method(Box::new(return_type.clone()))),

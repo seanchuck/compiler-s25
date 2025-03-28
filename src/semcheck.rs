@@ -147,7 +147,7 @@ pub fn build_symbol_table(
                                         TableEntry::Variable {
                                             name: id.clone(),
                                             typ: typ.clone(),
-                                            is_array: false,
+                                            length: None,
                                             span: span.clone(),
                                         },
                                     ).is_some() { // rule 1
@@ -269,7 +269,7 @@ pub fn build_method(
                             TableEntry::Variable {
                                 name: id.clone(),
                                 typ: param.typ.clone(),
-                                is_array: false,
+                                length: None,
                                 span: span.clone(),
                             },
                         ).is_some() {
@@ -372,7 +372,7 @@ pub fn build_block(
                                         TableEntry::Variable {
                                             name: id.clone(),
                                             typ: typ.clone(),
-                                            is_array: false,
+                                            length: None,
                                             span: span.clone(),
                                         },
                                     ).is_some() {
@@ -547,7 +547,7 @@ pub fn build_statement(
             let mut var_typ: Type = Type::Int;
             if let Some(var_entry) = scope.borrow().lookup(var){
                 match var_entry {
-                    TableEntry::Variable { name: _, typ, is_array: _, span } => {
+                    TableEntry::Variable { typ, span, .. } => {
                         match typ {
                             Type::Int | Type::Long => {
                                 var_typ = typ;
@@ -584,7 +584,7 @@ pub fn build_statement(
                 TableEntry::Variable {
                     name: var.clone(),
                     typ: var_typ, // TODO: Determine type dynamically
-                    is_array: false,
+                    length: None,
                     span: span.clone(),
                 },
             ).is_none() {
@@ -876,7 +876,7 @@ fn check_len_argument(id: &AST, span: &Span, scope: &Scope, writer: &mut dyn std
     if let AST::Identifier { id, .. } = id {
         if let Some(entry) = scope.lookup(id) {
             match entry {
-                TableEntry::Variable { is_array: true, .. } => {
+                TableEntry::Variable { length: Some(_), .. } => {
                     return true
                     // Valid: `len` is used on an array
                 }
@@ -972,7 +972,7 @@ fn check_and_insert_array_field(
         TableEntry::Variable {
             name: id.clone(),
             typ: typ.clone(),
-            is_array: true,
+            length: parsed_size,
             span: span.clone(),
         },
     ).is_some() { // rule 1

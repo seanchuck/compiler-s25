@@ -12,7 +12,11 @@ use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Operand {
-    Id(String),
+    GlobalVar(String),
+    GlobalArrElement(String, Box<Operand>), // name and index
+    String(usize), // ID of string constant
+    LocalVar(String),
+    LocalArrElement(String, Box<Operand>),
     Const(Literal),
     Argument(usize) // position of the argument
 }
@@ -21,21 +25,13 @@ impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Operand::Const(lit) => write!(f, "{}", lit),
-            Operand::Id(name) => write!(f, "{}", name),
+            Operand::String(id) => write!(f, "str{}", id),
+            Operand::GlobalVar(name) => write!(f, "{}", name),
+            Operand::GlobalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
+            Operand::LocalVar(name) => write!(f, "{}", name),
+            Operand::LocalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
             Operand::Argument(pos) => write!(f, "arg{}", pos)
         }
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct ArrayElement {
-    pub id: String,
-    pub index: Operand,
-}
-
-impl fmt::Display for ArrayElement {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}[{}]", self.id, self.index)
     }
 }
 
@@ -168,12 +164,8 @@ pub enum Instruction {
     // Nop,
 
     // MEMORY
-    Load {
-        src: ArrayElement,
-        dest: Operand,
-    },
-    Store {
+    LoadString {
         src: Operand,
-        dest: ArrayElement,
+        dest: Operand,
     },
 }

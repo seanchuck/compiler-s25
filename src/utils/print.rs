@@ -57,8 +57,7 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     }
                     Instruction::Subtract { left, right, dest } => { println!("        {dest} <- {left} - {right}"); }
                     Instruction::UJmp { id } => { println!("        jmp {id}"); }
-                    Instruction::Load { src, dest } => { println!("        {dest} <- load {src}"); }
-                    Instruction::Store { src, dest } => { println!("        store {dest} <- {src}"); }
+                    Instruction::LoadString { src, dest } => { println!("        {dest} <- {src}"); }
                 }
             }
         }
@@ -149,10 +148,10 @@ fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
             TableEntry::Variable {
                 name,
                 typ,
-                is_array,
+                length,
                 span,
             } => {
-                let array_str = if *is_array { "[]" } else { "" };
+                let array_str = if length.is_some() { "[]" } else { "" };
                 println!(
                     "{}    \"{}\": Variable {{ typ: {:?}{}, span: {:?} }},",
                     indent_str, name, typ, array_str, span
