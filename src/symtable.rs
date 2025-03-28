@@ -71,9 +71,8 @@ pub enum SymStatement {
     VarDecl {
         name: String,
         typ: Type,
-        is_array: bool,
+        length: Option<Literal>,
         span: Span,
-        size: Literal
     },
     Assignment {
         target: SymExpr, //Now supports both `Identifier` and `ArrAccess`

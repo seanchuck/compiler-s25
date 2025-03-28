@@ -1,12 +1,14 @@
 /**
- Control flow graph (CFG) representation.
- 
- Consists of basic blocks and directed edges
- between those basic blocks.
- **/
- use std::collections::BTreeMap;
- use crate::tac::*;
+Control flow graph (CFG) representation.
 
+Consists of basic blocks and directed edges
+between those basic blocks.
+**/
+
+use std::collections::BTreeMap;
+use crate::tac::*;
+
+const ELEMENT_SIZE: i32 = 8; // for now, allocate 8 bytes for everything no matter the type
 
 #[derive(Debug, Clone)]
 pub struct CFG {
@@ -15,7 +17,7 @@ pub struct CFG {
     pub blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
                                        // no need to store edges because basic blocks end with a jump/branch instruction
     pub stack_size: i32, // total space to allocate on the stack for this method
-    pub stack_offsets: BTreeMap<String, i32> // maps each temp var to its stack offset
+    pub locals: BTreeMap<String, Local>
 }
 
 #[derive(Debug, Clone)]
@@ -27,7 +29,13 @@ pub struct BasicBlock {
 
 pub struct Global {
     pub name: String, 
-    pub size: i32 // bytes
+    pub length: Option<i32> // if array
+}
+
+#[derive(Debug, Clone)]
+pub struct Local {
+    stack_offset: i32,
+    length: Option<i32> // if array
 }
 
 impl CFG {
@@ -35,7 +43,7 @@ impl CFG {
         CFG {
             blocks: BTreeMap::new(),
             stack_size: 0,
-            stack_offsets: BTreeMap::new()
+            locals: BTreeMap::new()
         }
     }
 
@@ -69,9 +77,17 @@ impl CFG {
     }
 
     /// Allocate space on the stack for a new temp var
-    pub fn add_temp_var(&mut self, temp: String, size: i32) {
+    pub fn add_temp_var(&mut self, temp: String, length: Option<i32>) {
+        let size: i32;
+        if length.is_some() {
+            // add one to store the array length
+            size = (length.unwrap() + 1) * ELEMENT_SIZE;
+        } else {
+            size = ELEMENT_SIZE;
+        }
+
         self.stack_size += size;
-        self.stack_offsets.insert(temp, -self.stack_size);
+        self.locals.insert(temp, Local { stack_offset: -self.stack_size, length: length });
     }
 }
 

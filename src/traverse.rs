@@ -39,7 +39,7 @@ fn check_block(block: &SymBlock, return_type: &Type, in_loop: bool, writer: &mut
 
 fn check_statement(statement: &SymStatement, return_type: &Type, in_loop: bool, scope: &Scope, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     match statement {
-        SymStatement::VarDecl { name: _, typ: _, is_array, size, span} => check_var_decl( is_array, size, span, writer, context),
+        SymStatement::VarDecl { name: _, typ: _, length, span} => check_var_decl( length.clone(), span, writer, context),
         SymStatement::Assignment { target, expr, op, span } => check_assignment(target, expr, op, scope, span, writer, context),
         SymStatement::MethodCall { method_name, args, span } => check_method_call(method_name, &args.into_iter().map(|expr| Rc::new(expr.clone())).collect(), scope, span, writer, context),
         SymStatement::If { condition, then_block, else_block, span } => check_if(condition, then_block, else_block, return_type, in_loop, scope, span, writer, context),
@@ -52,9 +52,9 @@ fn check_statement(statement: &SymStatement, return_type: &Type, in_loop: bool, 
     }
 }
 
-fn check_var_decl(is_array: &bool, size: &Literal, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
-    if *is_array {
-        infer_literal_type(size, span, writer, context); // must be an int, but check rule 21
+fn check_var_decl(length: Option<Literal>, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+    if length.is_some() {
+        infer_literal_type(&length.unwrap(), span, writer, context); // must be an int, but check rule 21
     }
 }
 

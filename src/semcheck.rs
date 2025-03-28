@@ -387,9 +387,8 @@ pub fn build_block(
                                     sym_statements.push(Rc::new(SymStatement::VarDecl {
                                         name: id.clone(),
                                         typ: typ.clone(),
-                                        is_array: false,
+                                        length: None,
                                         span: span.clone(),
-                                        size: Literal::Int("".to_string()) // dummy literal
                                     }));
                                 }
 
@@ -404,9 +403,8 @@ pub fn build_block(
                                     sym_statements.push(Rc::new(SymStatement::VarDecl {
                                         name: id.clone(),
                                         typ: typ.clone(),
-                                        is_array: true,
+                                        length: Some(size.clone()),
                                         span: span.clone(),
-                                        size: size.clone()
                                     }));
                                 }
                                 _ => panic!("Unexpected field declaration type!"),
