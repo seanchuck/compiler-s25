@@ -20,10 +20,8 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
             for insn in block.get_instructions() {
                 match insn {
                     Instruction::Add { left, right, dest } => { println!("        {dest} <- {left} + {right}"); }
-                    // Instruction::And { left, right, dest } => { println!("        {dest} <- {left} && {right}"); }
-                    // Instruction::ArrAccess { array, index, dest } => { println!("        {dest} <- {array}[{index}]"); }
                     Instruction::Assign { src, dest } => { println!("        {dest} <- {src}"); }
-                    Instruction::Branch { condition, true_target, false_target } => { println!("        branch {condition}, {true_target}, {false_target}"); }
+                    Instruction::CJmp { condition, id } => { println!("        cjmp {condition}, {id}"); }
                     Instruction::Cast { expr, dest, target_type } => { println!("        {dest} <- {target_type}({expr})"); }
                     Instruction::Divide { left, right, dest } => { println!("        {dest} <- {left} / {right}"); }
                     Instruction::Equal { left, right, dest } => { println!("        {dest} <- {left} == {right}"); }
@@ -42,11 +40,8 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     }
                     Instruction::Modulo { left, right, dest } => { println!("        {dest} <- {left} % {right}"); }
                     Instruction::Multiply { left, right, dest } => { println!("        {dest} <- {left} * {right}"); }
-                    // Instruction::Neg { expr, dest } => { println!("        {dest} <- -{expr}"); }
-                    // Instruction::Nop => { println!("        nop"); }
                     Instruction::Not { expr, dest } => { println!("        {dest} <- !{expr}"); }
                     Instruction::NotEqual { left, right, dest } => { println!("        {dest} <- {left} != {right}"); }
-                    // Instruction::Or { left, right, dest } => { println!("        {dest} <- {left} || {right}"); }
                     Instruction::Ret { value } => { 
                         if value.is_some() {
                             let val_str = value.unwrap();
@@ -56,7 +51,7 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                         }
                     }
                     Instruction::Subtract { left, right, dest } => { println!("        {dest} <- {left} - {right}"); }
-                    Instruction::UJmp { id } => { println!("        jmp {id}"); }
+                    Instruction::UJmp { id } => { println!("        ujmp {id}"); }
                     Instruction::LoadString { src, dest } => { println!("        {dest} <- {src}"); }
                 }
             }

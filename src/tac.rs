@@ -141,11 +141,10 @@ pub enum Instruction {
         // unconditonal jump
         id: i32, // ID of basic block to jump to
     },
-    Branch {
+    CJmp {
         // conditional jump
         condition: Operand,
-        true_target: i32,  // ID of basic block to jump to if condition is true
-        false_target: i32, // ID of basic block to jump to if condition is false
+        id: i32,  // ID of basic block to jump to if condition is true
     },
     Ret {
         value: Option<Operand>,

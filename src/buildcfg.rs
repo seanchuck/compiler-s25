@@ -424,10 +424,15 @@ fn build_cond(
 
                     cfg.add_instruction_to_block(
                         cur_block_id,
-                        Instruction::Branch {
+                        Instruction::CJmp {
                             condition: dest,
-                            true_target: next_true_block_id,
-                            false_target: next_false_block_id,
+                            id: next_true_block_id,
+                        },
+                    );
+                    cfg.add_instruction_to_block(
+                        cur_block_id,
+                        Instruction::UJmp {
+                            id: next_false_block_id,
                         },
                     );
                 }
@@ -455,10 +460,15 @@ fn build_cond(
 
                     cfg.add_instruction_to_block(
                         cur_block_id,
-                        Instruction::Branch {
+                        Instruction::CJmp {
                             condition: dest,
-                            true_target: next_true_block_id,
-                            false_target: next_false_block_id,
+                            id: next_true_block_id
+                        },
+                    );
+                    cfg.add_instruction_to_block(
+                        cur_block_id,
+                        Instruction::UJmp {
+                            id: next_false_block_id
                         },
                     );
                 }
@@ -468,12 +478,18 @@ fn build_cond(
         _ => {
             let dest: Operand;
             (cur_block_id, dest) = destruct_expr(cfg, expr, cur_block_id, scope, strings);
+
             cfg.add_instruction_to_block(
                 cur_block_id,
-                Instruction::Branch {
+                Instruction::CJmp {
                     condition: dest,
-                    true_target: next_true_block_id,
-                    false_target: next_false_block_id,
+                    id: next_true_block_id
+                },
+            );
+            cfg.add_instruction_to_block(
+                cur_block_id,
+                Instruction::UJmp {
+                    id: next_false_block_id
                 },
             );
         }
