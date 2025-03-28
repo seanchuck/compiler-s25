@@ -14,6 +14,8 @@ pub struct CFG {
     // entry block has ID 0
     pub blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
                                        // no need to store edges because basic blocks end with a jump/branch instruction
+    pub stack_size: i32, // total space to allocate on the stack for this method
+    pub stack_offsets: BTreeMap<String, i32> // maps each temp var to its stack offset
 }
 
 #[derive(Debug, Clone)]
@@ -32,6 +34,8 @@ impl CFG {
     pub fn new() -> CFG {
         CFG {
             blocks: BTreeMap::new(),
+            stack_size: 0,
+            stack_offsets: BTreeMap::new()
         }
     }
 
@@ -62,6 +66,12 @@ impl CFG {
             let block = self.get_block_with_id(id);
             block.add_instruction(instruction);
         }
+    }
+
+    /// Allocate space on the stack for a new temp var
+    pub fn add_temp_var(&mut self, temp: String, size: i32) {
+        self.stack_size += size;
+        self.stack_offsets.insert(temp, -self.stack_size);
     }
 }
 

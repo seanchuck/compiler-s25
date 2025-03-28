@@ -13,6 +13,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 const UNREACHABLE_BLOCK: i32 = -1; // id for an unreachable block
 
+const ELEMENT_SIZE: i32 = 8; // for now, allocate 8 bytes for everything no matter the type
+
 // Initialize a counter for naming temps and indexing basic blocks
 thread_local! {
     static TEMP_COUNTER: RefCell<usize> = RefCell::new(0);
@@ -103,10 +105,13 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
         SymExpr::Literal { value, .. } => {
             match value {
                 Literal::String(val) => {
-                    let temp = Operand::LocalVar(fresh_temp());
-                    cfg.add_instruction_to_block(cur_block_id, Instruction::LoadString { src: Operand::String(strings.len()), dest: temp.clone() });
+                    let temp = fresh_temp();
+                    let temp_op = Operand::LocalVar(temp.clone());
+                    cfg.add_temp_var(temp.to_string(), ELEMENT_SIZE);
+
+                    cfg.add_instruction_to_block(cur_block_id, Instruction::LoadString { src: Operand::String(strings.len()), dest: temp_op.clone() });
                     strings.push(val.to_string());
-                    (cur_block_id, temp)
+                    (cur_block_id, temp_op)
                 }
                 _ => (cur_block_id, Operand::Const(value.clone()))
 
@@ -120,7 +125,10 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
 
         SymExpr::ArrAccess { id, index, .. } => {
             // load array element into a temp
-            let array_element = Operand::LocalVar(fresh_temp());
+            let temp = fresh_temp();
+            let array_element = Operand::LocalVar(temp.to_string());
+
+            cfg.add_temp_var(temp, ELEMENT_SIZE);
 
             // array index can be an expression
             let (next_block_id, index_operand) = destruct_expr(cfg, index, cur_block_id, scope, strings);
@@ -147,7 +155,9 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
                 arg_ops.push(arg_op);
             }
 
-            let temp_method_result = Operand::LocalVar(fresh_temp());
+            let temp = fresh_temp();
+            let temp_method_result = Operand::LocalVar(temp.to_string());
+            cfg.add_temp_var(temp, ELEMENT_SIZE);
 
             cfg.add_instruction_to_block(
                 cur_block_id,
@@ -167,7 +177,9 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
             match op {
                 // short-circuiting (from recitation 6)
                 BinaryOp::And | BinaryOp::Or => {
-                    let dest = Operand::LocalVar(fresh_temp());
+                    let temp = fresh_temp();
+                    let dest = Operand::LocalVar(temp.to_string());
+                    cfg.add_temp_var(temp, ELEMENT_SIZE);
                     let next_true_block = BasicBlock::new(next_bblock_id());
                     let next_false_block = BasicBlock::new(next_bblock_id());
                     let next_block = BasicBlock::new(next_bblock_id());
@@ -224,7 +236,9 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
                     (cur_block_id, left_operand) = destruct_expr(cfg, left, cur_block_id, scope, strings);
                     (cur_block_id, right_operand) = destruct_expr(cfg, right, cur_block_id, scope, strings);
 
-                    let result = Operand::LocalVar(fresh_temp());
+                    let temp = fresh_temp();
+                    let result = Operand::LocalVar(temp.to_string());
+                    cfg.add_temp_var(temp, ELEMENT_SIZE);
 
                     let instruction: Instruction = match op {
                         BinaryOp::Add => Instruction::Add {
@@ -293,7 +307,9 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
         }
 
         SymExpr::UnaryExpr { op, expr, .. } => {
-            let result = Operand::LocalVar(fresh_temp());
+            let temp = fresh_temp();
+            let result = Operand::LocalVar(temp.to_string());
+            cfg.add_temp_var(temp, ELEMENT_SIZE);
             let operand: Operand;
             (cur_block_id, operand) = destruct_expr(cfg, expr, cur_block_id, scope, strings);
 
@@ -317,7 +333,9 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
         SymExpr::Cast {
             target_type, expr, ..
         } => {
-            let result = Operand::LocalVar(fresh_temp());
+            let temp = fresh_temp();
+            let result = Operand::LocalVar(temp.to_string());
+            cfg.add_temp_var(temp, ELEMENT_SIZE);
             let operand: Operand;
             (cur_block_id, operand) = destruct_expr(cfg, expr, cur_block_id, scope, strings);
 
@@ -333,7 +351,9 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
         }
 
         SymExpr::Len { id, .. } => {
-            let result = Operand::LocalVar(fresh_temp());
+            let temp = fresh_temp();
+            let result = Operand::LocalVar(temp.to_string());
+            cfg.add_temp_var(temp, ELEMENT_SIZE);
             let operand: Operand = scope.lookup_var(id.to_string());
 
             let instruction = Instruction::Len {
@@ -534,7 +554,9 @@ fn destruct_statement(
                             let array_element = scope.lookup_arr(id.to_string(), index_op);
 
                             // load array element into a new temp
-                            let array_element_temp = Operand::LocalVar(fresh_temp());
+                            let array_temp = fresh_temp();
+                            let array_element_temp = Operand::LocalVar(array_temp.to_string());
+                            cfg.add_temp_var(array_temp, ELEMENT_SIZE);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
@@ -544,7 +566,9 @@ fn destruct_statement(
                             );
 
                             // add array element to rhs
-                            let new_rhs = Operand::LocalVar(fresh_temp());
+                            let rhs_temp = fresh_temp();
+                            let new_rhs = Operand::LocalVar(rhs_temp.to_string());
+                            cfg.add_temp_var(rhs_temp, ELEMENT_SIZE);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Add {
@@ -567,7 +591,9 @@ fn destruct_statement(
                             let array_element = scope.lookup_arr(id.to_string(), index_op);
 
                             // load array element into a new temp
-                            let array_element_temp = Operand::LocalVar(fresh_temp());
+                            let array_temp = fresh_temp();
+                            let array_element_temp = Operand::LocalVar(array_temp.to_string());
+                            cfg.add_temp_var(array_temp, ELEMENT_SIZE);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
@@ -577,7 +603,9 @@ fn destruct_statement(
                             );
 
                             // subtract rhs from array element
-                            let new_rhs = Operand::LocalVar(fresh_temp());
+                            let rhs_temp = fresh_temp();
+                            let new_rhs = Operand::LocalVar(rhs_temp.to_string());
+                            cfg.add_temp_var(rhs_temp, ELEMENT_SIZE);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Subtract {
@@ -600,7 +628,9 @@ fn destruct_statement(
                             let array_element = scope.lookup_arr(id.to_string(), index_op);
 
                             // load array element into a new temp
-                            let array_element_temp = Operand::LocalVar(fresh_temp());
+                            let array_temp = fresh_temp();
+                            let array_element_temp = Operand::LocalVar(array_temp.to_string());
+                            cfg.add_temp_var(array_temp, ELEMENT_SIZE);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
@@ -610,7 +640,9 @@ fn destruct_statement(
                             );
 
                             // multiply array element by rhs
-                            let new_rhs = Operand::LocalVar(fresh_temp());
+                            let rhs_temp = fresh_temp();
+                            let new_rhs = Operand::LocalVar(rhs_temp.to_string());
+                            cfg.add_temp_var(rhs_temp, ELEMENT_SIZE);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Multiply {
@@ -633,7 +665,9 @@ fn destruct_statement(
                             let array_element = scope.lookup_arr(id.to_string(), index_op);
 
                             // load array element into a new temp
-                            let array_element_temp = Operand::LocalVar(fresh_temp());
+                            let array_temp = fresh_temp();
+                            let array_element_temp = Operand::LocalVar(array_temp.to_string());
+                            cfg.add_temp_var(array_temp, ELEMENT_SIZE);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
@@ -643,7 +677,9 @@ fn destruct_statement(
                             );
 
                             // divide array element by rhs
-                            let new_rhs = Operand::LocalVar(fresh_temp());
+                            let rhs_temp = fresh_temp();
+                            let new_rhs = Operand::LocalVar(rhs_temp.to_string());
+                            cfg.add_temp_var(rhs_temp, ELEMENT_SIZE);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Divide {
@@ -666,7 +702,9 @@ fn destruct_statement(
                             let array_element = scope.lookup_arr(id.to_string(), index_op);
 
                             // load array element into a new temp
-                            let array_element_temp = Operand::LocalVar(fresh_temp());
+                            let array_temp = fresh_temp();
+                            let array_element_temp = Operand::LocalVar(array_temp.to_string());
+                            cfg.add_temp_var(array_temp, ELEMENT_SIZE);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
@@ -676,7 +714,9 @@ fn destruct_statement(
                             );
 
                             // modulo array element by rhs
-                            let new_rhs = Operand::LocalVar(fresh_temp());
+                            let rhs_temp = fresh_temp();
+                            let new_rhs = Operand::LocalVar(rhs_temp.to_string());
+                            cfg.add_temp_var(rhs_temp, ELEMENT_SIZE);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Modulo {
@@ -981,7 +1021,9 @@ fn destruct_statement(
         }
         SymStatement::VarDecl { name, .. } => {
             // create new temp variable for this local variable, and add it to the scope
-            scope.add_local(name.to_string(), fresh_temp());
+            let temp = fresh_temp();
+            scope.add_local(name.to_string(), temp.to_string());
+            cfg.add_temp_var(temp, ELEMENT_SIZE);
             cur_block_id
         }
         _ => unreachable!(),
@@ -1004,7 +1046,8 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
     // add parameters to method scope
     for (pos, (_, name, _)) in method.params.iter().enumerate() {
         let temp = fresh_temp();
-        scope.add_local(name.to_string(), temp.clone());
+        method_cfg.add_temp_var(temp.to_string(), ELEMENT_SIZE);
+        scope.add_local(name.to_string(), temp.to_string());
         method_cfg.add_instruction_to_block(cur_block_id, Instruction::Assign { src: Operand::Argument(pos), dest: Operand::LocalVar(temp) });
     }
 
@@ -1046,9 +1089,9 @@ pub fn build_cfg(
         match entry {
             TableEntry::Variable { name, typ: _, length, .. } => {
                 if length.is_some() {
-                    globals.push(Global { name: name.to_string(), size: 8 * length.unwrap() }); // for now, allocate 8 bytes per element no matter the type
+                    globals.push(Global { name: name.to_string(), size: ELEMENT_SIZE * length.unwrap() });
                 } else {
-                    globals.push(Global { name: name.to_string(), size: 8 }) // 8 bytes for now
+                    globals.push(Global { name: name.to_string(), size: ELEMENT_SIZE })
                 }
             }
             _ => {
