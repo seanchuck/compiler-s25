@@ -21,7 +21,8 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                 match insn {
                     Instruction::Add { left, right, dest } => { println!("        {dest} <- {left} + {right}"); }
                     Instruction::Assign { src, dest } => { println!("        {dest} <- {src}"); }
-                    Instruction::CJmp { condition, id } => { println!("        cjmp {condition}, {id}"); }
+                    Instruction::Cmp { arg1, arg2 } => { println!("        cmp {arg1}, {arg2}"); }
+                    Instruction::CJmp { condition, target_id } => { println!("        cjmp {condition}, {target_id}"); }
                     Instruction::Cast { expr, dest, target_type } => { println!("        {dest} <- {target_type}({expr})"); }
                     Instruction::Divide { left, right, dest } => { println!("        {dest} <- {left} / {right}"); }
                     Instruction::Equal { left, right, dest } => { println!("        {dest} <- {left} == {right}"); }

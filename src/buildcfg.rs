@@ -400,11 +400,14 @@ fn build_cond(
 
                     cfg.add_instruction_to_block(
                         cur_block_id,
-                        Instruction::CJmp {
-                            condition: dest,
-                            id: next_true_block_id,
-                        },
+                        Instruction::Cmp { arg1: dest, arg2: Operand::Const(Literal::Int("1".to_string())) }
                     );
+
+                    cfg.add_instruction_to_block(
+                        cur_block_id,
+                        Instruction::CJmp { condition: Relation::BE, target_id: next_true_block_id }
+                    );
+
                     cfg.add_instruction_to_block(
                         cur_block_id,
                         Instruction::UJmp {
@@ -436,11 +439,14 @@ fn build_cond(
 
                     cfg.add_instruction_to_block(
                         cur_block_id,
-                        Instruction::CJmp {
-                            condition: dest,
-                            id: next_true_block_id
-                        },
+                        Instruction::Cmp { arg1: dest, arg2: Operand::Const(Literal::Int("1".to_string())) }
                     );
+
+                    cfg.add_instruction_to_block(
+                        cur_block_id,
+                        Instruction::CJmp { condition: Relation::BE, target_id: next_true_block_id }
+                    );
+
                     cfg.add_instruction_to_block(
                         cur_block_id,
                         Instruction::UJmp {
@@ -457,11 +463,14 @@ fn build_cond(
 
             cfg.add_instruction_to_block(
                 cur_block_id,
-                Instruction::CJmp {
-                    condition: dest,
-                    id: next_true_block_id
-                },
+                Instruction::Cmp { arg1: dest, arg2: Operand::Const(Literal::Int("1".to_string())) }
             );
+
+            cfg.add_instruction_to_block(
+                cur_block_id,
+                Instruction::CJmp { condition: Relation::BE, target_id: next_true_block_id }
+            );
+
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::UJmp {

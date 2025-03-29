@@ -141,10 +141,14 @@ pub enum Instruction {
         // unconditonal jump
         id: i32, // ID of basic block to jump to
     },
+    Cmp {
+        arg1: Operand,
+        arg2: Operand,
+    },
     CJmp {
         // conditional jump
-        condition: Operand,
-        id: i32,  // ID of basic block to jump to if condition is true
+        condition: Relation,
+        target_id: i32,  // ID of basic block to jump to if condition is true
     },
     Ret {
         value: Option<Operand>,
@@ -167,4 +171,29 @@ pub enum Instruction {
         src: Operand,
         dest: Operand,
     },
+}
+
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum Relation {
+    BLT,
+    BGT,
+    BLE,
+    BGE,
+    BE,
+    BNE,
+}
+
+impl fmt::Display for Relation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Relation::BLT => "BLT",
+            Relation::BGT => "BGT",
+            Relation::BLE => "BLE",
+            Relation::BGE => "BGE",
+            Relation::BE  => "BE",
+            Relation::BNE => "BNE",
+        };
+        write!(f, "{}", name)
+    }
 }
