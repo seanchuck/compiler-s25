@@ -11,7 +11,6 @@ use crate::symtable::{SymExpr, SymMethod, SymProgram, SymStatement};
 use crate::token::Literal;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-const UNREACHABLE_BLOCK: i32 = -1; // id for an unreachable block
 
 // Initialize a counter for naming temps and indexing basic blocks
 thread_local! {
@@ -52,53 +51,12 @@ fn reset_counters() {
     });
 }
 
-struct Loop {
-    break_to: i32,    // ID of basic block following the loop
-    continue_to: i32, // ID of loop's header basic block
-}
-
-#[derive(Clone)]
-struct Scope {
-    parent: Option<Box<Scope>>,
-    local_to_temp: HashMap<String, String> // maps local variable to temp variable
-}
-
-impl Scope {
-    /// Returns this global variable, or the temp variable associated to this local variable
-    fn lookup_var(&self, var: String) -> Operand {
-        if let Some(temp) = self.local_to_temp.get(&var) {
-            Operand::LocalVar(temp.to_string())
-        } else if let Some(parent) = &self.parent {
-            parent.lookup_var(var)
-        } else {
-            // assume it is in the global scope
-            Operand::GlobalVar(var)
-        }
-    }
-
-    /// Returns this global array element, or the temp array element associated to this local array element
-    fn lookup_arr(&self, arr: String, idx: Operand) -> Operand {
-        if let Some(temp) = self.local_to_temp.get(&arr) {
-            Operand::LocalArrElement(temp.to_string(), Box::new(idx))
-        } else if let Some(parent) = &self.parent {
-            parent.lookup_arr(arr, idx)
-        } else {
-            // assume it is in the global scope
-            Operand::GlobalArrElement(arr, Box::new(idx))
-        }
-    }
-
-    /// Add a new local variable to the scope
-    fn add_local(&mut self, local: String, temp: String) {
-        self.local_to_temp.insert(local, temp);
-    }
-}
 
 /// Helper to convert literal or identifier expressions into operands.
 /// The expression's evaluation starts at the end of cur_block.
 /// Returns the block at the end of expr's evaluation, and the Operand
 /// that holds its result.
-fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &Scope, strings: &mut Vec<String>) -> (i32, Operand) {
+fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &CFGScope, strings: &mut Vec<String>) -> (i32, Operand) {
     match expr {
         SymExpr::Literal { value, .. } => {
             match value {
@@ -379,7 +337,7 @@ fn build_cond(
     mut cur_block_id: i32,
     next_true_block_id: i32,
     next_false_block_id: i32,
-    scope: &Scope,
+    scope: &CFGScope,
     strings: &mut Vec<String>
 ) {
     match expr {
@@ -522,7 +480,7 @@ fn destruct_statement(
     mut cur_block_id: i32,
     statement: &SymStatement,
     cur_loop: Option<&Loop>,
-    scope: &mut Scope,
+    scope: &mut CFGScope,
     strings: &mut Vec<String>
 ) -> i32 {
     match &*statement {
@@ -812,7 +770,7 @@ fn destruct_statement(
             cfg.add_block(&body_block);
             let next_block: BasicBlock; // the block after the whole if
 
-            let mut if_scope = Scope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
+            let mut if_scope = CFGScope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
 
             if else_block.is_some() {
                 let else_body_block = &BasicBlock::new(next_bblock_id());
@@ -821,7 +779,7 @@ fn destruct_statement(
 
                 next_block = BasicBlock::new(next_bblock_id());
 
-                let mut else_scope = Scope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
+                let mut else_scope = CFGScope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
 
                 build_cond(
                     cfg,
@@ -911,7 +869,7 @@ fn destruct_statement(
                 continue_to: header_id,
             };
 
-            let mut new_scope = Scope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
+            let mut new_scope = CFGScope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
 
             for statement in &block.statements {
                 body_id = destruct_statement(cfg, body_id, statement, Some(&next_loop), &mut new_scope, strings);
@@ -964,7 +922,7 @@ fn destruct_statement(
                 continue_to: header_id,
             };
 
-            let mut new_scope = Scope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
+            let mut new_scope = CFGScope { parent: Some(Box::new(scope.clone())), local_to_temp: HashMap::new() };
 
             for statement in &block.statements {
                 body_id = destruct_statement(cfg, body_id, statement, Some(&next_loop), &mut new_scope, strings);
@@ -1053,7 +1011,7 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
 
     let mut method_cfg = CFG::new();
 
-    let mut scope: Scope = Scope { parent: None, local_to_temp: HashMap::new() };
+    let mut scope = CFGScope { parent: None, local_to_temp: HashMap::new() };
 
     let mut cur_block_id = next_bblock_id(); // should be 0
     let entry_block = BasicBlock::new(cur_block_id);

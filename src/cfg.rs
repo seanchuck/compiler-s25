@@ -5,10 +5,21 @@ Consists of basic blocks and directed edges
 between those basic blocks.
 **/
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use crate::tac::*;
 
+
+// #################################################
+// CONSTANTS
+// #################################################
+
+pub const UNREACHABLE_BLOCK: i32 = -1; // id for an unreachable block
 const ELEMENT_SIZE: i32 = 8; // for now, allocate 8 bytes for everything no matter the type
+
+
+// #################################################
+// STRUCT DEFINITIONS
+// #################################################
 
 #[derive(Debug, Clone)]
 pub struct CFG {
@@ -27,6 +38,7 @@ pub struct BasicBlock {
     id: i32, // TODO: can add meaningful labels to each BB instead of referring to them by ID
 }
 
+#[derive(Debug, Clone)]
 pub struct Global {
     pub name: String, 
     pub length: Option<i32> // if array
@@ -34,9 +46,58 @@ pub struct Global {
 
 #[derive(Debug, Clone)]
 pub struct Local {
-    stack_offset: i32,
-    length: Option<i32> // if array
+    pub stack_offset: i32,
+    pub length: Option<i32> // if array
 }
+
+#[derive(Debug, Clone)]
+pub struct Loop {
+    pub break_to: i32,    // ID of basic block following the loop
+    pub continue_to: i32, // ID of loop's header basic block
+}
+
+#[derive(Debug, Clone)]
+pub struct CFGScope {
+    pub parent: Option<Box<CFGScope>>,
+    pub local_to_temp: HashMap<String, String> // maps local variable to temp variable
+}
+
+
+// #################################################
+// IMPLEMENTATIONS
+// #################################################
+
+impl CFGScope {
+    /// Returns this global variable, or the temp variable associated to this local variable
+    pub fn lookup_var(&self, var: String) -> Operand {
+        if let Some(temp) = self.local_to_temp.get(&var) {
+            Operand::LocalVar(temp.to_string())
+        } else if let Some(parent) = &self.parent {
+            parent.lookup_var(var)
+        } else {
+            // assume it is in the global CFGScope
+            Operand::GlobalVar(var)
+        }
+    }
+
+    /// Returns this global array element, or the temp array element associated to this local array element
+    pub fn lookup_arr(&self, arr: String, idx: Operand) -> Operand {
+        if let Some(temp) = self.local_to_temp.get(&arr) {
+            Operand::LocalArrElement(temp.to_string(), Box::new(idx))
+        } else if let Some(parent) = &self.parent {
+            parent.lookup_arr(arr, idx)
+        } else {
+            // assume it is in the global CFGScope
+            Operand::GlobalArrElement(arr, Box::new(idx))
+        }
+    }
+
+    /// Add a new local variable to the CFGScope
+    pub fn add_local(&mut self, local: String, temp: String) {
+        self.local_to_temp.insert(local, temp);
+    }
+}
+
 
 impl CFG {
     pub fn new() -> CFG {
@@ -90,6 +151,7 @@ impl CFG {
         self.locals.insert(temp, Local { stack_offset: -self.stack_size, length: length });
     }
 }
+
 
 impl BasicBlock {
     pub fn new(id: i32) -> BasicBlock {
