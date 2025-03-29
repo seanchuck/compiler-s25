@@ -31,7 +31,6 @@ pub enum EnclosingBlock {
 /// declared variables or Method.
 /// Have just enough information to perform semantic
 /// check, without requiring, e.g., full method bodies.
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum TableEntry {
     Variable {

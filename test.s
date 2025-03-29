@@ -1,26 +1,17 @@
-# int a;
-#
-# void main() {
-#     a = 2;
-#     printf("Hello Decaf%d\n", a);
-# }
-
-.comm a, 4, 4
-
 str0:
-    .string "Hello Decaf%d\n"
+    .string "%d\n"  # string constant
 
-.globl _main
-_main:
+.globl main
+main:
     # pre-call ritual
     pushq %rbp         # save base pointer
     movq  %rsp, %rbp   # save stack pointer
 
     # call function `printf`
-    leaq format_str_0(%rip), %rdi  # 1st arg; load the address of str constant into %rdi
-    movq a, %rsi
+    leaq str0(%rip), %rdi  # 1st arg; load the address of str constant into %rdi
+    movq $-32, %rsi                 # 2nd arg; load int constant into %rsi
     movq $0, %rax                  # zero rax before printf
-    call _printf                   # call with the above args
+    call printf                    # call with the above args
 
     # analogous to 'return 0;' in C's main
     mov $0, %rax

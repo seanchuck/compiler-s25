@@ -67,7 +67,6 @@ fn get_span(ast: &AST) -> Span {
             | Statement::MethodCall { span, .. }
             | Statement::If { span, .. }
             | Statement::For { span, .. }
-            | Statement::Update { span, .. }
             | Statement::While { span, .. }
             | Statement::Return { span, .. }
             | Statement::Break { span }

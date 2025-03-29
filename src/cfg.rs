@@ -48,8 +48,8 @@ impl CFG {
     }
 
     /// Get all basic blocks
-    pub fn get_blocks(self) -> BTreeMap<i32, BasicBlock> {
-        self.blocks
+    pub fn get_blocks(&self) -> &BTreeMap<i32, BasicBlock> {
+        &self.blocks
     }
 
     /// Get basic block with ID
@@ -89,6 +89,11 @@ impl CFG {
         self.stack_size += size;
         self.locals.insert(temp, Local { stack_offset: -self.stack_size, length: length });
     }
+
+    /// Get the stack offset of a temp var
+    pub fn get_stack_offset(&self, temp: &String) -> i32 {
+        self.locals.get(temp).unwrap().stack_offset
+    }
 }
 
 impl BasicBlock {
@@ -103,8 +108,8 @@ impl BasicBlock {
         self.id
     }
 
-    pub fn get_instructions(self) -> Vec<Instruction> {
-        self.instructions
+    pub fn get_instructions(&self) -> &Vec<Instruction> {
+        &self.instructions
     }
 
     fn add_instruction(&mut self, instruction: Instruction) {

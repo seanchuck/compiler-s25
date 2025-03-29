@@ -16,7 +16,6 @@ pub struct Span {
 
 /// Token is the main data structure used by the scanner.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
 pub enum Token {
     Keyword {
         value: Keyword,
@@ -61,7 +60,6 @@ pub enum Keyword {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
 pub enum Symbol {
     Operator(Operator),
     Punctuation(Punctuation),

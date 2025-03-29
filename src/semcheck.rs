@@ -462,7 +462,7 @@ pub fn build_statement(
                         }
 
                     } else {
-                        SymStatement::Error { span: span.clone() }
+                        SymStatement::Error
                     }
                 },
 

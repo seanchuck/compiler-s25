@@ -14,7 +14,7 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
     for (method_name, cfg) in method_cfgs {
         println!("\n{method_name}:");
 
-        for (id, block) in cfg.clone().get_blocks() {
+        for (id, block) in cfg.get_blocks() {
             println!("    {id}:");
 
             for insn in block.get_instructions() {
@@ -33,7 +33,7 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     Instruction::MethodCall { name, args, dest } => { 
                         let args_string = args.iter().map(|op| op.to_string()).collect::<Vec<_>>().join(", ");
                         if dest.is_some() { 
-                            let dest_string = dest.unwrap();
+                            let dest_string = dest.clone().unwrap();
                             println!("        {dest_string} <- {name}({args_string})"); 
                         }
                         else { println!("        {name}({args_string})"); }
@@ -44,7 +44,7 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     Instruction::NotEqual { left, right, dest } => { println!("        {dest} <- {left} != {right}"); }
                     Instruction::Ret { value } => { 
                         if value.is_some() {
-                            let val_str = value.unwrap();
+                            let val_str = value.clone().unwrap();
                             println!("        ret {val_str}"); 
                         } else {
                             println!("        ret"); 

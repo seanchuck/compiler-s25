@@ -7,24 +7,23 @@ instructions that are simplified, and TAC.
 */
 
 use crate::ast::Type;
-use crate::token::Literal;
 use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Operand {
     GlobalVar(String),
     GlobalArrElement(String, Box<Operand>), // name and index
-    String(usize), // ID of string constant
+    String(i32), // ID of string constant
     LocalVar(String),
     LocalArrElement(String, Box<Operand>),
-    Const(Literal),
-    Argument(usize) // position of the argument
+    Const(i64),
+    Argument(i32) // position of the argument
 }
 
 impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Operand::Const(lit) => write!(f, "{}", lit),
+            Operand::Const(val) => write!(f, "{}", val),
             Operand::String(id) => write!(f, "str{}", id),
             Operand::GlobalVar(name) => write!(f, "{}", name),
             Operand::GlobalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),

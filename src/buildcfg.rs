@@ -107,11 +107,21 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
                     let temp_op = Operand::LocalVar(temp.clone());
                     cfg.add_temp_var(temp.to_string(), None);
 
-                    cfg.add_instruction_to_block(cur_block_id, Instruction::LoadString { src: Operand::String(strings.len()), dest: temp_op.clone() });
+                    cfg.add_instruction_to_block(cur_block_id, Instruction::LoadString { src: Operand::String(strings.len().try_into().unwrap()), dest: temp_op.clone() });
                     strings.push(val.to_string());
                     (cur_block_id, temp_op)
                 }
-                _ => (cur_block_id, Operand::Const(value.clone()))
+                Literal::Bool(val) => {
+                    match val {
+                        true => (cur_block_id, Operand::Const(1)),
+                        false => (cur_block_id, Operand::Const(0))
+                    }
+                }
+                Literal::Int(val) => (cur_block_id, Operand::Const(val.parse::<i64>().unwrap())),
+                Literal::HexInt(val) => (cur_block_id, Operand::Const(i64::from_str_radix(&val, 16).unwrap())),
+                Literal::Long(val) => (cur_block_id, Operand::Const(val.parse::<i64>().unwrap())),
+                Literal::HexLong(val) => (cur_block_id, Operand::Const(i64::from_str_radix(&val, 16).unwrap())),
+                Literal::Char(val) => (cur_block_id, Operand::Const(*val as i64))
 
             }
         }
@@ -190,7 +200,7 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
                     cfg.add_instruction_to_block(
                         next_true_block.get_id(),
                         Instruction::Assign {
-                            src: Operand::Const(Literal::Int("1".to_string())),
+                            src: Operand::Const(1),
                             dest: dest.clone(),
                         },
                     );
@@ -205,7 +215,7 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
                     cfg.add_instruction_to_block(
                         next_false_block.get_id(),
                         Instruction::Assign {
-                            src: Operand::Const(Literal::Int("0".to_string())),
+                            src: Operand::Const(0),
                             dest: dest.clone(),
                         },
                     );
@@ -313,7 +323,7 @@ fn destruct_expr(cfg: &mut CFG, expr: &SymExpr, mut cur_block_id: i32, scope: &S
 
             let instruction: Instruction = match op {
                 UnaryOp::Neg => Instruction::Subtract {
-                    left: Operand::Const(Literal::Int("0".to_string())),
+                    left: Operand::Const(0),
                     right: operand,
                     dest: result.clone(),
                 },
@@ -1064,7 +1074,7 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
         let temp = fresh_temp();
         method_cfg.add_temp_var(temp.to_string(), None);
         scope.add_local(name.to_string(), temp.to_string());
-        method_cfg.add_instruction_to_block(cur_block_id, Instruction::Assign { src: Operand::Argument(pos), dest: Operand::LocalVar(temp) });
+        method_cfg.add_instruction_to_block(cur_block_id, Instruction::Assign { src: Operand::Argument(pos.try_into().unwrap()), dest: Operand::LocalVar(temp) });
     }
 
     for statement in method.body.statements.clone() {

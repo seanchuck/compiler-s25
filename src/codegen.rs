@@ -26,30 +26,51 @@ use crate::tac::*;
 //  - ret
 
 
-/// Linerize the CFG into an instrruction list
-/// suitable for code generation.
-fn linearize_cfg(cfg: &CFG) -> Vec<Instruction>{
-
-    // TODO
-
-    // Iterate over CFG to flatten it
-    for (id, block) in cfg.blocks.clone() {
-    }
-
-    todo!()
-
-}
-
-
 /// Emit x86 code corresponding to the given CFG
 /// Returns a vector of strings of x86 instructions.
-fn generate_method_x86(linear_method: &Vec<Instruction>) -> Vec<X86Instr>{
-    let mut x86_instructions: Vec<X86Instr> = Vec::new();
+fn generate_method_x86(method_name: &String, method_cfg: &mut CFG) -> Vec<X86Insn>{
+    let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
+    x86_instructions.push(X86Insn::Label(method_name.to_string()));
 
-    // TODO: initial pass over blocks to precompute
-    // stack offsets
+    // TODO: method prolog
 
+    for (id, block) in method_cfg.get_blocks() {
+
+        x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
+
+        for insn in block.get_instructions() {
+            match insn {
+                Instruction::Add { left, right, dest } => {
+                    let left_op = match left {
+                        Operand::Const(val) => X86Operand::Constant(*val),
+                        Operand::LocalVar(temp) => X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp)),
+                        Operand::GlobalVar(val) => X86Operand::Global(val.to_string()),
+                        _ => unreachable!()
+                    };
+                    let right_op = match right {
+                        Operand::Const(val) => X86Operand::Constant(*val),
+                        Operand::LocalVar(temp) => X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp)),
+                        Operand::GlobalVar(val) => X86Operand::Global(val.to_string()),
+                        _ => unreachable!()
+                    };
+                    let dest_op = match dest {
+                        Operand::LocalVar(temp) => X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp)),
+                        Operand::GlobalVar(val) => X86Operand::Global(val.to_string()),
+                        _ => unreachable!()
+                    };
+
+                    // rax as working register
+                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
+                    x86_instructions.push(X86Insn::Add(right_op, X86Operand::Reg(Register::Rax)));
+                    x86_instructions.push(X86Insn::Add(X86Operand::Reg(Register::Rax), dest_op));
+                }
+                _ => todo!()
+            }
+        }
+    }
+
+    // TODO: method epilog
     
     x86_instructions
 }
@@ -69,17 +90,10 @@ pub fn generate_assembly(
         print_cfg(&method_cfgs);
     }
 
-    // Generate the linearized IR for each method
-    let mut linearized_methods: HashMap<String, Vec<Instruction>> = HashMap::new();
-    for (method_name, cfg) in &method_cfgs {
-        let instructions = linearize_cfg(cfg); 
-        linearized_methods.insert(method_name.clone(), instructions);
-    }
-
     // Generate a vector of x86 for each method
-    let mut code: HashMap<String, Vec<X86Instr>> = HashMap::new();
-    for (method_name, linear_method) in &linearized_methods {
-        let method_code = generate_method_x86(linear_method); 
+    let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
+    for (method_name, mut method_cfg) in method_cfgs {
+        let method_code = generate_method_x86(&method_name, &mut method_cfg); 
         code.insert(method_name.clone(), method_code);
     }
 
