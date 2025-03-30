@@ -13,8 +13,8 @@ pub enum X86Insn {
     Label(String),
     Push(X86Operand),
     Pop(X86Operand),
-    Ret
-    // TODO: complete
+    Ret,
+    Lea(X86Operand, X86Operand)
 }
 
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ pub enum X86Operand {
     RegLabel(Register, String), // label offset
     Constant(i64),
     Global(String), // name of global constant
-    // GlobalOffset(String, i32) // integer offset
+    Address(Option<String>, Option<Register>, Register, i64) // reg1 + reg2 * scale, offset by label
 }
 
 impl fmt::Display for X86Operand {
@@ -35,6 +35,15 @@ impl fmt::Display for X86Operand {
             X86Operand::Global(name) => write!(f, "{}", name),
             X86Operand::RegInt(reg, offset) => write!(f, "{}({})", offset, reg),
             X86Operand::RegLabel(reg, label) => write!(f, "{}({})", label, reg),
+            X86Operand::Address(label, reg1, reg2, scale) => {
+                    write!(f, "{}({}, {}, {})", 
+                        if label.is_some() { label.clone().unwrap() } else { "".to_string() }, 
+                        if reg1.is_some() { reg1.as_ref().unwrap().to_string() } else { "".to_string() }, 
+                        reg2, 
+                        scale)
+            }
+            
+            
         }
     }
 }
@@ -50,7 +59,8 @@ pub enum Register {
     R10,
     Rbp,
     Rsp,
-    Rax
+    Rax,
+    Rip
 }
 
 impl fmt::Display for Register {
@@ -65,12 +75,12 @@ impl fmt::Display for Register {
             Register::R10 => write!(f, "%r10"),
             Register::Rbp => write!(f, "%rbp"),
             Register::Rsp => write!(f, "%rsp"),
-            Register::Rax => write!(f, "%rax")
+            Register::Rax => write!(f, "%rax"),
+            Register::Rip => write!(f, "%rip"),
         }
     }
 }
 
-// TODO: complete
 impl fmt::Display for X86Insn {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -82,6 +92,7 @@ impl fmt::Display for X86Insn {
             X86Insn::Push(op) => write!(f, "    pushq {}", op),
             X86Insn::Pop(op) => write!(f, "    popq {}", op),
             X86Insn::Ret => write!(f, "    ret"),
+            X86Insn::Lea(src, dst) => write!(f, "    leaq {}, {}", src, dst),
         }
     }
 }

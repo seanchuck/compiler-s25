@@ -3,6 +3,7 @@ Generate x86 code from the Control flow graph.
 **/
 
 use std::collections::HashMap;
+use crate::cfg::ELEMENT_SIZE;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use crate::utils::print::print_cfg;
 use crate::x86::*;
@@ -25,6 +26,64 @@ use crate::tac::*;
 //  - callee function epilogue
 //  - ret
 
+/// Returns the x86 operand corresponding to operand
+fn map_operand(method_cfg: &CFG, operand: &Operand, x86_instructions: &mut Vec<X86Insn>) -> X86Operand {    
+    match operand {
+        Operand::Const(val) => X86Operand::Constant(*val),
+        Operand::LocalVar(temp) => X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp)),
+        Operand::GlobalVar(val) => X86Operand::Global(val.to_string()),
+        Operand::LocalArrElement(arr, idx) => {
+            let idx_op = map_operand(method_cfg, idx, x86_instructions);
+            x86_instructions.push(X86Insn::Lea(X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(arr)), X86Operand::Reg(Register::Rax))); // store base address of array in rax
+            x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(Register::R10))); // store index in r10
+            X86Operand::Address(None, Some(Register::Rax), Register::R10, ELEMENT_SIZE)
+        }
+        Operand::GlobalArrElement(arr, idx) => {
+            let idx_op = map_operand(method_cfg, idx, x86_instructions);
+            x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(Register::R10))); // store index in r10
+            X86Operand::Address(Some(arr.to_string()), None, Register::R10, ELEMENT_SIZE)
+        }
+        Operand::Argument(pos) => {
+            match pos {
+                0 => X86Operand::Reg(Register::Rdi),
+                1 => X86Operand::Reg(Register::Rsi),
+                2 => X86Operand::Reg(Register::Rdx),
+                3 => X86Operand::Reg(Register::Rcx),
+                4 => X86Operand::Reg(Register::R8),
+                5 => X86Operand::Reg(Register::R9),
+                _ => todo!()
+            }
+        }
+        Operand::String(idx) => X86Operand::RegLabel(Register::Rip, format!("str{idx}"))
+    }
+}
+
+/// Adds the x86 instructions corresponding to insn to x86_instructions
+fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut Vec<X86Insn>) {
+    match insn {
+        Instruction::Add { left, right, dest } => {
+            let left_op = map_operand(method_cfg, left, x86_instructions);
+            let right_op = map_operand(method_cfg, right, x86_instructions);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+
+            // rax as working register
+            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Add(right_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Add(X86Operand::Reg(Register::Rax), dest_op));
+        }
+        Instruction::Assign { src, dest } => {
+            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+            let src_op = map_operand(method_cfg, src, x86_instructions);
+            x86_instructions.push(X86Insn::Mov(dest_op, src_op));
+        }
+        Instruction::LoadString { src, dest } => {
+            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+            let src_op = map_operand(method_cfg, src, x86_instructions);
+            x86_instructions.push(X86Insn::Lea(dest_op, src_op));
+        }
+        _ => todo!()
+    }
+}
 
 /// Emit x86 code corresponding to the given CFG
 /// Returns a vector of strings of x86 instructions.
@@ -43,33 +102,7 @@ fn generate_method_x86(method_name: &String, method_cfg: &mut CFG) -> Vec<X86Ins
         x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
 
         for insn in block.get_instructions() {
-            match insn {
-                Instruction::Add { left, right, dest } => {
-                    let left_op = match left {
-                        Operand::Const(val) => X86Operand::Constant(*val),
-                        Operand::LocalVar(temp) => X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp)),
-                        Operand::GlobalVar(val) => X86Operand::Global(val.to_string()),
-                        _ => unreachable!()
-                    };
-                    let right_op = match right {
-                        Operand::Const(val) => X86Operand::Constant(*val),
-                        Operand::LocalVar(temp) => X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp)),
-                        Operand::GlobalVar(val) => X86Operand::Global(val.to_string()),
-                        _ => unreachable!()
-                    };
-                    let dest_op = match dest {
-                        Operand::LocalVar(temp) => X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp)),
-                        Operand::GlobalVar(val) => X86Operand::Global(val.to_string()),
-                        _ => unreachable!()
-                    };
-
-                    // rax as working register
-                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
-                    x86_instructions.push(X86Insn::Add(right_op, X86Operand::Reg(Register::Rax)));
-                    x86_instructions.push(X86Insn::Add(X86Operand::Reg(Register::Rax), dest_op));
-                }
-                _ => todo!()
-            }
+            add_instruction(method_cfg, &insn, &mut x86_instructions);
         }
     }
 
@@ -104,9 +137,7 @@ pub fn generate_assembly(
     }
 
     // Emit the final code
-    for (method_name, method_code) in &code {
-        writeln!(writer, "{}:", method_name).expect("Failed to write label!");
-    
+    for (_, method_code) in &code {    
         for instr in method_code {
             writeln!(writer, "{}", instr).expect("Failed to write instruction!");
         }

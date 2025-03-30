@@ -8,7 +8,7 @@ between those basic blocks.
 use std::collections::BTreeMap;
 use crate::tac::*;
 
-const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
+pub const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
 
 #[derive(Debug, Clone)]
 pub struct CFG {
