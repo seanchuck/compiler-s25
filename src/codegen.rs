@@ -33,7 +33,10 @@ fn generate_method_x86(method_name: &String, method_cfg: &mut CFG) -> Vec<X86Ins
 
     x86_instructions.push(X86Insn::Label(method_name.to_string()));
 
-    // TODO: method prolog
+    // method prologue
+    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rbp))); // push base pointer onto stack
+    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rsp), X86Operand::Reg(Register::Rbp))); // copy stack pointer to base pointer
+    x86_instructions.push(X86Insn::Sub(X86Operand::Constant(method_cfg.stack_size), X86Operand::Reg(Register::Rsp))); // decrease stack pointer to allocate space on the stack
 
     for (id, block) in method_cfg.get_blocks() {
 
@@ -70,7 +73,10 @@ fn generate_method_x86(method_name: &String, method_cfg: &mut CFG) -> Vec<X86Ins
         }
     }
 
-    // TODO: method epilog
+    // method epilogue
+    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rbp), X86Operand::Reg(Register::Rsp))); // move base pointer to stack pointer
+    x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
+    x86_instructions.push(X86Insn::Ret); // return to where function was called
     
     x86_instructions
 }

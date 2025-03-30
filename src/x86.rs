@@ -11,13 +11,16 @@ pub enum X86Insn {
     Sub(X86Operand, X86Operand),
     Call(String),
     Label(String),
+    Push(X86Operand),
+    Pop(X86Operand),
+    Ret
     // TODO: complete
 }
 
 #[derive(Debug, Clone)]
 pub enum X86Operand {
     Reg(Register), // no offset
-    RegInt(Register, i32), // integer offset
+    RegInt(Register, i64), // integer offset
     RegLabel(Register, String), // label offset
     Constant(i64),
     Global(String), // name of global constant
@@ -71,11 +74,14 @@ impl fmt::Display for Register {
 impl fmt::Display for X86Insn {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            X86Insn::Mov(dst, src) => write!(f, "    movq {}, {}", dst, src),
-            X86Insn::Add(dst, src) => write!(f, "    addq {}, {}", dst, src),
-            X86Insn::Sub(dst, src) => write!(f, "    subq {}, {}", dst, src),
-            X86Insn::Call(label)   => write!(f, "    call {}", label),
-            X86Insn::Label(name)   => write!(f, "{}:", name),
+            X86Insn::Mov(src, dst) => write!(f, "    movq {}, {}", src, dst),
+            X86Insn::Add(src, dst) => write!(f, "    addq {}, {}", src, dst),
+            X86Insn::Sub(src, dst) => write!(f, "    subq {}, {}", src, dst),
+            X86Insn::Call(label) => write!(f, "    call {}", label),
+            X86Insn::Label(name) => write!(f, "{}:", name),
+            X86Insn::Push(op) => write!(f, "    pushq {}", op),
+            X86Insn::Pop(op) => write!(f, "    popq {}", op),
+            X86Insn::Ret => write!(f, "    ret"),
         }
     }
 }

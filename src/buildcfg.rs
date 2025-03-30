@@ -1036,11 +1036,11 @@ fn destruct_statement(
                 // array
                 match length.as_ref().unwrap() {
                     Literal::Int(val) => {
-                        let int_val = val.parse::<i32>();
+                        let int_val = val.parse::<i64>();
                         cfg.add_temp_var(temp, Some(int_val.unwrap()));
                     }
                     Literal::HexInt(val) => {
-                        let int_val = i32::from_str_radix(&val, 16);
+                        let int_val = i64::from_str_radix(&val, 16);
                         cfg.add_temp_var(temp, Some(int_val.unwrap()));
                     }
                     _ => unreachable!()

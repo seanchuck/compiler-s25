@@ -8,7 +8,7 @@ between those basic blocks.
 use std::collections::BTreeMap;
 use crate::tac::*;
 
-const ELEMENT_SIZE: i32 = 8; // for now, allocate 8 bytes for everything no matter the type
+const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
 
 #[derive(Debug, Clone)]
 pub struct CFG {
@@ -16,7 +16,7 @@ pub struct CFG {
     // entry block has ID 0
     pub blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
                                        // no need to store edges because basic blocks end with a jump/branch instruction
-    pub stack_size: i32, // total space to allocate on the stack for this method
+    pub stack_size: i64, // total space to allocate on the stack for this method
     pub locals: BTreeMap<String, Local>
 }
 
@@ -34,8 +34,8 @@ pub struct Global {
 
 #[derive(Debug, Clone)]
 pub struct Local {
-    stack_offset: i32,
-    length: Option<i32> // if array
+    stack_offset: i64,
+    length: Option<i64> // if array
 }
 
 impl CFG {
@@ -77,8 +77,8 @@ impl CFG {
     }
 
     /// Allocate space on the stack for a new temp var
-    pub fn add_temp_var(&mut self, temp: String, length: Option<i32>) {
-        let size: i32;
+    pub fn add_temp_var(&mut self, temp: String, length: Option<i64>) {
+        let size: i64;
         if length.is_some() {
             // add one to store the array length
             size = (length.unwrap() + 1) * ELEMENT_SIZE;
@@ -91,7 +91,7 @@ impl CFG {
     }
 
     /// Get the stack offset of a temp var
-    pub fn get_stack_offset(&self, temp: &String) -> i32 {
+    pub fn get_stack_offset(&self, temp: &String) -> i64 {
         self.locals.get(temp).unwrap().stack_offset
     }
 }
