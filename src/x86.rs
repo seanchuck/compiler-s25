@@ -16,7 +16,7 @@ pub enum X86Instr {
     Label(String),
     Push(String),
     Pop(String),
-    Mul(String),
+    Mul(String, String),
     // TODO: complete
     Comment(String)
 }
@@ -29,12 +29,12 @@ impl fmt::Display for X86Instr {
             X86Instr::Mov(dst, src) => write!(f, "    movq {}, {}", dst, src),
             X86Instr::Add(dst, src) => write!(f, "    addq {}, {}", dst, src),
             X86Instr::Sub(dst, src) => write!(f, "    subq {}, {}", dst, src),
+            X86Instr::Mul(dst, src) => write!(f, "    imul {}, {}", dst, src),
             X86Instr::Call(label)   => write!(f, "    call {}", label),
             X86Instr::Label(name)   => write!(f, "{}:", name),
-            X86Instr::Comment(message) => write!(f, "# {}", message),
+            X86Instr::Comment(message) => write!(f, "    # {}", message),
             X86Instr::Push(name) => write!(f, "    push {}", name),
             X86Instr::Pop(name) => write!(f, "    pop {}", name),
-            X86Instr::Mul(dst, src) => write!(f, "    push {}", name),
         }
     }
 }

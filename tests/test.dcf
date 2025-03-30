@@ -1,15 +1,9 @@
-"// This is a comment
+void main() {
+    int a;
+    int b;
+    int c;
 
-/* 
-This is a multi-line comment
-*/
-
-class Main {
-    a = 5;
-    void main() {
-        if (a > 0) {
-            Print("Hello, World!");
-        }
-    }
+    a = 4;
+    b = 3;
+    c = a + b;
 }
-"

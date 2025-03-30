@@ -3,83 +3,95 @@ Generate x86 code from the Control flow graph.
 **/
 
 use std::collections::HashMap;
-use crate::cfg::BasicBlock;
-use crate::tac::Instruction;
+use crate::cfg::{BasicBlock};
+use crate::token::Literal;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use crate::utils::print::print_cfg;
 use crate::x86::X86Instr;
-// use crate::tac::*;
+use crate::tac::*;
 
 
-// TODO: 
-// Use the CFGS to linearize all blocks starting from main 
-// Convert linear blocks into x86 Assembly
-
-// Remember to follow x86 calling convention:
-//  - For now, everything on stack (no registers!)
-//  - Args in %rdi, ...
-//  - Save all caller saved registers
-//  - call
-// 
-//  - callee function prologue (%bp, new stack frame)
-//  - save callee saved registers
-//  - function body
-//  - callee function epilogue
-//  - ret
-
-
-// /// Linerize the CFG into an instrruction list
-// /// suitable for code generation.
-// fn linearize_cfg(cfg: &CFG) -> Vec<Instruction>{
-
-//     // TODO
-
-//     // Iterate over CFG to flatten it
-//     for (id, block) in cfg.blocks.clone() {
-//     }
-
-//     todo!()
-
-// }
-
-// Convienient helper for storing top of stack into a dest operand
-fn store_top_to(dest: &Operand) -> Vec<X86Instr> {
-    let dest_str = operand_to_x86(dest);
-    vec![
-        X86Instr::Pop("%rax".into()),                 // Pop result into %rax
-        X86Instr::Mov(dest_str, "%rax".into()),      // Store into destination
-    ]
+fn literal_to_x86(lit: &Literal) -> String {
+    match lit {
+        Literal::Char(c) => format!("${}", *c as u8),
+        Literal::String(s) => format!("${}", s),
+        Literal::Int(s) => format!("${}", s),
+        Literal::Long(s) => format!("${}", s),
+        Literal::HexInt(s) => format!("${}", s),
+        Literal::HexLong(s) => format!("${}", s),
+        Literal::Bool(true) => "$1".to_string(),
+        Literal::Bool(false) => "$0".to_string(),
+    }
 }
 
-fn instruction_to_x86(instruction: Instruction) -> Vec<X86Instr> {
+
+fn operand_to_x86(op: &Operand) -> String {
+    match op {
+        Operand::GlobalVar(name) => format!("{}", name),
+        Operand::GlobalArrElement(name, index) => {
+            let index_str = operand_to_x86(index);
+            format!("{}({})", name, index_str)
+        }
+        Operand::String(id) => format!(".S{}", id),
+        Operand::LocalVar(name) => format!("-{}(%rbp)", name),
+        Operand::LocalArrElement(name, index) => {
+            let index_str = operand_to_x86(index);
+            format!("-{}({})", name, index_str)
+        }
+        Operand::Const(lit) => literal_to_x86(lit),
+        Operand::Argument(pos) => {
+            // System V x86_64 calling convention: first 6 arguments are in registers
+            let arg_regs = ["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
+            if *pos < arg_regs.len() {
+                arg_regs[*pos].to_string()
+            } else {
+                // After the 6th argument, they are pushed on stack (simplified)
+                let offset = 16 + 8 * (pos - arg_regs.len()); // after return addr and old RBP
+                format!("{}(%rbp)", offset)     // TODO is this right way to handle arguments
+            }
+        }
+    }
+}
+
+
+fn instruction_to_x86(instruction: &Instruction) -> Vec<X86Instr> {
     match instruction {
         Instruction::Add { left, right, dest } => {
-            vec![
-                X86Instr::Comment(format!("Begin Add: {} = {} + {}", dest, left, right)),
-                X86Instr::Mov("%rax".into(), left),     
-                X86Instr::Add("%rax".into(), right), // rax = left + right
-                X86Instr::Mov(dest_str, "%rax".into()), 
-                X86Instr::Comment(format!("End Add")),
-            ]
-        },
+                        let left_str = operand_to_x86(left);
+                        let right_str = operand_to_x86(right);
+                        let dest_str = operand_to_x86(dest);
+                        vec![
+                            X86Instr::Comment(format!("Begin Add: {} = {} + {}", dest, left, right)),
+                            X86Instr::Mov("%rax".into(), left_str),
+                            X86Instr::Add("%rax".into(), right_str),
+                            X86Instr::Mov(dest_str, "%rax".into()),
+                            X86Instr::Comment("End Add".into()),
+                        ]
+            }
         Instruction::Subtract { left, right, dest } => {
-            vec![
-                X86Instr::Comment(format!("Begin Sub: {} = {} - {}", dest, left, right)),
-                X86Instr::Mov("%rax".into(), left),     
-                X86Instr::Sub("%rax".into(), right), // rax = left - right
-                X86Instr::Mov(dest_str, "%rax".into()), 
-                X86Instr::Comment(format!("End Sub")),
-            ]
-        },
+                let left_str = operand_to_x86(left);
+                let right_str = operand_to_x86(right);
+                let dest_str = operand_to_x86(dest);
+                vec![
+                    X86Instr::Comment(format!("Begin Sub: {} = {} - {}", dest, left, right)),
+                    X86Instr::Mov("%rax".into(), left_str),
+                    X86Instr::Sub("%rax".into(), right_str),
+                    X86Instr::Mov(dest_str, "%rax".into()),
+                    X86Instr::Comment("End Sub".into()),
+                ]
+            }
         Instruction::Multiply { left, right, dest } => {
-            vec![
-                X86Instr::Comment(format!("Begin Mul: {} = {} * {}", dest, left, right)),
-                X86Instr::Mov("%rax".into(), left),
-                X86Instr::Mul("%rax".into(), right), // rax = rax * right
-                X86Instr::Mov(dest_str, "%rax".into()), 
-                X86Instr::Comment(format!("End Mul")),
-            ]
-        },
+                let left_str = operand_to_x86(left);
+                let right_str = operand_to_x86(right);
+                let dest_str = operand_to_x86(dest);
+                vec![
+                    X86Instr::Comment(format!("Begin Mul: {} = {} * {}", dest, left, right)),
+                    X86Instr::Mov("%rax".into(), left_str),
+                    X86Instr::Mul("%rax".into(), right_str),
+                    X86Instr::Mov(dest_str, "%rax".into()),
+                    X86Instr::Comment("End Mul".into()),
+                ]
+            }
         Instruction::Divide { left, right, dest } => todo!(),
         Instruction::Modulo { left, right, dest } => todo!(),
         Instruction::Not { expr, dest } => todo!(),
@@ -93,19 +105,23 @@ fn instruction_to_x86(instruction: Instruction) -> Vec<X86Instr> {
         Instruction::NotEqual { left, right, dest } => todo!(),
         Instruction::MethodCall { name, args, dest } => todo!(),
         Instruction::UJmp { id } => todo!(),
-        Instruction::Branch { condition, true_target, false_target } => todo!(),
+        Instruction::Cmp { arg1, arg2 } => todo!(),
+        Instruction::CJmp { condition, target_id } => todo!(),
         Instruction::Ret { value } => todo!(),
-        Instruction::Assign { src, dest } => todo!(),
-        Instruction::Load { src, dest } => todo!(),
-        Instruction::Store { src, dest } => todo!(),
+        Instruction::Assign { src, dest } => {
+            let src_str = operand_to_x86(src);
+            let dest_str = operand_to_x86(dest);
+            vec![X86Instr::Mov(dest_str, src_str)]
+        },
+        Instruction::LoadString { src, dest } => todo!(),
     }
 }
 
 
-fn generate_block_x86(bblock: BasicBlock) -> Vec<X86Instr> {    // TODO make this into a simple map
-    let mut instructions: Vec<X86Instr> =  Vec::new();
+fn generate_block_x86(bblock: BasicBlock) -> Vec<X86Instr> {
+    let mut instructions: Vec<X86Instr> = Vec::new();
     for instruction in bblock.get_instructions() {
-        instructions.append(&mut instruction_to_x86(instruction));
+        instructions.append(&mut instruction_to_x86(&instruction));
     }
     instructions
 }
@@ -115,7 +131,7 @@ fn generate_method_x86(cfg: &CFG) -> Vec<X86Instr> {
     // TODO set up method call
 
     let blocks: std::collections::BTreeMap<i32, BasicBlock> = cfg.clone().get_blocks();
-    for (number, bblock) in blocks {
+    for (_number, bblock) in blocks {
         instructions.append(&mut generate_block_x86(bblock));
     }
 
@@ -133,7 +149,8 @@ pub fn generate_assembly(
 ) {
 
     // Generate the method CFGS
-    let method_cfgs: HashMap<String, CFG> = build_cfg(file, filename, writer, debug);
+    let (method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
+
     if debug {
         print_cfg(&method_cfgs);
     }
@@ -145,15 +162,15 @@ pub fn generate_assembly(
         code.insert(method_name.clone(), method_code);
     }
 
-    // // Emit the final code
-    // for (method_name, method_code) in &code {
-    //     writeln!(writer, "{}:", method_name).expect("Failed to write label!");
+    // Emit the final code
+    for (method_name, method_code) in &code {
+        writeln!(writer, "{}:", method_name).expect("Failed to write label!");
     
-    //     for instr in method_code {
-    //         writeln!(writer, "{}", instr).expect("Failed to write instruction!");
-    //     }
+        for instr in method_code {
+            writeln!(writer, "{}", instr).expect("Failed to write instruction!");
+        }
     
-    //     writeln!(writer).expect("Failed to write newline between methods!");
-    // }
+        writeln!(writer).expect("Failed to write newline between methods!");
+    }
     
 }
