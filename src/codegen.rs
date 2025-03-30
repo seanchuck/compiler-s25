@@ -5,7 +5,7 @@ Generate x86 code from the Control flow graph.
 use std::collections::HashMap;
 use crate::cfg::ELEMENT_SIZE;
 use crate::{buildcfg::build_cfg, cfg::CFG};
-use crate::utils::print::print_cfg;
+use crate::utils::print::{self, print_cfg};
 use crate::x86::*;
 use crate::tac::*;
 
@@ -69,17 +69,17 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             // rax as working register
             x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
             x86_instructions.push(X86Insn::Add(right_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Add(X86Operand::Reg(Register::Rax), dest_op));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
         }
         Instruction::Assign { src, dest } => {
             let dest_op = map_operand(method_cfg, dest, x86_instructions);
             let src_op = map_operand(method_cfg, src, x86_instructions);
-            x86_instructions.push(X86Insn::Mov(dest_op, src_op));
+            x86_instructions.push(X86Insn::Mov(src_op, dest_op));
         }
         Instruction::LoadString { src, dest } => {
             let dest_op = map_operand(method_cfg, dest, x86_instructions);
             let src_op = map_operand(method_cfg, src, x86_instructions);
-            x86_instructions.push(X86Insn::Lea(dest_op, src_op));
+            x86_instructions.push(X86Insn::Lea(src_op, dest_op));
         }
         _ => todo!()
     }
@@ -137,6 +137,7 @@ pub fn generate_assembly(
     }
 
     // Emit the final code
+    writeln!(writer, "{}", "\n========== X86 Code ==========\n").expect("Failed to write instruction!");
     for (_, method_code) in &code {    
         for instr in method_code {
             writeln!(writer, "{}", instr).expect("Failed to write instruction!");
