@@ -81,7 +81,42 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             let src_op = map_operand(method_cfg, src, x86_instructions);
             x86_instructions.push(X86Insn::Lea(src_op, dest_op));
         }
-        _ => todo!()
+        Instruction::MethodCall { name, args, dest } => {
+            // Determine the destination operand
+            let dest_op = match dest {
+                Some(d) => map_operand(method_cfg, d, x86_instructions),
+                None => X86Operand::Reg(Register::Rax),
+            };
+        
+            // Setup arguments
+            // TODO: push arguments onto the stack or into registers as per calling convention
+            for (i, arg) in args.iter().enumerate() {
+                let arg_reg = map_operand(method_cfg, &Operand::Argument(i as i32), x86_instructions);
+                let src_reg = map_operand(method_cfg, arg, x86_instructions);
+                x86_instructions.push(X86Insn::Mov(src_reg, arg_reg));
+            }
+        
+            // Make the call
+            x86_instructions.push(X86Insn::Call(name.to_string()));
+            
+            // Move the result into `dest` if necessary
+            match dest_op {
+                X86Operand::Reg(Register::Rax) => {}
+                _ => x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op))
+            }
+        }
+        Instruction::Ret { value } => {
+            if let Some(value) = value {
+                let value_reg = map_operand(method_cfg, value, x86_instructions);
+                x86_instructions.push(X86Insn::Mov(value_reg, X86Operand::Reg(Register::Rax)));
+            }
+            x86_instructions.push(X86Insn::Ret);
+        }
+        
+        _ => {
+            println!("{:?}", insn);
+            todo!()
+        }
     }
 }
 
