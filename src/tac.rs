@@ -13,11 +13,11 @@ use std::fmt;
 pub enum Operand {
     GlobalVar(String),
     GlobalArrElement(String, Box<Operand>), // name and index
-    String(i32), // ID of string constant
+    String(i32),                            // ID of string constant
     LocalVar(String),
     LocalArrElement(String, Box<Operand>),
     Const(i64),
-    Argument(i32) // position of the argument
+    Argument(i32), // position of the argument
 }
 
 impl fmt::Display for Operand {
@@ -29,7 +29,7 @@ impl fmt::Display for Operand {
             Operand::GlobalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
             Operand::LocalVar(name) => write!(f, "{}", name),
             Operand::LocalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
-            Operand::Argument(pos) => write!(f, "arg{}", pos)
+            Operand::Argument(pos) => write!(f, "arg{}", pos),
         }
     }
 }
@@ -143,7 +143,7 @@ pub enum Instruction {
     CJmp {
         // conditional jump
         condition: Operand,
-        id: i32,  // ID of basic block to jump to if condition is true
+        id: i32, // ID of basic block to jump to if condition is true
     },
     Ret {
         value: Option<Operand>,

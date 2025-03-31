@@ -1,12 +1,11 @@
+use crate::tac::*;
 /**
 Control flow graph (CFG) representation.
 
 Consists of basic blocks and directed edges
 between those basic blocks.
 **/
-
 use std::collections::BTreeMap;
-use crate::tac::*;
 
 pub const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
 
@@ -15,9 +14,9 @@ pub struct CFG {
     // BTreeMap is hash map that allows constant iteration order
     // entry block has ID 0
     pub blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
-                                       // no need to store edges because basic blocks end with a jump/branch instruction
+    // no need to store edges because basic blocks end with a jump/branch instruction
     pub stack_size: i64, // total space to allocate on the stack for this method
-    pub locals: BTreeMap<String, Local>
+    pub locals: BTreeMap<String, Local>,
 }
 
 #[derive(Debug, Clone)]
@@ -28,14 +27,14 @@ pub struct BasicBlock {
 }
 
 pub struct Global {
-    pub name: String, 
-    pub length: Option<i32> // if array
+    pub name: String,
+    pub length: Option<i32>, // if array
 }
 
 #[derive(Debug, Clone)]
 pub struct Local {
     stack_offset: i64,
-    length: Option<i64> // if array
+    length: Option<i64>, // if array
 }
 
 impl CFG {
@@ -43,7 +42,7 @@ impl CFG {
         CFG {
             blocks: BTreeMap::new(),
             stack_size: 0,
-            locals: BTreeMap::new()
+            locals: BTreeMap::new(),
         }
     }
 
@@ -87,7 +86,13 @@ impl CFG {
         }
 
         self.stack_size += size;
-        self.locals.insert(temp, Local { stack_offset: -self.stack_size, length: length });
+        self.locals.insert(
+            temp,
+            Local {
+                stack_offset: -self.stack_size,
+                length: length,
+            },
+        );
     }
 
     /// Get the stack offset of a temp var
@@ -100,7 +105,7 @@ impl BasicBlock {
     pub fn new(id: i32) -> BasicBlock {
         BasicBlock {
             instructions: Vec::new(),
-            id
+            id,
         }
     }
 

@@ -11,8 +11,8 @@ This may lead to BUGS(!) so be sure to check the validity.
     of packing stuff in enums, but whatever.
 */
 
-use std::fmt;
 use crate::token::{Literal, Span};
+use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum AST {

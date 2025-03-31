@@ -66,7 +66,7 @@ pub enum SymStatement {
         target: SymExpr, //Now supports both `Identifier` and `ArrAccess`
         expr: SymExpr,
         span: Span,
-        op: AssignOp
+        op: AssignOp,
     },
     MethodCall {
         method_name: String,
@@ -102,7 +102,7 @@ pub enum SymStatement {
     Continue {
         span: Span,
     },
-    Error
+    Error,
 }
 
 /// IR representation for expressions

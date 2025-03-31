@@ -1,7 +1,6 @@
 /**
 Data structures for x86 code generation.
 **/
-
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -14,17 +13,17 @@ pub enum X86Insn {
     Push(X86Operand),
     Pop(X86Operand),
     Ret,
-    Lea(X86Operand, X86Operand)
+    Lea(X86Operand, X86Operand),
 }
 
 #[derive(Debug, Clone)]
 pub enum X86Operand {
-    Reg(Register), // no offset
-    RegInt(Register, i64), // integer offset
+    Reg(Register),              // no offset
+    RegInt(Register, i64),      // integer offset
     RegLabel(Register, String), // label offset
     Constant(i64),
     Global(String), // name of global constant
-    Address(Option<String>, Option<Register>, Register, i64) // reg1 + reg2 * scale, offset by label
+    Address(Option<String>, Option<Register>, Register, i64), // reg1 + reg2 * scale, offset by label
 }
 
 impl fmt::Display for X86Operand {
@@ -36,14 +35,23 @@ impl fmt::Display for X86Operand {
             X86Operand::RegInt(reg, offset) => write!(f, "{}({})", offset, reg),
             X86Operand::RegLabel(reg, label) => write!(f, "{}({})", label, reg),
             X86Operand::Address(label, reg1, reg2, scale) => {
-                    write!(f, "{}({}, {}, {})", 
-                        if label.is_some() { label.clone().unwrap() } else { "".to_string() }, 
-                        if reg1.is_some() { reg1.as_ref().unwrap().to_string() } else { "".to_string() }, 
-                        reg2, 
-                        scale)
+                write!(
+                    f,
+                    "{}({}, {}, {})",
+                    if label.is_some() {
+                        label.clone().unwrap()
+                    } else {
+                        "".to_string()
+                    },
+                    if reg1.is_some() {
+                        reg1.as_ref().unwrap().to_string()
+                    } else {
+                        "".to_string()
+                    },
+                    reg2,
+                    scale
+                )
             }
-            
-            
         }
     }
 }
@@ -60,7 +68,7 @@ pub enum Register {
     Rbp,
     Rsp,
     Rax,
-    Rip
+    Rip,
 }
 
 impl fmt::Display for Register {

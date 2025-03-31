@@ -1,17 +1,20 @@
 /**
  * Traverse the IR after it is built to perform more semantic checks
  */
-
 use std::cmp;
 use std::rc::Rc;
 
-use crate::semcheck::{format_error_message, format_error_message0, format_error_message2};
-use crate::token::{Span, Literal};
 use crate::ast::{AssignOp, BinaryOp, Type, UnaryOp};
 use crate::scope::*;
+use crate::semcheck::{format_error_message, format_error_message0, format_error_message2};
 use crate::symtable::*;
+use crate::token::{Literal, Span};
 
-pub fn traverse_ir(program: &SymProgram, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+pub fn traverse_ir(
+    program: &SymProgram,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     match program {
         SymProgram { methods, .. } => {
             for (_, body) in methods.iter() {
@@ -23,42 +26,139 @@ pub fn traverse_ir(program: &SymProgram, writer: &mut dyn std::io::Write, contex
 
 fn check_method(body: &SymMethod, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
     match body {
-        SymMethod { return_type, body, .. } => check_block(&body, return_type, false, writer, context),
+        SymMethod {
+            return_type, body, ..
+        } => check_block(&body, return_type, false, writer, context),
     }
 }
 
-fn check_block(block: &SymBlock, return_type: &Type, in_loop: bool, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_block(
+    block: &SymBlock,
+    return_type: &Type,
+    in_loop: bool,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     match block {
-        SymBlock { scope, statements , ..} => {
+        SymBlock {
+            scope, statements, ..
+        } => {
             for statement in statements.iter() {
-                check_statement(statement, return_type, in_loop, &*scope.borrow(), writer, context);
+                check_statement(
+                    statement,
+                    return_type,
+                    in_loop,
+                    &*scope.borrow(),
+                    writer,
+                    context,
+                );
             }
         }
     }
 }
 
-fn check_statement(statement: &SymStatement, return_type: &Type, in_loop: bool, scope: &Scope, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_statement(
+    statement: &SymStatement,
+    return_type: &Type,
+    in_loop: bool,
+    scope: &Scope,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     match statement {
-        SymStatement::VarDecl { name: _, typ: _, length, span} => check_var_decl( length.clone(), span, writer, context),
-        SymStatement::Assignment { target, expr, op, span } => check_assignment(target, expr, op, scope, span, writer, context),
-        SymStatement::MethodCall { method_name, args, span } => check_method_call(method_name, &args.into_iter().map(|expr| Rc::new(expr.clone())).collect(), scope, span, writer, context),
-        SymStatement::If { condition, then_block, else_block, span } => check_if(condition, then_block, else_block, return_type, in_loop, scope, span, writer, context),
-        SymStatement::While { condition, block , span} => check_while(condition, block, return_type, scope, span, writer, context),
-        SymStatement::For { var, init, condition, update, block, span } => check_for(var, init, condition, update, block, return_type, scope, span, writer, context),
-        SymStatement::Return { expr, span } => check_return(expr, return_type, scope, span, writer, context),
-        SymStatement::Break{ span} => check_break(in_loop, span, writer, context),
-        SymStatement::Continue{ span} => check_continue(in_loop, span, writer, context),
-        SymStatement::Error{..} => {},
+        SymStatement::VarDecl {
+            name: _,
+            typ: _,
+            length,
+            span,
+        } => check_var_decl(length.clone(), span, writer, context),
+        SymStatement::Assignment {
+            target,
+            expr,
+            op,
+            span,
+        } => check_assignment(target, expr, op, scope, span, writer, context),
+        SymStatement::MethodCall {
+            method_name,
+            args,
+            span,
+        } => check_method_call(
+            method_name,
+            &args.into_iter().map(|expr| Rc::new(expr.clone())).collect(),
+            scope,
+            span,
+            writer,
+            context,
+        ),
+        SymStatement::If {
+            condition,
+            then_block,
+            else_block,
+            span,
+        } => check_if(
+            condition,
+            then_block,
+            else_block,
+            return_type,
+            in_loop,
+            scope,
+            span,
+            writer,
+            context,
+        ),
+        SymStatement::While {
+            condition,
+            block,
+            span,
+        } => check_while(condition, block, return_type, scope, span, writer, context),
+        SymStatement::For {
+            var,
+            init,
+            condition,
+            update,
+            block,
+            span,
+        } => check_for(
+            var,
+            init,
+            condition,
+            update,
+            block,
+            return_type,
+            scope,
+            span,
+            writer,
+            context,
+        ),
+        SymStatement::Return { expr, span } => {
+            check_return(expr, return_type, scope, span, writer, context)
+        }
+        SymStatement::Break { span } => check_break(in_loop, span, writer, context),
+        SymStatement::Continue { span } => check_continue(in_loop, span, writer, context),
+        SymStatement::Error { .. } => {}
     }
 }
 
-fn check_var_decl(length: Option<Literal>, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_var_decl(
+    length: Option<Literal>,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     if length.is_some() {
         infer_literal_type(&length.unwrap(), span, writer, context); // must be an int, but check rule 21
     }
 }
 
-fn type_check_assignment(expr: &SymExpr, op: &AssignOp, typ: &Type, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn type_check_assignment(
+    expr: &SymExpr,
+    op: &AssignOp,
+    typ: &Type,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     let expr_type = infer_expr_type(expr, scope, writer, context);
 
     match op {
@@ -68,26 +168,46 @@ fn type_check_assignment(expr: &SymExpr, op: &AssignOp, typ: &Type, scope: &Scop
                 writeln!(
                     writer,
                     "{}",
-                    format_error_message(&format!("{}", typ), Some(&span), &format!("cannot assign type `{}` to type", expr_type.unwrap()), context)
+                    format_error_message(
+                        &format!("{}", typ),
+                        Some(&span),
+                        &format!("cannot assign type `{}` to type", expr_type.unwrap()),
+                        context
+                    )
                 )
                 .expect("Failed to write error message");
             }
         }
         _ => {
             // rule 18
-            if expr_type.is_some() && expr_type.clone().unwrap() != Type::Int && expr_type.clone().unwrap() != Type::Long
-                || *typ != Type::Int && *typ != Type::Long {
+            if expr_type.is_some()
+                && expr_type.clone().unwrap() != Type::Int
+                && expr_type.clone().unwrap() != Type::Long
+                || *typ != Type::Int && *typ != Type::Long
+            {
                 writeln!(
                     writer,
                     "{}",
-                    format_error_message2(&format!("{}", typ), &format!("{}", expr_type.unwrap()), Some(&span), "invalid types for compound assignment", context)
+                    format_error_message2(
+                        &format!("{}", typ),
+                        &format!("{}", expr_type.unwrap()),
+                        Some(&span),
+                        "invalid types for compound assignment",
+                        context
+                    )
                 )
                 .expect("Failed to write error message");
             } else if expr_type.is_some() && expr_type.clone().unwrap() != *typ {
                 writeln!(
                     writer,
                     "{}",
-                    format_error_message2(&format!("{}", expr_type.unwrap()), &format!("{}", typ), Some(&span), "mismatched types in compound assignment", context)
+                    format_error_message2(
+                        &format!("{}", expr_type.unwrap()),
+                        &format!("{}", typ),
+                        Some(&span),
+                        "mismatched types in compound assignment",
+                        context
+                    )
                 )
                 .expect("Failed to write error message");
             }
@@ -95,17 +215,32 @@ fn type_check_assignment(expr: &SymExpr, op: &AssignOp, typ: &Type, scope: &Scop
     }
 }
 
-fn check_assignment(target: &SymExpr, expr: &SymExpr, op: &AssignOp, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_assignment(
+    target: &SymExpr,
+    expr: &SymExpr,
+    op: &AssignOp,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     match target {
         SymExpr::Identifier { entry, .. } => {
             match entry {
-                TableEntry::Variable { name, typ, length, .. } => {
+                TableEntry::Variable {
+                    name, typ, length, ..
+                } => {
                     // rule 23
                     if length.is_some() {
                         writeln!(
                             writer,
                             "{}",
-                            format_error_message(name, Some(&span), "cannot assign to array", context)
+                            format_error_message(
+                                name,
+                                Some(&span),
+                                "cannot assign to array",
+                                context
+                            )
                         )
                         .expect("Failed to write error message");
                     } else {
@@ -134,18 +269,43 @@ fn check_assignment(target: &SymExpr, expr: &SymExpr, op: &AssignOp, scope: &Sco
             let target_type = infer_arr_access_type(id, index, scope, span, writer, context);
 
             if target_type.is_some() {
-                type_check_assignment(expr, op, &target_type.unwrap(), scope, span, writer, context);
+                type_check_assignment(
+                    expr,
+                    op,
+                    &target_type.unwrap(),
+                    scope,
+                    span,
+                    writer,
+                    context,
+                );
             }
         }
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 
-fn check_method_call(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_method_call(
+    method_name: &String,
+    args: &Vec<Rc<SymExpr>>,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     infer_method_call_type(method_name, args, scope, span, writer, context);
 }
 
-fn check_if(condition: &SymExpr, then_block: &Rc<SymBlock>, else_block: &Option<Rc<SymBlock>>, return_type: &Type, in_loop: bool, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_if(
+    condition: &SymExpr,
+    then_block: &Rc<SymBlock>,
+    else_block: &Option<Rc<SymBlock>>,
+    return_type: &Type,
+    in_loop: bool,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     // rule 13
     let cond_type = infer_expr_type(condition, scope, writer, context);
 
@@ -153,7 +313,12 @@ fn check_if(condition: &SymExpr, then_block: &Rc<SymBlock>, else_block: &Option<
         writeln!(
             writer,
             "{}",
-            format_error_message(&format!("{}", cond_type.unwrap()), Some(&span), "if condition must have type `bool`, instead found", context)
+            format_error_message(
+                &format!("{}", cond_type.unwrap()),
+                Some(&span),
+                "if condition must have type `bool`, instead found",
+                context
+            )
         )
         .expect("Failed to write error message");
     }
@@ -161,11 +326,25 @@ fn check_if(condition: &SymExpr, then_block: &Rc<SymBlock>, else_block: &Option<
     check_block(&then_block, return_type, in_loop, writer, context);
 
     if else_block.is_some() {
-        check_block(&else_block.as_ref().unwrap(), return_type, in_loop, writer, context);
+        check_block(
+            &else_block.as_ref().unwrap(),
+            return_type,
+            in_loop,
+            writer,
+            context,
+        );
     }
 }
 
-fn check_while(condition: &SymExpr, block: &Rc<SymBlock>, return_type: &Type, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_while(
+    condition: &SymExpr,
+    block: &Rc<SymBlock>,
+    return_type: &Type,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     // rule 13
     let cond_type = infer_expr_type(condition, scope, writer, context);
 
@@ -173,7 +352,12 @@ fn check_while(condition: &SymExpr, block: &Rc<SymBlock>, return_type: &Type, sc
         writeln!(
             writer,
             "{}",
-            format_error_message(&format!("{}", cond_type.unwrap()), Some(&span), "while condition must have type `bool`, instead found", context)
+            format_error_message(
+                &format!("{}", cond_type.unwrap()),
+                Some(&span),
+                "while condition must have type `bool`, instead found",
+                context
+            )
         )
         .expect("Failed to write error message");
     }
@@ -181,19 +365,34 @@ fn check_while(condition: &SymExpr, block: &Rc<SymBlock>, return_type: &Type, sc
     check_block(&block, return_type, true, writer, context);
 }
 
-fn check_for(var: &String, init: &SymExpr, condition: &SymExpr, update: &SymStatement, block: &Rc<SymBlock>, return_type: &Type, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_for(
+    var: &String,
+    init: &SymExpr,
+    condition: &SymExpr,
+    update: &SymStatement,
+    block: &Rc<SymBlock>,
+    return_type: &Type,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     // use var and make sure it matches init
-    // build up and use check_assignment 
+    // build up and use check_assignment
     let init_type = infer_expr_type(init, scope, writer, context);
-    let cond_type = infer_expr_type(condition, scope,  writer, context);
-
+    let cond_type = infer_expr_type(condition, scope, writer, context);
 
     // rule 5
     if init_type.is_some() && init_type == Some(Type::Void) {
         writeln!(
             writer,
             "{}",
-            format_error_message(&format!("{}", init_type.unwrap()), Some(&span), "method call in init expression cannot return type", context)
+            format_error_message(
+                &format!("{}", init_type.unwrap()),
+                Some(&span),
+                "method call in init expression cannot return type",
+                context
+            )
         )
         .expect("Failed to write error message");
     }
@@ -203,40 +402,70 @@ fn check_for(var: &String, init: &SymExpr, condition: &SymExpr, update: &SymStat
         writeln!(
             writer,
             "{}",
-            format_error_message(&format!("{}", cond_type.unwrap()), Some(&span), "for condition must have type `bool`, instead found", context)
+            format_error_message(
+                &format!("{}", cond_type.unwrap()),
+                Some(&span),
+                "for condition must have type `bool`, instead found",
+                context
+            )
         )
         .expect("Failed to write error message");
     }
 
     // Check the init statement validity
     if let Some(var_entry) = scope.lookup(var) {
-        let init_statement = SymStatement::Assignment { target: (SymExpr::Identifier { entry: (var_entry), span: (span.clone()) }), expr: (init.clone()), span: (span.clone()), op: (AssignOp::Assign) };
-        check_statement(&init_statement, return_type, false, scope, writer, context); // in_loop shouldnt matter here
+        let init_statement = SymStatement::Assignment {
+            target: (SymExpr::Identifier {
+                entry: (var_entry),
+                span: (span.clone()),
+            }),
+            expr: (init.clone()),
+            span: (span.clone()),
+            op: (AssignOp::Assign),
+        };
+        check_statement(&init_statement, return_type, false, scope, writer, context);
+    // in_loop shouldnt matter here
     } else {
         writeln!(
             writer,
             "{}",
-            format_error_message(&format!("{}", var), Some(&span), "init statement contains undefined variable", context)
+            format_error_message(
+                &format!("{}", var),
+                Some(&span),
+                "init statement contains undefined variable",
+                context
+            )
         )
         .expect("Failed to write error message");
     }
 
     // Check update statement for validity
-    check_statement(update, return_type, false, scope, writer, context);  // in_loop shouldnt matter in this case
-    
+    check_statement(update, return_type, false, scope, writer, context); // in_loop shouldnt matter in this case
 
     // 5) Check the loop body.
     check_block(block, return_type, true, writer, context);
 }
 
 // rules 7 and 8
-fn check_return(expr: &Option<SymExpr>, expected_return_type: &Type, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_return(
+    expr: &Option<SymExpr>,
+    expected_return_type: &Type,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     if expr.is_some() {
         if *expected_return_type == Type::Void {
             writeln!(
                 writer,
                 "{}",
-                format_error_message(&format!("{}", expected_return_type), Some(&span), "did not expect expression, method returns", context)
+                format_error_message(
+                    &format!("{}", expected_return_type),
+                    Some(&span),
+                    "did not expect expression, method returns",
+                    context
+                )
             )
             .expect("Failed to write error message");
         } else {
@@ -246,17 +475,31 @@ fn check_return(expr: &Option<SymExpr>, expected_return_type: &Type, scope: &Sco
                 writeln!(
                     writer,
                     "{}",
-                    format_error_message(&format!("{}", expr_type.unwrap()), Some(&span), &format!("expected return type `{}`, instead found", expected_return_type), context)
+                    format_error_message(
+                        &format!("{}", expr_type.unwrap()),
+                        Some(&span),
+                        &format!(
+                            "expected return type `{}`, instead found",
+                            expected_return_type
+                        ),
+                        context
+                    )
                 )
                 .expect("Failed to write error message");
             }
         }
-    } else {    // Function actually returns void
+    } else {
+        // Function actually returns void
         if *expected_return_type != Type::Void {
             writeln!(
                 writer,
                 "{}",
-                format_error_message(&format!("{:?}", expr), Some(&span), "expected non-void return and got void", context)
+                format_error_message(
+                    &format!("{:?}", expr),
+                    Some(&span),
+                    "expected non-void return and got void",
+                    context
+                )
             )
             .expect("Failed to write error message");
         }
@@ -264,7 +507,12 @@ fn check_return(expr: &Option<SymExpr>, expected_return_type: &Type, scope: &Sco
 }
 
 // rule 19
-fn check_break(in_loop: bool, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_break(
+    in_loop: bool,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     if !in_loop {
         writeln!(
             writer,
@@ -276,7 +524,12 @@ fn check_break(in_loop: bool, span: &Span, writer: &mut dyn std::io::Write, cont
 }
 
 // rule 19
-fn check_continue(in_loop: bool, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) {
+fn check_continue(
+    in_loop: bool,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) {
     if !in_loop {
         writeln!(
             writer,
@@ -287,26 +540,57 @@ fn check_continue(in_loop: bool, span: &Span, writer: &mut dyn std::io::Write, c
     }
 }
 
-fn infer_expr_type(expr: &SymExpr, scope: &Scope, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Option<Type> {
+fn infer_expr_type(
+    expr: &SymExpr,
+    scope: &Scope,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) -> Option<Type> {
     match expr {
-        SymExpr::ArrAccess { id, index, span } => infer_arr_access_type(id, index, scope, span, writer, context),
-        SymExpr::BinaryExpr { op, left, right, span } => infer_binary_expr_type(op, left, right, scope, span, writer, context),
-        SymExpr::Cast { target_type, expr, span } => infer_cast_type(target_type, expr, scope, span, writer, context),
+        SymExpr::ArrAccess { id, index, span } => {
+            infer_arr_access_type(id, index, scope, span, writer, context)
+        }
+        SymExpr::BinaryExpr {
+            op,
+            left,
+            right,
+            span,
+        } => infer_binary_expr_type(op, left, right, scope, span, writer, context),
+        SymExpr::Cast {
+            target_type,
+            expr,
+            span,
+        } => infer_cast_type(target_type, expr, scope, span, writer, context),
         SymExpr::Error { .. } => None,
         SymExpr::Identifier { entry, .. } => infer_id_type(entry),
-        SymExpr::Len {.. } => infer_len_type(),
+        SymExpr::Len { .. } => infer_len_type(),
         SymExpr::Literal { value, span } => infer_literal_type(value, span, writer, context),
-        SymExpr::MethodCall { method_name, args, span } => infer_method_call_type(method_name, args, scope, span, writer, context),
-        SymExpr::UnaryExpr { op, expr, span } => infer_unary_expr_type(op, expr, scope, span, writer, context),
+        SymExpr::MethodCall {
+            method_name,
+            args,
+            span,
+        } => infer_method_call_type(method_name, args, scope, span, writer, context),
+        SymExpr::UnaryExpr { op, expr, span } => {
+            infer_unary_expr_type(op, expr, scope, span, writer, context)
+        }
     }
 }
 
-fn infer_arr_access_type(id: &String, index: &SymExpr, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Option<Type> {
+fn infer_arr_access_type(
+    id: &String,
+    index: &SymExpr,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) -> Option<Type> {
     let entry = scope.lookup(id);
 
     // rule 11
     match entry {
-        Some(TableEntry::Variable { name, typ, length, .. }) => {
+        Some(TableEntry::Variable {
+            name, typ, length, ..
+        }) => {
             match length {
                 Some(_) => {
                     let index_type = infer_expr_type(index, scope, writer, context);
@@ -317,20 +601,30 @@ fn infer_arr_access_type(id: &String, index: &SymExpr, scope: &Scope, span: &Spa
                             writeln!(
                                 writer,
                                 "{}",
-                                format_error_message(&format!("{}", index_typ), Some(&span), "invalid index type", context)
+                                format_error_message(
+                                    &format!("{}", index_typ),
+                                    Some(&span),
+                                    "invalid index type",
+                                    context
+                                )
                             )
                             .expect("Failed to write error message");
 
                             Some(typ)
                         }
-                        None => None // assume an error has already been printed
+                        None => None, // assume an error has already been printed
                     }
                 }
                 None => {
                     writeln!(
                         writer,
                         "{}",
-                        format_error_message(&name, Some(&span), "cannot index into non-array", context)
+                        format_error_message(
+                            &name,
+                            Some(&span),
+                            "cannot index into non-array",
+                            context
+                        )
                     )
                     .expect("Failed to write error message");
 
@@ -339,17 +633,29 @@ fn infer_arr_access_type(id: &String, index: &SymExpr, scope: &Scope, span: &Spa
             }
         }
         None => None, // array doesn't exist
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 
-fn infer_binary_expr_type(op: &BinaryOp, left: &SymExpr, right: &SymExpr, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Option<Type> {
+fn infer_binary_expr_type(
+    op: &BinaryOp,
+    left: &SymExpr,
+    right: &SymExpr,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) -> Option<Type> {
     let left_type = infer_expr_type(left, scope, writer, context);
     let right_type = infer_expr_type(right, scope, writer, context);
 
     match op {
         // rule 14
-        BinaryOp::Add | BinaryOp::Divide | BinaryOp::Modulo | BinaryOp::Multiply | BinaryOp::Subtract => {
+        BinaryOp::Add
+        | BinaryOp::Divide
+        | BinaryOp::Modulo
+        | BinaryOp::Multiply
+        | BinaryOp::Subtract => {
             match left_type {
                 Some(Type::Int) => {
                     match right_type {
@@ -358,23 +664,35 @@ fn infer_binary_expr_type(op: &BinaryOp, left: &SymExpr, right: &SymExpr, scope:
                             writeln!(
                                 writer,
                                 "{}",
-                                format_error_message2(&format!("{}", left_type.unwrap()), &format!("{}", right_type.unwrap()), Some(&span), "mismatched types for arithmetic operation", context)
-                            )
-                            .expect("Failed to write error message");
-
-                            None
-                        },
-                        Some(_) => {
-                            writeln!(
-                                writer,
-                                "{}",
-                                format_error_message2(&format!("{}", left_type.unwrap()), &format!("{}", right_type.unwrap()), Some(&span), "invalid types for arithmetic operation", context)
+                                format_error_message2(
+                                    &format!("{}", left_type.unwrap()),
+                                    &format!("{}", right_type.unwrap()),
+                                    Some(&span),
+                                    "mismatched types for arithmetic operation",
+                                    context
+                                )
                             )
                             .expect("Failed to write error message");
 
                             None
                         }
-                        None => None // assume error already printed
+                        Some(_) => {
+                            writeln!(
+                                writer,
+                                "{}",
+                                format_error_message2(
+                                    &format!("{}", left_type.unwrap()),
+                                    &format!("{}", right_type.unwrap()),
+                                    Some(&span),
+                                    "invalid types for arithmetic operation",
+                                    context
+                                )
+                            )
+                            .expect("Failed to write error message");
+
+                            None
+                        }
+                        None => None, // assume error already printed
                     }
                 }
                 Some(Type::Long) => {
@@ -384,36 +702,54 @@ fn infer_binary_expr_type(op: &BinaryOp, left: &SymExpr, right: &SymExpr, scope:
                             writeln!(
                                 writer,
                                 "{}",
-                                format_error_message2(&format!("{}", left_type.unwrap()), &format!("{}", right_type.unwrap()), Some(&span), "mismatched types for arithmetic operation", context)
-                            )
-                            .expect("Failed to write error message");
-
-                            None
-                        },
-                        Some(_) => {
-                            writeln!(
-                                writer,
-                                "{}",
-                                format_error_message2(&format!("{}", left_type.unwrap()), &format!("{}", right_type.unwrap()), Some(&span), "invalid types for arithmetic operation", context)
+                                format_error_message2(
+                                    &format!("{}", left_type.unwrap()),
+                                    &format!("{}", right_type.unwrap()),
+                                    Some(&span),
+                                    "mismatched types for arithmetic operation",
+                                    context
+                                )
                             )
                             .expect("Failed to write error message");
 
                             None
                         }
-                        None => None // assume error already printed
+                        Some(_) => {
+                            writeln!(
+                                writer,
+                                "{}",
+                                format_error_message2(
+                                    &format!("{}", left_type.unwrap()),
+                                    &format!("{}", right_type.unwrap()),
+                                    Some(&span),
+                                    "invalid types for arithmetic operation",
+                                    context
+                                )
+                            )
+                            .expect("Failed to write error message");
+
+                            None
+                        }
+                        None => None, // assume error already printed
                     }
                 }
                 Some(_) => {
                     writeln!(
                         writer,
                         "{}",
-                        format_error_message2(&format!("{}", left_type.unwrap()), &format!("{}", right_type.unwrap()), Some(&span), "invalid types for arithmetic operation", context)
+                        format_error_message2(
+                            &format!("{}", left_type.unwrap()),
+                            &format!("{}", right_type.unwrap()),
+                            Some(&span),
+                            "invalid types for arithmetic operation",
+                            context
+                        )
                     )
                     .expect("Failed to write error message");
 
                     None
                 }
-                None => None // assume error already printed
+                None => None, // assume error already printed
             }
         }
 
@@ -427,38 +763,58 @@ fn infer_binary_expr_type(op: &BinaryOp, left: &SymExpr, right: &SymExpr, scope:
                             writeln!(
                                 writer,
                                 "{}",
-                                format_error_message2(&format!("{}", left_type.unwrap()), &format!("{}", right_type.unwrap()), Some(&span), "invalid types for conditional operation", context)
+                                format_error_message2(
+                                    &format!("{}", left_type.unwrap()),
+                                    &format!("{}", right_type.unwrap()),
+                                    Some(&span),
+                                    "invalid types for conditional operation",
+                                    context
+                                )
                             )
                             .expect("Failed to write error message");
-        
+
                             None
                         }
-                        None => None // assume error already printed
+                        None => None, // assume error already printed
                     }
                 }
                 Some(_) => {
                     writeln!(
                         writer,
                         "{}",
-                        format_error_message2(&format!("{}", left_type.unwrap()), &format!("{}", right_type.unwrap()), Some(&span), "invalid types for conditional operation", context)
+                        format_error_message2(
+                            &format!("{}", left_type.unwrap()),
+                            &format!("{}", right_type.unwrap()),
+                            Some(&span),
+                            "invalid types for conditional operation",
+                            context
+                        )
                     )
                     .expect("Failed to write error message");
 
                     None
                 }
-                None => None // assume error already printed
+                None => None, // assume error already printed
             }
         }
 
         // rule 14
         BinaryOp::Greater | BinaryOp::GreaterEqual | BinaryOp::Less | BinaryOp::LessEqual => {
-            if (left_type == Some(Type::Int) || left_type == Some(Type::Long)) && (right_type == Some(Type::Int) || right_type == Some(Type::Long)) {
+            if (left_type == Some(Type::Int) || left_type == Some(Type::Long))
+                && (right_type == Some(Type::Int) || right_type == Some(Type::Long))
+            {
                 Some(Type::Bool)
             } else {
                 writeln!(
                     writer,
                     "{}",
-                    format_error_message2(&format!("{}", left_type.unwrap()), &format!("{}", right_type.unwrap()), Some(&span), "invalid types for relational operation", context)
+                    format_error_message2(
+                        &format!("{}", left_type.unwrap()),
+                        &format!("{}", right_type.unwrap()),
+                        Some(&span),
+                        "invalid types for relational operation",
+                        context
+                    )
                 )
                 .expect("Failed to write error message");
 
@@ -476,7 +832,13 @@ fn infer_binary_expr_type(op: &BinaryOp, left: &SymExpr, right: &SymExpr, scope:
                         writeln!(
                             writer,
                             "{}",
-                            format_error_message2(&format!("{}", left_type.unwrap()), &format!("{}", right_type.unwrap()), Some(&span), "mismatched types for equality operation", context)
+                            format_error_message2(
+                                &format!("{}", left_type.unwrap()),
+                                &format!("{}", right_type.unwrap()),
+                                Some(&span),
+                                "mismatched types for equality operation",
+                                context
+                            )
                         )
                         .expect("Failed to write error message");
 
@@ -487,21 +849,34 @@ fn infer_binary_expr_type(op: &BinaryOp, left: &SymExpr, right: &SymExpr, scope:
                     writeln!(
                         writer,
                         "{}",
-                        format_error_message2(&format!("{}", left_type.unwrap()), &format!("{}", right_type.unwrap()), Some(&span), "invalid types for equality operation", context)
+                        format_error_message2(
+                            &format!("{}", left_type.unwrap()),
+                            &format!("{}", right_type.unwrap()),
+                            Some(&span),
+                            "invalid types for equality operation",
+                            context
+                        )
                     )
                     .expect("Failed to write error message");
 
                     None
                 }
-                None => None // assume error already printed
+                None => None, // assume error already printed
             }
         }
     }
 }
 
-fn infer_cast_type(target_type: &Type, expr: &SymExpr, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Option<Type> {
+fn infer_cast_type(
+    target_type: &Type,
+    expr: &SymExpr,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) -> Option<Type> {
     let expr_type = infer_expr_type(expr, scope, writer, context);
-    
+
     // rule 20
     match target_type {
         Type::Int | Type::Long => {
@@ -511,20 +886,31 @@ fn infer_cast_type(target_type: &Type, expr: &SymExpr, scope: &Scope, span: &Spa
                     writeln!(
                         writer,
                         "{}",
-                        format_error_message2(&format!("{}", target_type), &format!("{}", expr_type.unwrap()), Some(&span), "incompatible types for cast", context)
+                        format_error_message2(
+                            &format!("{}", target_type),
+                            &format!("{}", expr_type.unwrap()),
+                            Some(&span),
+                            "incompatible types for cast",
+                            context
+                        )
                     )
                     .expect("Failed to write error message");
-    
+
                     None
                 }
-                None => None // assume error already printed
+                None => None, // assume error already printed
             }
         }
         _ => {
             writeln!(
                 writer,
                 "{}",
-                format_error_message(&format!("{}", target_type), Some(&span), "cannot cast to type", context)
+                format_error_message(
+                    &format!("{}", target_type),
+                    Some(&span),
+                    "cannot cast to type",
+                    context
+                )
             )
             .expect("Failed to write error message");
 
@@ -535,14 +921,12 @@ fn infer_cast_type(target_type: &Type, expr: &SymExpr, scope: &Scope, span: &Spa
 
 fn infer_id_type(entry: &TableEntry) -> Option<Type> {
     match entry {
-        TableEntry::Variable { typ, length, .. } => {
-            match length {
-                Some(_) => Some(Type::Array(Box::new(typ.clone()))),
-                None => Some(typ.clone())
-            }
-        }
+        TableEntry::Variable { typ, length, .. } => match length {
+            Some(_) => Some(Type::Array(Box::new(typ.clone()))),
+            None => Some(typ.clone()),
+        },
         TableEntry::Method { return_type, .. } => Some(Type::Method(Box::new(return_type.clone()))),
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 
@@ -552,7 +936,12 @@ fn infer_len_type() -> Option<Type> {
 }
 
 // rules 21 and 22
-fn infer_literal_type(value: &Literal, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Option<Type> {
+fn infer_literal_type(
+    value: &Literal,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) -> Option<Type> {
     match value {
         Literal::Int(val) => {
             let int_val = val.parse::<i32>();
@@ -569,7 +958,7 @@ fn infer_literal_type(value: &Literal, span: &Span, writer: &mut dyn std::io::Wr
                 Some(Type::Int)
             }
         }
-    
+
         Literal::Long(val) => {
             let long_val = val.parse::<i64>();
             if long_val.is_err() {
@@ -590,12 +979,11 @@ fn infer_literal_type(value: &Literal, span: &Span, writer: &mut dyn std::io::Wr
             let int_val = i32::from_str_radix(&val, 16);
 
             if int_val.is_err() {
-                let msg = 
-                    if val.starts_with("-") {
-                        format!("-0x{}", &val[1..]) // move negative sign before 0x
-                    } else {
-                        format!("0x{}", val)
-                    };
+                let msg = if val.starts_with("-") {
+                    format!("-0x{}", &val[1..]) // move negative sign before 0x
+                } else {
+                    format!("0x{}", val)
+                };
 
                 writeln!(
                     writer,
@@ -614,12 +1002,11 @@ fn infer_literal_type(value: &Literal, span: &Span, writer: &mut dyn std::io::Wr
             let int_val = i64::from_str_radix(&val, 16);
 
             if int_val.is_err() {
-                let msg = 
-                    if val.starts_with("-") {
-                        format!("-0x{}", &val[1..]) // move negative sign before 0x
-                    } else {
-                        format!("0x{}", val)
-                    };
+                let msg = if val.starts_with("-") {
+                    format!("-0x{}", &val[1..]) // move negative sign before 0x
+                } else {
+                    format!("0x{}", val)
+                };
 
                 writeln!(
                     writer,
@@ -636,12 +1023,19 @@ fn infer_literal_type(value: &Literal, span: &Span, writer: &mut dyn std::io::Wr
 
         Literal::Bool(..) => Some(Type::Bool),
         Literal::Char(..) => Some(Type::Int),
-        Literal::String(..) => Some(Type::String)
+        Literal::String(..) => Some(Type::String),
     }
 }
 
 // rules 4 and 10
-fn infer_method_call_type(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Option<Type> {
+fn infer_method_call_type(
+    method_name: &String,
+    args: &Vec<Rc<SymExpr>>,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) -> Option<Type> {
     let entry = scope.lookup(method_name);
 
     // rule 10
@@ -655,7 +1049,11 @@ fn infer_method_call_type(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: 
                     writeln!(
                         writer,
                         "{}",
-                        format_error_message0(Some(&span), "arguments cannot have type `void`", context)
+                        format_error_message0(
+                            Some(&span),
+                            "arguments cannot have type `void`",
+                            context
+                        )
                     )
                     .expect("Failed to write error message");
                 }
@@ -663,14 +1061,24 @@ fn infer_method_call_type(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: 
 
             Some(Type::Int)
         }
-        
-        Some(TableEntry::Method { name: _, return_type, params, .. }) => {
+
+        Some(TableEntry::Method {
+            name: _,
+            return_type,
+            params,
+            ..
+        }) => {
             // rule 4
             if args.len() != params.len() {
                 writeln!(
                     writer,
                     "{}",
-                    format_error_message(&method_name, Some(&span), "incorrect number of arguments to method", context)
+                    format_error_message(
+                        &method_name,
+                        Some(&span),
+                        "incorrect number of arguments to method",
+                        context
+                    )
                 )
                 .expect("Failed to write error message");
                 return None;
@@ -683,7 +1091,13 @@ fn infer_method_call_type(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: 
                     writeln!(
                         writer,
                         "{}",
-                        format_error_message2(&format!("{}", params[i].0), &format!("{}", expr_type.clone().unwrap()), Some(&span), &format!("mismatched types for param `{}`", &params[i].1), context)
+                        format_error_message2(
+                            &format!("{}", params[i].0),
+                            &format!("{}", expr_type.clone().unwrap()),
+                            Some(&span),
+                            &format!("mismatched types for param `{}`", &params[i].1),
+                            context
+                        )
                     )
                     .expect("Failed to write error message");
                 }
@@ -705,7 +1119,14 @@ fn infer_method_call_type(method_name: &String, args: &Vec<Rc<SymExpr>>, scope: 
     }
 }
 
-fn infer_unary_expr_type(op: &UnaryOp, expr: &SymExpr, scope: &Scope, span: &Span, writer: &mut dyn std::io::Write, context: &mut SemanticContext) -> Option<Type> {
+fn infer_unary_expr_type(
+    op: &UnaryOp,
+    expr: &SymExpr,
+    scope: &Scope,
+    span: &Span,
+    writer: &mut dyn std::io::Write,
+    context: &mut SemanticContext,
+) -> Option<Type> {
     match op {
         UnaryOp::Neg => {
             let expr_type = infer_expr_type(expr, scope, writer, context);
@@ -718,13 +1139,18 @@ fn infer_unary_expr_type(op: &UnaryOp, expr: &SymExpr, scope: &Scope, span: &Spa
                     writeln!(
                         writer,
                         "{}",
-                        format_error_message(&format!("{}", typ), Some(span), "invalid type for operand of unary minus", context)
+                        format_error_message(
+                            &format!("{}", typ),
+                            Some(span),
+                            "invalid type for operand of unary minus",
+                            context
+                        )
                     )
                     .expect("Failed to write error message");
 
                     None
                 }
-                None => None // assume an error has already been printed
+                None => None, // assume an error has already been printed
             }
         }
         UnaryOp::Not => {
@@ -737,13 +1163,18 @@ fn infer_unary_expr_type(op: &UnaryOp, expr: &SymExpr, scope: &Scope, span: &Spa
                     writeln!(
                         writer,
                         "{}",
-                        format_error_message(&format!("{}", typ), Some(span), "invalid type for operand of logical not", context)
+                        format_error_message(
+                            &format!("{}", typ),
+                            Some(span),
+                            "invalid type for operand of logical not",
+                            context
+                        )
                     )
                     .expect("Failed to write error message");
 
                     None
                 }
-                None => None // assume an error has already been printed
+                None => None, // assume an error has already been printed
             }
         }
     }
