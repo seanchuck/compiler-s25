@@ -1,19 +1,31 @@
 /**
 Data structures for x86 code generation.
 **/
-use std::fmt;
+use std::fmt::{self, write};
 
 #[derive(Debug, Clone)]
 pub enum X86Insn {
     Mov(X86Operand, X86Operand),
     Add(X86Operand, X86Operand),
     Sub(X86Operand, X86Operand),
+    Mul(X86Operand, X86Operand),
+    Div(X86Operand),
+    Xor(X86Operand, X86Operand),
     Call(String),
     Label(String),
+    Jmp(String),
     Push(X86Operand),
     Pop(X86Operand),
     Ret,
     Lea(X86Operand, X86Operand),
+    Cmp(X86Operand, X86Operand),
+    Jne(String),
+    Sete(X86Operand),
+    Setg(X86Operand),
+    Setge(X86Operand),
+    Setl(X86Operand),
+    Setle(X86Operand),
+    Setne(X86Operand),
 }
 
 #[derive(Debug, Clone)]
@@ -95,12 +107,24 @@ impl fmt::Display for X86Insn {
             X86Insn::Mov(src, dst) => write!(f, "    movq {}, {}", src, dst),
             X86Insn::Add(src, dst) => write!(f, "    addq {}, {}", src, dst),
             X86Insn::Sub(src, dst) => write!(f, "    subq {}, {}", src, dst),
+            X86Insn::Mul(src, dst) => write!(f, "    imul {}, {}", src, dst),
+            X86Insn::Div(divisor) => write!(f, "    idiv {}", divisor),
+            X86Insn::Xor(src, dst) => write!(f, "    xor {}, {}", src, dst),
             X86Insn::Call(label) => write!(f, "    call {}", label),
             X86Insn::Label(name) => write!(f, "{}:", name),
+            X86Insn::Jmp(label) => write!(f, "    jmp {}", label),
             X86Insn::Push(op) => write!(f, "    pushq {}", op),
             X86Insn::Pop(op) => write!(f, "    popq {}", op),
             X86Insn::Ret => write!(f, "    ret"),
             X86Insn::Lea(src, dst) => write!(f, "    leaq {}, {}", src, dst),
+            X86Insn::Cmp(left, right) => write!(f, "    cmp {}, {}", left, right),
+            X86Insn::Jne(label) => writeln!(f, "    jne {}", label),
+            X86Insn::Sete(dst) => write!(f, "    sete {}", dst),
+            X86Insn::Setg(dst) => write!(f, "    setg {}", dst),
+            X86Insn::Setge(dst) => write!(f, "    setge {}", dst),
+            X86Insn::Setl(dst) => write!(f, "    setl {}", dst),
+            X86Insn::Setle(dst) => write!(f, "    setle {}", dst),
+            X86Insn::Setne(dst) => write!(f, "    setne {}", dst),
         }
     }
 }

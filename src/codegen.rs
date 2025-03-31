@@ -1,6 +1,8 @@
+use nom::combinator::map;
+
 use crate::cfg::ELEMENT_SIZE;
 use crate::tac::*;
-use crate::utils::print::{self, print_cfg};
+use crate::utils::print::print_cfg;
 use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 /**
@@ -77,7 +79,14 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
         }
         Instruction::Subtract { left, right, dest } => {
-            todo!()
+            let left_op = map_operand(method_cfg, left, x86_instructions);
+            let right_op = map_operand(method_cfg, right, x86_instructions);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+
+            // rax as working register
+            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Sub(right_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
         }
         Instruction::Assign { src, dest } => {
             let dest_op = map_operand(method_cfg, dest, x86_instructions);
@@ -121,24 +130,115 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             }
             x86_instructions.push(X86Insn::Ret);
         }
-        Instruction::Multiply { left, right, dest } => todo!(),
-        Instruction::Divide { left, right, dest } => todo!(),
-        Instruction::Modulo { left, right, dest } => todo!(),
-        Instruction::Not { expr, dest } => todo!(),
+        Instruction::Multiply { left, right, dest } => {
+            let left_op = map_operand(method_cfg, left, x86_instructions);
+            let right_op = map_operand(method_cfg, right, x86_instructions);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+
+            // rax as working register
+            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Mul(right_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+        }
+        Instruction::Divide { left, right, dest } => {
+            let left_op = map_operand(method_cfg, left, x86_instructions);
+            let right_op = map_operand(method_cfg, right, x86_instructions);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+
+            // Signed division in x86:
+            // Dividend in RAX, sign-extended into RDX using CQO
+            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Xor(
+                X86Operand::Reg(Register::Rdx),
+                X86Operand::Reg(Register::Rdx),
+            )); // TODO is sign extension in Rdx necessary? right now just zero it
+            x86_instructions.push(X86Insn::Div(right_op)); // Signed divide RDX:RAX by right_op
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+        }
+        Instruction::Modulo { left, right, dest } => {
+            let left_op: X86Operand = map_operand(method_cfg, left, x86_instructions);
+            let right_op = map_operand(method_cfg, right, x86_instructions);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+
+            // Signed modulo using XOR to zero out %rdx
+            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax))); // RAX = left
+            x86_instructions.push(X86Insn::Xor(
+                X86Operand::Reg(Register::Rdx),
+                X86Operand::Reg(Register::Rdx),
+            )); // zero RDX
+            x86_instructions.push(X86Insn::Div(right_op)); // RAX = quotient, RDX = remainder
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op));
+        }
+        Instruction::Not { expr, dest } => {
+            let expr_op = map_operand(method_cfg, expr, x86_instructions);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+
+            // Move expr to RAX (or any scratch reg), xor with 1
+            x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Xor(
+                X86Operand::Constant(1),
+                X86Operand::Reg(Register::Rax),
+            ));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+        }
         Instruction::Cast {
             expr,
             dest,
             target_type,
-        } => todo!(),
-        Instruction::Len { expr, dest } => todo!(),
-        Instruction::Greater { left, right, dest } => todo!(),
-        Instruction::Less { left, right, dest } => todo!(),
-        Instruction::LessEqual { left, right, dest } => todo!(),
-        Instruction::GreaterEqual { left, right, dest } => todo!(),
-        Instruction::Equal { left, right, dest } => todo!(),
-        Instruction::NotEqual { left, right, dest } => todo!(),
-        Instruction::UJmp { id } => todo!(),
-        Instruction::CJmp { condition, id } => todo!(),
+        } => {
+            let expr_op = map_operand(method_cfg, expr, x86_instructions);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+
+            match target_type {
+                crate::ast::Type::Int => {
+                    // TODO implement this when we differentiate ints and longs
+                }
+                crate::ast::Type::Long => {
+                    // TODO implement this when we differentiate ints and longs
+                }
+                _ => panic!("Shouldnt get here, cannot cast non int or long value"),
+            }
+        }
+        Instruction::Len { expr, dest } => {
+            let expr_op = map_operand(method_cfg, expr, x86_instructions);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+
+            x86_instructions.push(X86Insn::Mov(expr_op, dest_op));
+        }
+        Instruction::Greater { left, right, dest }
+        | Instruction::Less { left, right, dest }
+        | Instruction::LessEqual { left, right, dest }
+        | Instruction::GreaterEqual { left, right, dest }
+        | Instruction::Equal { left, right, dest }
+        | Instruction::NotEqual { left, right, dest } => {
+            let left_op = map_operand(method_cfg, left, x86_instructions);
+            let right_op = map_operand(method_cfg, right, x86_instructions);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+
+            x86_instructions.push(X86Insn::Cmp(right_op, left_op)); // cmp right, left
+
+            let set_instr = match insn {
+                Instruction::Greater { .. } => X86Insn::Setg(dest_op),
+                Instruction::Less { .. } => X86Insn::Setl(dest_op),
+                Instruction::LessEqual { .. } => X86Insn::Setle(dest_op),
+                Instruction::GreaterEqual { .. } => X86Insn::Setge(dest_op),
+                Instruction::Equal { .. } => X86Insn::Sete(dest_op),
+                Instruction::NotEqual { .. } => X86Insn::Setne(dest_op),
+                _ => unreachable!(),
+            };
+
+            x86_instructions.push(set_instr);
+        }
+        Instruction::UJmp { id } => {
+            x86_instructions.push(X86Insn::Jmp(id.to_string()));
+        }
+        Instruction::CJmp { condition, id } => {
+            let cond_op = map_operand(method_cfg, condition, x86_instructions);
+
+            // cmp condition, 0 → is condition true?
+            x86_instructions.push(X86Insn::Cmp(cond_op, X86Operand::Constant(0)));
+            x86_instructions.push(X86Insn::Jne(id.to_string())); // jump if condition != 0
+        }
     }
 }
 
