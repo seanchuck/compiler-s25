@@ -47,7 +47,6 @@ fn map_operand(
         }
         Operand::GlobalArrElement(arr, idx) => {
             let idx_op = map_operand(method_cfg, idx, x86_instructions);
-            println!("{:?}", idx_op);
             x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(Register::R10))); // store index in r10
             X86Operand::Address(Some(arr.to_string()), None, Register::R10, ELEMENT_SIZE)
         }
@@ -90,7 +89,9 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
         Instruction::Assign { src, dest } => {
             let dest_op = map_operand(method_cfg, dest, x86_instructions);
             let src_op = map_operand(method_cfg, src, x86_instructions);
-            x86_instructions.push(X86Insn::Mov(src_op, dest_op));
+
+            x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
         }
         Instruction::LoadString { src, dest } => {
             let dest_op = map_operand(method_cfg, dest, x86_instructions);
@@ -130,6 +131,11 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 let value_reg = map_operand(method_cfg, value, x86_instructions);
                 x86_instructions.push(X86Insn::Mov(value_reg, X86Operand::Reg(Register::Rax)));
             }
+            x86_instructions.push(X86Insn::Mov(
+                X86Operand::Reg(Register::Rbp),
+                X86Operand::Reg(Register::Rsp),
+            ));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp)));
             x86_instructions.push(X86Insn::Ret);
         }
         Instruction::Multiply { left, right, dest } => {
@@ -154,7 +160,8 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 X86Operand::Reg(Register::Rdx),
                 X86Operand::Reg(Register::Rdx),
             )); // TODO is sign extension in Rdx necessary? right now just zero it
-            x86_instructions.push(X86Insn::Div(right_op)); // Signed divide RDX:RAX by right_op
+            x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx)));  // Division cannot work on immediate, move to scratch reg
+            x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
             x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
         }
         Instruction::Modulo { left, right, dest } => {
@@ -168,7 +175,8 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 X86Operand::Reg(Register::Rdx),
                 X86Operand::Reg(Register::Rdx),
             )); // zero RDX
-            x86_instructions.push(X86Insn::Div(right_op)); // RAX = quotient, RDX = remainder
+            x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx)));  // Division cannot work on immediate, move to scratch reg
+            x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
             x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op));
         }
         Instruction::Not { expr, dest } => {
@@ -220,16 +228,17 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             x86_instructions.push(X86Insn::Cmp(right_op, left_op)); // cmp right, left
 
             let set_instr = match insn {
-                Instruction::Greater { .. } => X86Insn::Setg(dest_op),
-                Instruction::Less { .. } => X86Insn::Setl(dest_op),
-                Instruction::LessEqual { .. } => X86Insn::Setle(dest_op),
-                Instruction::GreaterEqual { .. } => X86Insn::Setge(dest_op),
-                Instruction::Equal { .. } => X86Insn::Sete(dest_op),
-                Instruction::NotEqual { .. } => X86Insn::Setne(dest_op),
+                Instruction::Greater { .. } => X86Insn::Setg(X86Operand::Reg(Register::Al)),
+                Instruction::Less { .. } => X86Insn::Setl(X86Operand::Reg(Register::Al)),
+                Instruction::LessEqual { .. } => X86Insn::Setle(X86Operand::Reg(Register::Al)),
+                Instruction::GreaterEqual { .. } => X86Insn::Setge(X86Operand::Reg(Register::Al)),
+                Instruction::Equal { .. } => X86Insn::Sete(X86Operand::Reg(Register::Al)),
+                Instruction::NotEqual { .. } => X86Insn::Setne(X86Operand::Reg(Register::Al)),
                 _ => unreachable!(),
             };
 
             x86_instructions.push(set_instr);
+            x86_instructions.push(X86Insn::Movzbq(X86Operand::Reg(Register::Al), dest_op));
         }
         Instruction::UJmp { name, id } => {
             let label = format!("{}{}", name, id);

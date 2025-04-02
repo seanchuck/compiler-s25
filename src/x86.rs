@@ -7,6 +7,7 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub enum X86Insn {
     Mov(X86Operand, X86Operand),
+    Movzbq(X86Operand, X86Operand),
     Add(X86Operand, X86Operand),
     Sub(X86Operand, X86Operand),
     Mul(X86Operand, X86Operand),
@@ -84,6 +85,7 @@ pub enum Register {
     Rbp,
     Rsp,
     Rax,
+    Al,
     Rip,
 }
 
@@ -100,6 +102,7 @@ impl fmt::Display for Register {
             Register::Rbp => write!(f, "%rbp"),
             Register::Rsp => write!(f, "%rsp"),
             Register::Rax => write!(f, "%rax"),
+            Register::Al => write!(f, "%al"),
             Register::Rip => write!(f, "%rip"),
         }
     }
@@ -109,6 +112,7 @@ impl fmt::Display for X86Insn {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             X86Insn::Mov(src, dst) => write!(f, "    movq {}, {}", src, dst),
+            X86Insn::Movzbq(src, dst) => write!(f, "    movzbq {}, {}", src, dst),
             X86Insn::Add(src, dst) => write!(f, "    addq {}, {}", src, dst),
             X86Insn::Sub(src, dst) => write!(f, "    subq {}, {}", src, dst),
             X86Insn::Mul(src, dst) => write!(f, "    imul {}, {}", src, dst),
