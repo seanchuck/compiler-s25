@@ -99,8 +99,8 @@ for file in "$BASE_DIR/$ERROR_DIR"/*; do
         # Assemble and link
         gcc -O0 -no-pie "$assembly_file" -o "$executable_file"
         if [[ $? -ne 0 ]]; then
-            echo "Correctly failed to link for $file" | tee -a "$OUTPUT_FILE"
-            correct=$((correct + 1))
+            echo "Assembly linking failed for $file" | tee -a "$OUTPUT_FILE"
+            incorrect=$((incorrect + 1))
             rm -f "$assembly_file" "$executable_file"
             continue
         fi
