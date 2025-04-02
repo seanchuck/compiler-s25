@@ -1,5 +1,3 @@
-use nom::combinator::map;
-
 use crate::cfg::ELEMENT_SIZE;
 use crate::tac::*;
 use crate::utils::print::print_cfg;
@@ -287,6 +285,27 @@ pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::W
         print_cfg(&method_cfgs);
     }
 
+    let mut global_code: Vec<X86Insn> = Vec::new();
+
+    // global variables
+    for global in globals {
+        if global.length.is_some() {
+            // allocate an extra element's worth of space to store the length of the array
+            // 8 byte alignment for now...
+            global_code.push(X86Insn::Comm(global.name, ELEMENT_SIZE*i64::from(global.length.unwrap()+1), ELEMENT_SIZE));
+        } else {
+            global_code.push(X86Insn::Comm(global.name, ELEMENT_SIZE, ELEMENT_SIZE));
+        }
+    }
+
+    // strings
+    for (idx, string) in strings.iter().enumerate() {
+        global_code.push(X86Insn::Label(format!("str{idx}")));
+        global_code.push(X86Insn::String(string.to_string()));
+    }
+
+    writeln!(writer).expect("Failed to write newline after globals!");
+
     // Generate a vector of x86 for each method
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, mut method_cfg) in method_cfgs {
@@ -295,8 +314,12 @@ pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::W
     }
 
     // Emit the final code
-    writeln!(writer, "{}", "\n========== X86 Code ==========\n")
-        .expect("Failed to write instruction!");
+    println!("\n========== X86 Code ==========\n");
+
+    for insn in &global_code {
+        writeln!(writer, "{}", insn).expect("Failed to write instruction!");
+    }
+
     for (_, method_code) in &code {
         for instr in method_code {
             writeln!(writer, "{}", instr).expect("Failed to write instruction!");

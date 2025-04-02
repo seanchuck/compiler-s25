@@ -1,7 +1,8 @@
 /**
 Data structures for x86 code generation.
 **/
-use std::fmt::{self, write};
+
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum X86Insn {
@@ -26,6 +27,8 @@ pub enum X86Insn {
     Setl(X86Operand),
     Setle(X86Operand),
     Setne(X86Operand),
+    Comm(String, i64, i64), // name, size, alignment
+    String(String)
 }
 
 #[derive(Debug, Clone)]
@@ -125,6 +128,8 @@ impl fmt::Display for X86Insn {
             X86Insn::Setl(dst) => write!(f, "    setl {}", dst),
             X86Insn::Setle(dst) => write!(f, "    setle {}", dst),
             X86Insn::Setne(dst) => write!(f, "    setne {}", dst),
+            X86Insn::Comm(name, size, alignment) => write!(f, ".comm {name}, {size}, {alignment}"),
+            X86Insn::String(val) => write!(f, "    .string \"{val}\""),
         }
     }
 }
