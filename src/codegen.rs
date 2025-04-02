@@ -160,7 +160,8 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 X86Operand::Reg(Register::Rdx),
                 X86Operand::Reg(Register::Rdx),
             )); // TODO is sign extension in Rdx necessary? right now just zero it
-            x86_instructions.push(X86Insn::Div(right_op)); // Signed divide RDX:RAX by right_op
+            x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx)));  // Division cannot work on immediate, move to scratch reg
+            x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
             x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
         }
         Instruction::Modulo { left, right, dest } => {
@@ -174,7 +175,8 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 X86Operand::Reg(Register::Rdx),
                 X86Operand::Reg(Register::Rdx),
             )); // zero RDX
-            x86_instructions.push(X86Insn::Div(right_op)); // RAX = quotient, RDX = remainder
+            x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx)));  // Division cannot work on immediate, move to scratch reg
+            x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
             x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op));
         }
         Instruction::Not { expr, dest } => {
