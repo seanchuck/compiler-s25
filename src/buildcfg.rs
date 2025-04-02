@@ -221,6 +221,7 @@ fn destruct_expr(
                     cfg.add_instruction_to_block(
                         next_true_block.get_id(),
                         Instruction::UJmp {
+                            name: cfg.name.clone(),
                             id: next_block.get_id(),
                         },
                     );
@@ -236,6 +237,7 @@ fn destruct_expr(
                     cfg.add_instruction_to_block(
                         next_false_block.get_id(),
                         Instruction::UJmp {
+                            name: cfg.name.clone(),
                             id: next_block.get_id(),
                         },
                     );
@@ -468,6 +470,7 @@ fn build_cond(
                     cfg.add_instruction_to_block(
                         cur_block_id,
                         Instruction::CJmp {
+                            name: cfg.name.clone(),
                             condition: dest,
                             id: next_true_block_id,
                         },
@@ -475,6 +478,7 @@ fn build_cond(
                     cfg.add_instruction_to_block(
                         cur_block_id,
                         Instruction::UJmp {
+                            name: cfg.name.clone(),
                             id: next_false_block_id,
                         },
                     );
@@ -504,6 +508,7 @@ fn build_cond(
                     cfg.add_instruction_to_block(
                         cur_block_id,
                         Instruction::CJmp {
+                            name: cfg.name.clone(),
                             condition: dest,
                             id: next_true_block_id,
                         },
@@ -511,6 +516,7 @@ fn build_cond(
                     cfg.add_instruction_to_block(
                         cur_block_id,
                         Instruction::UJmp {
+                            name: cfg.name.clone(),
                             id: next_false_block_id,
                         },
                     );
@@ -525,6 +531,7 @@ fn build_cond(
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::CJmp {
+                    name: cfg.name.clone(),
                     condition: dest,
                     id: next_true_block_id,
                 },
@@ -532,6 +539,7 @@ fn build_cond(
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::UJmp {
+                    name: cfg.name.clone(),
                     id: next_false_block_id,
                 },
             );
@@ -879,6 +887,7 @@ fn destruct_statement(
                 cfg.add_instruction_to_block(
                     body_block_id,
                     Instruction::UJmp {
+                        name: cfg.name.clone(),
                         id: next_block.get_id(),
                     },
                 );
@@ -897,6 +906,7 @@ fn destruct_statement(
                 cfg.add_instruction_to_block(
                     else_body_block_id,
                     Instruction::UJmp {
+                        name: cfg.name.clone(),
                         id: next_block.get_id(),
                     },
                 );
@@ -928,6 +938,7 @@ fn destruct_statement(
                 cfg.add_instruction_to_block(
                     body_block_id,
                     Instruction::UJmp {
+                        name: cfg.name.clone(),
                         id: next_block.get_id(),
                     },
                 );
@@ -951,6 +962,7 @@ fn destruct_statement(
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::UJmp {
+                    name: cfg.name.clone(),
                     id: header_block.get_id(),
                 },
             );
@@ -987,7 +999,7 @@ fn destruct_statement(
             }
 
             // jump back to header block after the body
-            cfg.add_instruction_to_block(body_id, Instruction::UJmp { id: header_id });
+            cfg.add_instruction_to_block(body_id, Instruction::UJmp { name: cfg.name.clone(), id: header_id });
 
             next_block.get_id()
         }
@@ -1022,6 +1034,7 @@ fn destruct_statement(
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::UJmp {
+                    name: cfg.name.clone(),
                     id: header_block.get_id(),
                 },
             );
@@ -1061,7 +1074,7 @@ fn destruct_statement(
             body_id = destruct_statement(cfg, body_id, update, Some(&next_loop), scope, strings);
 
             // jump back to header block after the body
-            cfg.add_instruction_to_block(body_id, Instruction::UJmp { id: header_id });
+            cfg.add_instruction_to_block(body_id, Instruction::UJmp { name: cfg.name.clone(), id: header_id });
 
             next_block.get_id()
         }
@@ -1069,6 +1082,7 @@ fn destruct_statement(
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::UJmp {
+                    name: cfg.name.clone(),
                     id: cur_loop.unwrap().break_to,
                 },
             );
@@ -1080,6 +1094,7 @@ fn destruct_statement(
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::UJmp {
+                    name: cfg.name.clone(),
                     id: cur_loop.clone().unwrap().continue_to,
                 },
             );
@@ -1144,7 +1159,7 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
     // reset counters for each CFG
     reset_counters();
 
-    let mut method_cfg = CFG::new();
+    let mut method_cfg = CFG::new(method.name.clone());
 
     let mut scope: Scope = Scope {
         parent: None,

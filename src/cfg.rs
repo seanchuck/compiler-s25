@@ -13,6 +13,7 @@ pub const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no 
 pub struct CFG {
     // BTreeMap is hash map that allows constant iteration order
     // entry block has ID 0
+    pub name: String,   // Name of the method for the CFG
     pub blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
     // no need to store edges because basic blocks end with a jump/branch instruction
     pub stack_size: i64, // total space to allocate on the stack for this method
@@ -38,8 +39,9 @@ pub struct Local {
 }
 
 impl CFG {
-    pub fn new() -> CFG {
+    pub fn new(name: String) -> CFG {
         CFG {
+            name,
             blocks: BTreeMap::new(),
             stack_size: 0,
             locals: BTreeMap::new(),

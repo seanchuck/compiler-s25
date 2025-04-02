@@ -1,5 +1,3 @@
-use nom::combinator::map;
-
 use crate::cfg::ELEMENT_SIZE;
 use crate::tac::*;
 use crate::utils::print::print_cfg;
@@ -49,6 +47,7 @@ fn map_operand(
         }
         Operand::GlobalArrElement(arr, idx) => {
             let idx_op = map_operand(method_cfg, idx, x86_instructions);
+            println!("{:?}", idx_op);
             x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(Register::R10))); // store index in r10
             X86Operand::Address(Some(arr.to_string()), None, Register::R10, ELEMENT_SIZE)
         }
@@ -229,15 +228,17 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
 
             x86_instructions.push(set_instr);
         }
-        Instruction::UJmp { id } => {
-            x86_instructions.push(X86Insn::Jmp(id.to_string()));
+        Instruction::UJmp { name, id } => {
+            let label = format!("{}{}", name, id);
+            x86_instructions.push(X86Insn::Jmp(label));
         }
-        Instruction::CJmp { condition, id } => {
+        Instruction::CJmp { name, condition, id } => {
+            let label = format!("{}{}", name, id);
             let cond_op = map_operand(method_cfg, condition, x86_instructions);
 
             // cmp condition, 0 → is condition true?
             x86_instructions.push(X86Insn::Cmp(cond_op, X86Operand::Constant(0)));
-            x86_instructions.push(X86Insn::Jne(id.to_string())); // jump if condition != 0
+            x86_instructions.push(X86Insn::Jne(label)); // jump if condition != 0
         }
     }
 }
