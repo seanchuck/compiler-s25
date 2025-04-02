@@ -138,10 +138,12 @@ pub enum Instruction {
     },
     UJmp {
         // unconditonal jump
+        name: String,   // Name of the method containing the Bblock
         id: i32, // ID of basic block to jump to
     },
     CJmp {
         // conditional jump
+        name: String,   // Name of the method containing the Bblock
         condition: Operand,
         id: i32, // ID of basic block to jump to if condition is true
     },

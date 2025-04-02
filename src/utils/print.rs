@@ -24,8 +24,8 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     Instruction::Assign { src, dest } => {
                         println!("        {dest} <- {src}");
                     }
-                    Instruction::CJmp { condition, id } => {
-                        println!("        cjmp {condition}, {id}");
+                    Instruction::CJmp { name, condition, id } => {
+                        println!("        cjmp {condition}, {name}{id}");
                     }
                     Instruction::Cast {
                         expr,
@@ -91,8 +91,8 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     Instruction::Subtract { left, right, dest } => {
                         println!("        {dest} <- {left} - {right}");
                     }
-                    Instruction::UJmp { id } => {
-                        println!("        ujmp {id}");
+                    Instruction::UJmp { name, id } => {
+                        println!("        ujmp {name}{id}");
                     }
                     Instruction::LoadString { src, dest } => {
                         println!("        {dest} <- {src}");
