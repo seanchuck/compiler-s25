@@ -89,7 +89,9 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
         Instruction::Assign { src, dest } => {
             let dest_op = map_operand(method_cfg, dest, x86_instructions);
             let src_op = map_operand(method_cfg, src, x86_instructions);
-            x86_instructions.push(X86Insn::Mov(src_op, dest_op));
+
+            x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
         }
         Instruction::LoadString { src, dest } => {
             let dest_op = map_operand(method_cfg, dest, x86_instructions);
