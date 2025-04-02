@@ -58,6 +58,15 @@ for file in "$BASE_DIR/$INPUT_DIR"/*; do
         
         # Run the executable and capture output
         "$executable_file" > "$actual_output"
+
+        # Check if it produced an error
+        exit_code=$?
+        if [[ $exit_code -ne 0 ]]; then
+            echo "Execution for $file returned with an error" | tee -a "$OUTPUT_FILE"
+            incorrect=$((incorrect + 1))
+            rm -f "$assembly_file" "$executable_file"
+            continue
+        fi
         
         # Compare output
         if compare_outputs "$actual_output" "$expected_output"; then

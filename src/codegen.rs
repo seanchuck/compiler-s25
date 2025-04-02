@@ -293,6 +293,7 @@ pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::W
     let (method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
     if debug {
         print_cfg(&method_cfgs);
+        println!("\n========== X86 Code ==========\n");
     }
 
     let mut global_code: Vec<X86Insn> = Vec::new();
@@ -324,8 +325,6 @@ pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::W
     }
 
     // Emit the final code
-    println!("\n========== X86 Code ==========\n");
-
     for insn in &global_code {
         writeln!(writer, "{}", insn).expect("Failed to write instruction!");
     }
