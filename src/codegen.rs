@@ -248,6 +248,10 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
 fn generate_method_x86(method_name: &String, method_cfg: &mut CFG) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
+    if method_name == "main" {
+        x86_instructions.push(X86Insn::Global(method_name.to_string()));
+    }
+
     x86_instructions.push(X86Insn::Label(method_name.to_string()));
 
     // method prologue
