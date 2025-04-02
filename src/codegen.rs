@@ -94,7 +94,10 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
         Instruction::LoadString { src, dest } => {
             let dest_op = map_operand(method_cfg, dest, x86_instructions);
             let src_op = map_operand(method_cfg, src, x86_instructions);
-            x86_instructions.push(X86Insn::Lea(src_op, dest_op));
+
+            // rax as working register
+            x86_instructions.push(X86Insn::Lea(src_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
         }
         Instruction::MethodCall { name, args, dest } => {
             // Determine the destination operand
@@ -253,6 +256,10 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
 fn generate_method_x86(method_name: &String, method_cfg: &mut CFG) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
+    if method_name == "main" {
+        x86_instructions.push(X86Insn::Global(method_name.to_string()));
+    }
+
     x86_instructions.push(X86Insn::Label(method_name.to_string()));
 
     // method prologue
@@ -293,6 +300,27 @@ pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::W
         print_cfg(&method_cfgs);
     }
 
+    let mut global_code: Vec<X86Insn> = Vec::new();
+
+    // global variables
+    for global in globals {
+        if global.length.is_some() {
+            // allocate an extra element's worth of space to store the length of the array
+            // 8 byte alignment for now...
+            global_code.push(X86Insn::Comm(global.name, ELEMENT_SIZE*i64::from(global.length.unwrap()+1), ELEMENT_SIZE));
+        } else {
+            global_code.push(X86Insn::Comm(global.name, ELEMENT_SIZE, ELEMENT_SIZE));
+        }
+    }
+
+    // strings
+    for (idx, string) in strings.iter().enumerate() {
+        global_code.push(X86Insn::Label(format!("str{idx}")));
+        global_code.push(X86Insn::String(string.to_string()));
+    }
+
+    writeln!(writer).expect("Failed to write newline after globals!");
+
     // Generate a vector of x86 for each method
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, mut method_cfg) in method_cfgs {
@@ -301,8 +329,12 @@ pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::W
     }
 
     // Emit the final code
-    writeln!(writer, "{}", "\n========== X86 Code ==========\n")
-        .expect("Failed to write instruction!");
+    println!("\n========== X86 Code ==========\n");
+
+    for insn in &global_code {
+        writeln!(writer, "{}", insn).expect("Failed to write instruction!");
+    }
+
     for (_, method_code) in &code {
         for instr in method_code {
             writeln!(writer, "{}", instr).expect("Failed to write instruction!");
