@@ -9,6 +9,7 @@ use crate::semcheck::semcheck;
 use crate::symtable::{SymExpr, SymMethod, SymProgram, SymStatement};
 use crate::tac::*;
 use crate::token::Literal;
+use crate::token::Span;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 const UNREACHABLE_BLOCK: i32 = -1; // id for an unreachable block
@@ -1194,6 +1195,19 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
             strings,
         );
     }
+
+    // If we get to end of main, make sure that we have a return zero (put zero in rax to signify success)
+    if (method.name.clone() == "main") {
+        destruct_statement(
+            &mut method_cfg,
+            cur_block_id,
+            &SymStatement::Return { expr: Some(SymExpr::Literal { value: Literal::Int("0".to_string()), span: Span { sline: 0, scol: 0, eline: 0, ecol: 0 }}), span: Span { sline: 0, scol: 0, eline: 0, ecol: 0 } },
+            None,
+            &mut scope,
+            strings,
+        );
+    }
+
 
     method_cfg
 }
