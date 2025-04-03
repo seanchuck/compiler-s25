@@ -136,7 +136,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             // TODO: this may mess up 16-byte alignment
             // Arguments {7...n} go on stack, with last args going first; assume stack 16-aligned before call
             let mut sp_offset = 0;
-            for arg in args.iter().skip(6).rev() {
+            for arg in args.iter().skip(6) {
                 let arg_val = map_operand(method_cfg, arg, x86_instructions);
                 x86_instructions.push(X86Insn::Mov(
                     arg_val.clone(),
