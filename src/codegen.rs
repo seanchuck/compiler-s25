@@ -24,6 +24,15 @@ use std::collections::HashMap;
 //  - callee function epilogue
 //  - ret
 
+fn is_memory_operand(op: &X86Operand) -> bool {
+    match op {
+        X86Operand::Reg(_) => false,
+        X86Operand::Constant(_) => false,
+        _ => true, // RegInt, RegLabel, Address, Global, etc.
+    }
+}
+
+
 /// Returns the x86 operand corresponding to operand
 fn map_operand(
     method_cfg: &CFG,
@@ -250,9 +259,15 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
         | Instruction::GreaterEqual { left, right, dest }
         | Instruction::Equal { left, right, dest }
         | Instruction::NotEqual { left, right, dest } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions);
+            let mut left_op = map_operand(method_cfg, left, x86_instructions);
             let right_op = map_operand(method_cfg, right, x86_instructions);
             let dest_op = map_operand(method_cfg, dest, x86_instructions);
+
+            // cannot perform cmp on two memory locations
+            if is_memory_operand(&left_op) && is_memory_operand(&right_op) {
+                x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), left_op.clone()));
+                left_op = X86Operand::Reg(Register::Rax);
+            }
 
             x86_instructions.push(X86Insn::Cmp(right_op, left_op)); // cmp right, left
 
@@ -289,6 +304,9 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
         }
     }
 }
+
+
+
 
 /// Emit x86 code corresponding to the given CFG
 /// Returns a vector of strings of x86 instructions.
