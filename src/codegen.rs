@@ -60,6 +60,7 @@ fn map_operand(
                 5 => X86Operand::Reg(Register::R9),
                 n => {
                     // Only used for callee retrieving operand, caller pushes without using map_operand!
+                    // 16 byte offset because: old_rbp and ra stored betweeen new_rbp and args
                     let offset = 16 + ((n - 6) as i64 * 8);
                     X86Operand::RegInt(Register::Rbp, offset)
                 }
