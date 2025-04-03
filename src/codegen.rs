@@ -32,7 +32,6 @@ fn is_memory_operand(op: &X86Operand) -> bool {
     }
 }
 
-
 /// Returns the x86 operand corresponding to operand
 fn map_operand(
     method_cfg: &CFG,
@@ -143,13 +142,22 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 //     ));
                 // }
 
-                // TODO: this may mess up 16-byte alignment
-                // Arguments {7...n} go on stack, with last args going first; assume stack 16-aligned before call
-                for arg in args.iter().skip(6).rev() {
-                    // same logic here
-                    let arg_val = map_operand(method_cfg, arg, x86_instructions);
-                    x86_instructions.push(X86Insn::Push(arg_val));
-                }
+            // TODO: this may mess up 16-byte alignment
+            // Arguments {7...n} go on stack, with last args going first; assume stack 16-aligned before call
+            let mut sp_offset = 0;
+            for arg in args.iter().skip(6) {
+                let arg_val = map_operand(method_cfg, arg, x86_instructions);
+                x86_instructions.push(X86Insn::Mov(
+                    arg_val.clone(),
+                    X86Operand::Reg(Register::Rax),
+                ));
+                x86_instructions.push(X86Insn::Mov(
+                    X86Operand::Reg(Register::Rax),
+                    X86Operand::RegInt(Register::Rsp, sp_offset),
+                ));
+
+                sp_offset += 8;
+            }
 
                 // Make the call
                 x86_instructions.push(X86Insn::Call(name.to_string()));
@@ -308,9 +316,6 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
         },
     }
 }
-
-
-
 
 /// Emit x86 code corresponding to the given CFG
 /// Returns a vector of strings of x86 instructions.
