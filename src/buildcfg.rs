@@ -1236,6 +1236,21 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
         );
     }
 
+    // Reserve extra stack space for the the method call with the largest 
+    // number of stack args, when num args > 6
+    let mut max_stack_args = 0;
+    for block in method_cfg.blocks.values() {
+        for instr in &block.instructions {
+            if let Instruction::MethodCall { args, .. } = instr {
+                let stack_arg_count = args.len().saturating_sub(6);
+                max_stack_args = max_stack_args.max(stack_arg_count);
+            }
+        }
+    }
+    if max_stack_args > 0 {
+        method_cfg.stack_size += max_stack_args as i64 * 8;
+    }
+
     method_cfg
 }
 

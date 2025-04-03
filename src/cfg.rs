@@ -16,6 +16,8 @@ pub struct CFG {
     pub name: String,   // Name of the method for the CFG
     pub blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
     // no need to store edges because basic blocks end with a jump/branch instruction
+
+    // TODO: also increase stack size for function call with ore than 6 args
     pub stack_size: i64, // total space to allocate on the stack for this method
     pub locals: BTreeMap<String, Local>,
 }
@@ -23,7 +25,7 @@ pub struct CFG {
 #[derive(Debug, Clone)]
 pub struct BasicBlock {
     // Basic block is just a vector of instructions
-    instructions: Vec<Instruction>,
+    pub instructions: Vec<Instruction>,
     id: i32, // TODO: can add meaningful labels to each BB instead of referring to them by ID
 }
 

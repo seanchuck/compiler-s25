@@ -124,7 +124,18 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 x86_instructions.push(X86Insn::Mov(arg_val, arg_reg));
             }
 
-            // Arguments {7...n} go on stack, with last args going first
+            // let num_stack_args = args.len().saturating_sub(6);
+        
+            // // Add padding if needed for 16-byte alignment before the call
+            // if num_stack_args % 2 != 0 {
+            //     x86_instructions.push(X86Insn::Sub(
+            //         X86Operand::Constant(8),
+            //         X86Operand::Reg(Register::Rsp),
+            //     ));
+            // }
+
+            // TODO: this may mess up 16-byte alignment
+            // Arguments {7...n} go on stack, with last args going first; assume stack 16-aligned before call
             for arg in args.iter().skip(6).rev() {
                 // same logic here
                 let arg_val = map_operand(method_cfg, arg, x86_instructions);
@@ -300,7 +311,7 @@ fn generate_method_x86(method_name: &String, method_cfg: &mut CFG) -> Vec<X86Ins
     // Round up to the next 16-byte alignment
     let aligned_stack_size = (method_cfg.stack_size + 15) / 16 * 16;
 
-    // TODO: round up method_cfg.stack_size to be 16-byte aligned
+    // round up method_cfg.stack_size to be 16-byte aligned
     x86_instructions.push(X86Insn::Sub(
         X86Operand::Constant(aligned_stack_size),
         X86Operand::Reg(Register::Rsp),
