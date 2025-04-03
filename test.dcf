@@ -1,31 +1,5 @@
-
+import printf;
 void main() {
-    bool t, f, m;
-    int j;
-    t = true;
-    f = false;
-    m = false;
-
-
-    if (t && f || m) {
-        j = 999999999;
-    } else {
-        j = 1;
-    }
-
-    j = 500;
-
+    int a[3];
+    printf("Hello Decaf\n");
 }
-
-// Linear IR rep
-
-
-// int a = 3;
-// bool temp = (a > 5)
-// branch (temp, _label_1, _label_2)
-
-// _label_1
-// a = 1;
-
-// _label_2
-// a = 2;

@@ -1000,7 +1000,13 @@ fn destruct_statement(
             }
 
             // jump back to header block after the body
-            cfg.add_instruction_to_block(body_id, Instruction::UJmp { name: cfg.name.clone(), id: header_id });
+            cfg.add_instruction_to_block(
+                body_id,
+                Instruction::UJmp {
+                    name: cfg.name.clone(),
+                    id: header_id,
+                },
+            );
 
             next_block.get_id()
         }
@@ -1075,7 +1081,13 @@ fn destruct_statement(
             body_id = destruct_statement(cfg, body_id, update, Some(&next_loop), scope, strings);
 
             // jump back to header block after the body
-            cfg.add_instruction_to_block(body_id, Instruction::UJmp { name: cfg.name.clone(), id: header_id });
+            cfg.add_instruction_to_block(
+                body_id,
+                Instruction::UJmp {
+                    name: cfg.name.clone(),
+                    id: header_id,
+                },
+            );
 
             next_block.get_id()
         }
@@ -1197,17 +1209,32 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
     }
 
     // If we get to end of main, make sure that we have a return zero (put zero in rax to signify success)
-    if (method.name.clone() == "main") {
+    if method.name.clone() == "main" {
         destruct_statement(
             &mut method_cfg,
             cur_block_id,
-            &SymStatement::Return { expr: Some(SymExpr::Literal { value: Literal::Int("0".to_string()), span: Span { sline: 0, scol: 0, eline: 0, ecol: 0 }}), span: Span { sline: 0, scol: 0, eline: 0, ecol: 0 } },
+            &SymStatement::Return {
+                expr: Some(SymExpr::Literal {
+                    value: Literal::Int("0".to_string()),
+                    span: Span {
+                        sline: 0,
+                        scol: 0,
+                        eline: 0,
+                        ecol: 0,
+                    },
+                }),
+                span: Span {
+                    sline: 0,
+                    scol: 0,
+                    eline: 0,
+                    ecol: 0,
+                },
+            },
             None,
             &mut scope,
             strings,
         );
     }
-
 
     method_cfg
 }

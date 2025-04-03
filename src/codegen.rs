@@ -50,15 +50,21 @@ fn map_operand(
             x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(Register::R10))); // store index in r10
             X86Operand::Address(Some(arr.to_string()), None, Register::R10, ELEMENT_SIZE)
         }
-        Operand::Argument(pos) => match pos {
-            0 => X86Operand::Reg(Register::Rdi),
-            1 => X86Operand::Reg(Register::Rsi),
-            2 => X86Operand::Reg(Register::Rdx),
-            3 => X86Operand::Reg(Register::Rcx),
-            4 => X86Operand::Reg(Register::R8),
-            5 => X86Operand::Reg(Register::R9),
-            _ => todo!(),
-        },
+        Operand::Argument(pos) => {
+            match pos {
+                0 => X86Operand::Reg(Register::Rdi),
+                1 => X86Operand::Reg(Register::Rsi),
+                2 => X86Operand::Reg(Register::Rdx),
+                3 => X86Operand::Reg(Register::Rcx),
+                4 => X86Operand::Reg(Register::R8),
+                5 => X86Operand::Reg(Register::R9),
+                n => {
+                    // Only used for callee retrieving operand, caller pushes without using map_operand!
+                    let offset = 16 + ((n - 6) as i64 * 8);
+                    X86Operand::RegInt(Register::Rbp, offset)
+                }
+            }
+        }
         Operand::String(idx) => X86Operand::RegLabel(Register::Rip, format!("str{idx}")),
     }
 }
@@ -109,12 +115,19 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             };
 
             // Setup arguments
-            // TODO: push arguments onto the stack or into registers as per calling convention
-            for (i, arg) in args.iter().enumerate() {
+            // First 6 args go in registers
+            for (i, arg) in args.iter().take(6).enumerate() {
                 let arg_reg =
                     map_operand(method_cfg, &Operand::Argument(i as i32), x86_instructions);
-                let src_reg = map_operand(method_cfg, arg, x86_instructions);
-                x86_instructions.push(X86Insn::Mov(src_reg, arg_reg));
+                let arg_val = map_operand(method_cfg, arg, x86_instructions);
+                x86_instructions.push(X86Insn::Mov(arg_val, arg_reg));
+            }
+
+            // Arguments {7...n} go on stack, with last args going first
+            for arg in args.iter().skip(6).rev() {
+                // same logic here
+                let arg_val = map_operand(method_cfg, arg, x86_instructions);
+                x86_instructions.push(X86Insn::Push(arg_val));
             }
 
             // Make the call
@@ -160,7 +173,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 X86Operand::Reg(Register::Rdx),
                 X86Operand::Reg(Register::Rdx),
             )); // TODO is sign extension in Rdx necessary? right now just zero it
-            x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx)));  // Division cannot work on immediate, move to scratch reg
+            x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx))); // Division cannot work on immediate, move to scratch reg
             x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
             x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
         }
@@ -175,7 +188,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 X86Operand::Reg(Register::Rdx),
                 X86Operand::Reg(Register::Rdx),
             )); // zero RDX
-            x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx)));  // Division cannot work on immediate, move to scratch reg
+            x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx))); // Division cannot work on immediate, move to scratch reg
             x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
             x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op));
         }
@@ -248,7 +261,11 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             let label = format!("{}{}", name, id);
             x86_instructions.push(X86Insn::Jmp(label));
         }
-        Instruction::CJmp { name, condition, id } => {
+        Instruction::CJmp {
+            name,
+            condition,
+            id,
+        } => {
             let label = format!("{}{}", name, id);
             let cond_op = map_operand(method_cfg, condition, x86_instructions);
 
@@ -276,6 +293,8 @@ fn generate_method_x86(method_name: &String, method_cfg: &mut CFG) -> Vec<X86Ins
         X86Operand::Reg(Register::Rsp),
         X86Operand::Reg(Register::Rbp),
     )); // copy stack pointer to base pointer
+
+    // TODO: round up method_cfg.stack_size to be 16-byte aligned
     x86_instructions.push(X86Insn::Sub(
         X86Operand::Constant(method_cfg.stack_size),
         X86Operand::Reg(Register::Rsp),
@@ -316,7 +335,11 @@ pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::W
         if global.length.is_some() {
             // allocate an extra element's worth of space to store the length of the array
             // 8 byte alignment for now...
-            global_code.push(X86Insn::Comm(global.name, ELEMENT_SIZE*i64::from(global.length.unwrap()+1), ELEMENT_SIZE));
+            global_code.push(X86Insn::Comm(
+                global.name,
+                ELEMENT_SIZE * i64::from(global.length.unwrap() + 1),
+                ELEMENT_SIZE,
+            ));
         } else {
             global_code.push(X86Insn::Comm(global.name, ELEMENT_SIZE, ELEMENT_SIZE));
         }

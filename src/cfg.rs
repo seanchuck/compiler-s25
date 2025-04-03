@@ -92,7 +92,7 @@ impl CFG {
             temp,
             Local {
                 stack_offset: -self.stack_size,
-                length: length,
+                length,
             },
         );
     }
