@@ -30,7 +30,8 @@ pub enum X86Insn {
     Setne(X86Operand),
     Comm(String, i64, i64), // name, size, alignment
     String(String),
-    Global(String)
+    Global(String),
+    Exit
 }
 
 #[derive(Debug, Clone)]
@@ -135,6 +136,7 @@ impl fmt::Display for X86Insn {
             X86Insn::Setl(dst) => write!(f, "    setl {}", dst),
             X86Insn::Setle(dst) => write!(f, "    setle {}", dst),
             X86Insn::Setne(dst) => write!(f, "    setne {}", dst),
+            X86Insn::Exit => write!(f, "    call exit"),
             X86Insn::Comm(name, size, alignment) => write!(f, ".comm {name}, {size}, {alignment}"),
             X86Insn::String(val) => write!(f, "    .string \"{val}\""),
             X86Insn::Global(val) => write!(f, ".globl {val}"),

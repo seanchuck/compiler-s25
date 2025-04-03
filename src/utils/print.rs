@@ -19,84 +19,87 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
             for insn in block.get_instructions() {
                 match insn {
                     Instruction::Add { left, right, dest } => {
-                        println!("        {dest} <- {left} + {right}");
-                    }
+                                        println!("        {dest} <- {left} + {right}");
+                                    }
                     Instruction::Assign { src, dest } => {
-                        println!("        {dest} <- {src}");
-                    }
+                                        println!("        {dest} <- {src}");
+                                    }
                     Instruction::CJmp { name, condition, id } => {
-                        println!("        cjmp {condition}, {name}{id}");
-                    }
+                                        println!("        cjmp {condition}, {name}{id}");
+                                    }
                     Instruction::Cast {
-                        expr,
-                        dest,
-                        target_type,
-                    } => {
-                        println!("        {dest} <- {target_type}({expr})");
-                    }
+                                        expr,
+                                        dest,
+                                        target_type,
+                                    } => {
+                                        println!("        {dest} <- {target_type}({expr})");
+                                    }
                     Instruction::Divide { left, right, dest } => {
-                        println!("        {dest} <- {left} / {right}");
-                    }
+                                        println!("        {dest} <- {left} / {right}");
+                                    }
                     Instruction::Equal { left, right, dest } => {
-                        println!("        {dest} <- {left} == {right}");
-                    }
+                                        println!("        {dest} <- {left} == {right}");
+                                    }
                     Instruction::Greater { left, right, dest } => {
-                        println!("        {dest} <- {left} > {right}");
-                    }
+                                        println!("        {dest} <- {left} > {right}");
+                                    }
                     Instruction::GreaterEqual { left, right, dest } => {
-                        println!("        {dest} <- {left} >= {right}");
-                    }
+                                        println!("        {dest} <- {left} >= {right}");
+                                    }
                     Instruction::Len { expr, dest } => {
-                        println!("        {dest} <- len({expr})");
-                    }
+                                        println!("        {dest} <- len({expr})");
+                                    }
                     Instruction::Less { left, right, dest } => {
-                        println!("        {dest} <- {left} < {right}");
-                    }
+                                        println!("        {dest} <- {left} < {right}");
+                                    }
                     Instruction::LessEqual { left, right, dest } => {
-                        println!("        {dest} <- {left} <= {right}");
-                    }
+                                        println!("        {dest} <- {left} <= {right}");
+                                    }
                     Instruction::MethodCall { name, args, dest } => {
-                        let args_string = args
-                            .iter()
-                            .map(|op| op.to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ");
-                        if dest.is_some() {
-                            let dest_string = dest.clone().unwrap();
-                            println!("        {dest_string} <- {name}({args_string})");
-                        } else {
-                            println!("        {name}({args_string})");
-                        }
-                    }
+                                        let args_string = args
+                                            .iter()
+                                            .map(|op| op.to_string())
+                                            .collect::<Vec<_>>()
+                                            .join(", ");
+                                        if dest.is_some() {
+                                            let dest_string = dest.clone().unwrap();
+                                            println!("        {dest_string} <- {name}({args_string})");
+                                        } else {
+                                            println!("        {name}({args_string})");
+                                        }
+                                    }
                     Instruction::Modulo { left, right, dest } => {
-                        println!("        {dest} <- {left} % {right}");
-                    }
+                                        println!("        {dest} <- {left} % {right}");
+                                    }
                     Instruction::Multiply { left, right, dest } => {
-                        println!("        {dest} <- {left} * {right}");
-                    }
+                                        println!("        {dest} <- {left} * {right}");
+                                    }
                     Instruction::Not { expr, dest } => {
-                        println!("        {dest} <- !{expr}");
-                    }
+                                        println!("        {dest} <- !{expr}");
+                                    }
                     Instruction::NotEqual { left, right, dest } => {
-                        println!("        {dest} <- {left} != {right}");
-                    }
+                                        println!("        {dest} <- {left} != {right}");
+                                    }
                     Instruction::Ret { value } => {
-                        if value.is_some() {
-                            let val_str = value.clone().unwrap();
-                            println!("        ret {val_str}");
-                        } else {
-                            println!("        ret");
-                        }
-                    }
+                                        if value.is_some() {
+                                            let val_str = value.clone().unwrap();
+                                            println!("        ret {val_str}");
+                                        } else {
+                                            println!("        ret");
+                                        }
+                                    }
                     Instruction::Subtract { left, right, dest } => {
-                        println!("        {dest} <- {left} - {right}");
-                    }
+                                        println!("        {dest} <- {left} - {right}");
+                                    }
                     Instruction::UJmp { name, id } => {
-                        println!("        ujmp {name}{id}");
-                    }
+                                        println!("        ujmp {name}{id}");
+                                    }
                     Instruction::LoadString { src, dest } => {
-                        println!("        {dest} <- {src}");
-                    }
+                                        println!("        {dest} <- {src}");
+                                    }
+                    Instruction::Exit { exit_code } => {
+                                        println!("        exit({})", exit_code);
+                                    },
                 }
             }
         }

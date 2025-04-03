@@ -168,4 +168,9 @@ pub enum Instruction {
         src: Operand,
         dest: Operand,
     },
+
+    // Runtime Exit
+    Exit {
+        exit_code: i64
+    }
 }

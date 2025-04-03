@@ -1163,6 +1163,10 @@ fn destruct_statement(
 
             cur_block_id
         }
+        SymStatement::Error => {
+            cfg.add_instruction_to_block(cur_block_id, Instruction::Exit {exit_code: -1});
+            cur_block_id
+        }
         _ => unreachable!(),
     }
 }
@@ -1202,6 +1206,17 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
             &mut method_cfg,
             cur_block_id,
             &statement,
+            None,
+            &mut scope,
+            strings,
+        );
+    }
+
+    if method.return_type != Type::Void {
+        destruct_statement(
+            &mut method_cfg,
+            cur_block_id,
+            &SymStatement::Error,
             None,
             &mut scope,
             strings,
