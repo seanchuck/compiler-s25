@@ -202,9 +202,13 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             match target_type {
                 crate::ast::Type::Int => {
                     // TODO implement this when we differentiate ints and longs
+                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Rax)));
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
                 }
                 crate::ast::Type::Long => {
                     // TODO implement this when we differentiate ints and longs
+                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Rax)));
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
                 }
                 _ => panic!("Shouldnt get here, cannot cast non int or long value"),
             }
