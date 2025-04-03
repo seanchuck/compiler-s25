@@ -297,9 +297,12 @@ fn generate_method_x86(method_name: &String, method_cfg: &mut CFG) -> Vec<X86Ins
         X86Operand::Reg(Register::Rbp),
     )); // copy stack pointer to base pointer
 
+    // Round up to the next 16-byte alignment
+    let aligned_stack_size = (method_cfg.stack_size + 15) / 16 * 16;
+
     // TODO: round up method_cfg.stack_size to be 16-byte aligned
     x86_instructions.push(X86Insn::Sub(
-        X86Operand::Constant(method_cfg.stack_size),
+        X86Operand::Constant(aligned_stack_size),
         X86Operand::Reg(Register::Rsp),
     )); // decrease stack pointer to allocate space on the stack
 
