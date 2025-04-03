@@ -40,10 +40,10 @@ fn map_operand(
             let idx_op = map_operand(method_cfg, idx, x86_instructions);
             x86_instructions.push(X86Insn::Lea(
                 X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(arr)),
-                X86Operand::Reg(Register::Rax),
+                X86Operand::Reg(Register::R11),
             )); // store base address of array in rax
             x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(Register::R10))); // store index in r10
-            X86Operand::Address(None, Some(Register::Rax), Register::R10, ELEMENT_SIZE)
+            X86Operand::Address(None, Some(Register::R11), Register::R10, ELEMENT_SIZE)
         }
         Operand::GlobalArrElement(arr, idx) => {
             let idx_op = map_operand(method_cfg, idx, x86_instructions);

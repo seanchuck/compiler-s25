@@ -87,6 +87,7 @@ pub enum Register {
     Rax,
     Al,
     Rip,
+    R11
 }
 
 impl fmt::Display for Register {
@@ -104,6 +105,7 @@ impl fmt::Display for Register {
             Register::Rax => write!(f, "%rax"),
             Register::Al => write!(f, "%al"),
             Register::Rip => write!(f, "%rip"),
+            Register::R11 => write!(f, "%r11"),
         }
     }
 }
