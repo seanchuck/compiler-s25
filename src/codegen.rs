@@ -242,7 +242,8 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             };
 
             x86_instructions.push(set_instr);
-            x86_instructions.push(X86Insn::Movzbq(X86Operand::Reg(Register::Al), dest_op));
+            x86_instructions.push(X86Insn::Movzbq(X86Operand::Reg(Register::Al), X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
         }
         Instruction::UJmp { name, id } => {
             let label = format!("{}{}", name, id);
@@ -253,7 +254,8 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             let cond_op = map_operand(method_cfg, condition, x86_instructions);
 
             // cmp condition, 0 → is condition true?
-            x86_instructions.push(X86Insn::Cmp(cond_op, X86Operand::Constant(0)));
+            x86_instructions.push(X86Insn::Mov(cond_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Cmp(X86Operand::Constant(0), X86Operand::Reg(Register::Rax)));
             x86_instructions.push(X86Insn::Jne(label)); // jump if condition != 0
         }
     }
