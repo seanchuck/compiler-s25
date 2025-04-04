@@ -77,6 +77,8 @@ for file in "$BASE_DIR/$INPUT_DIR"/*; do
             correct=$((correct + 1))
         else
             echo "Test failed for $file" | tee -a "$OUTPUT_FILE"
+            echo "Differences:" | tee -a "$OUTPUT_FILE"
+            diff "$actual_output" "$expected_output" | tee -a "$OUTPUT_FILE"
             incorrect=$((incorrect + 1))
         fi
 

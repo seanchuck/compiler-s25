@@ -977,15 +977,19 @@ fn destruct_statement(
             ..
         } => {
             let header_id = next_bblock_id();
-            let header_block = BasicBlock::new(header_id); // the block that evaluates the loop condition
+            let header_block = BasicBlock::new(header_id); // condition evaluation
             let mut body_id = next_bblock_id();
-            let body_block = &BasicBlock::new(body_id); // the block that starts the body
-            let next_block = BasicBlock::new(next_bblock_id()); // the block after the whole loop
+            let body_block = &BasicBlock::new(body_id);    // body of the loop
+            let update_block_id = next_bblock_id();
+            let update_block = BasicBlock::new(update_block_id); // update block
+            let next_block = BasicBlock::new(next_bblock_id());  // block after loop
+        
             cfg.add_block(&header_block);
             cfg.add_block(&body_block);
+            cfg.add_block(&update_block);
             cfg.add_block(&next_block);
-
-            // evaluate the for_init
+        
+            // for-loop initialization
             let lhs = scope.lookup_var(var.to_string());
             let rhs: Operand;
             (cur_block_id, rhs) = destruct_expr(cfg, init, cur_block_id, scope, strings);
@@ -996,14 +1000,17 @@ fn destruct_statement(
                     dest: lhs,
                 },
             );
+        
+            // jump to loop condition check
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::UJmp {
                     name: cfg.name.clone(),
-                    id: header_block.get_id(),
+                    id: header_id,
                 },
             );
-
+        
+            // build condition check
             build_cond(
                 cfg,
                 condition,
@@ -1013,17 +1020,20 @@ fn destruct_statement(
                 scope,
                 strings,
             );
-
+        
+            // loop struct
             let next_loop = Loop {
                 break_to: next_block.get_id(),
-                continue_to: header_id,
+                continue_to: update_block_id, // ← fix: continue should go to update
             };
-
+        
+            // scoped body
             let mut new_scope = CFGScope {
                 parent: Some(Box::new(scope.clone())),
                 local_to_temp: HashMap::new(),
             };
-
+        
+            // destruct loop body
             for statement in &block.statements {
                 body_id = destruct_statement(
                     cfg,
@@ -1034,21 +1044,32 @@ fn destruct_statement(
                     strings,
                 );
             }
-
-            // execute the for_update
-            body_id = destruct_statement(cfg, body_id, update, Some(&next_loop), scope, strings);
-
-            // jump back to header block after the body
+        
+            // jump to update block after body
             cfg.add_instruction_to_block(
                 body_id,
+                Instruction::UJmp {
+                    name: cfg.name.clone(),
+                    id: update_block_id,
+                },
+            );
+        
+            // update block executes update expression
+            let mut update_id = update_block_id;
+            update_id = destruct_statement(cfg, update_id, update, Some(&next_loop), scope, strings);
+        
+            // jump back to condition after update
+            cfg.add_instruction_to_block(
+                update_id,
                 Instruction::UJmp {
                     name: cfg.name.clone(),
                     id: header_id,
                 },
             );
-
+        
             next_block.get_id()
         }
+        
         SymStatement::Break { .. } => {
             cfg.add_instruction_to_block(
                 cur_block_id,
