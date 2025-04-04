@@ -8,5 +8,5 @@ int fib(int n) {
 }
 
 void main() {
-  printf(fib(5));
+  printf("%d\n", fib(5));
 }

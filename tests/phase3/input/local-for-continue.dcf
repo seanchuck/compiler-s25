@@ -2,11 +2,11 @@ import printf;
 
 
 void main() {
-  int i;    // This is causing infinite loop so just commented out rn until fixed
-  //for (i = 0; i < 5; i += 1) {
-  //  if (i % 2 == 0) {
-   //   continue;
-   // }
-   // printf(i);
-  //}
+  int i;
+  for (i = 0; i < 5; i += 1) {
+    if (i % 2 == 0) {
+      continue;
+    }
+    printf("%d\n", i);
+  }
 }

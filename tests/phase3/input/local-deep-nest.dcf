@@ -18,5 +18,5 @@ void main() {
     }
   }
 
-  printf(x);
+  printf("%d\n", x);
 }

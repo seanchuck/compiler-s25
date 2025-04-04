@@ -5,8 +5,8 @@ void main() {
   a = false;
 
   if (!a) {
-    printf(1);
+    printf("%d\n", 1);
   } else {
-    printf(0);
+    printf("%d\n", 0);
   }
 }

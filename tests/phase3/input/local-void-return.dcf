@@ -1,7 +1,7 @@
 import printf;
 
 void foo() {
-  printf(42);
+  printf("%d\n", 42);
   return;
 }
 

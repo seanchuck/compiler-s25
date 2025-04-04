@@ -9,6 +9,6 @@ void main() {
     if (i == 4) {
       break;
     }
-    printf(i);
+    printf("%d\n", i);
   }
 }

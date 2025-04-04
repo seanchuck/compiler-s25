@@ -21,5 +21,5 @@ void main() {
     sum += 2;
   }
 
-  printf(sum);
+  printf("%d\n", sum);
 }
