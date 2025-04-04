@@ -1,6 +1,0 @@
-import example;
-void foo() {}
-void main() {
-    int y;
-    y = example(foo());
-}

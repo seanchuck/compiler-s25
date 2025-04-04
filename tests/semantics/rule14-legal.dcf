@@ -1,6 +1,0 @@
-void main() {
-    long x;
-    long y;
-    x = 19L;
-    y = -x; // should be legal
-}

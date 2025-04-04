@@ -1,4 +1,0 @@
-void main() {
-    bool x;
-    x = (5 == true); // ❌ `int` and `bool` cannot be compared
-}

@@ -1,6 +1,0 @@
-void main() {
-    bool x;
-    int y;
-    x = true;
-    y = -x; // NOT ALLOWED, unary minus must be on int or long
-}

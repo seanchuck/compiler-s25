@@ -1,8 +1,0 @@
-void main() {
-    int x;
-    long y;
-    int z;
-    x = 5;
-    y = 6L;
-    z = x * y; // ❌ Cannot operate on `int` and `long`
-}

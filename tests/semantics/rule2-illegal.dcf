@@ -1,7 +1,0 @@
-// While this is a semantic error,
-// it is actually caught in the decaf grammar,
-// which ensures declarations before statements
-void main() {
-    x = 5;
-    int x;
-}

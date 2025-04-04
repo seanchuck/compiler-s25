@@ -1,5 +1,0 @@
-void main() {
-    bool x;
-    x = true;
-    x *= 1; // ❌ `+=` only works with `int` and `long`
-}

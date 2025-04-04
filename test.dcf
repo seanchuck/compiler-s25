@@ -1,5 +1,0 @@
-import printf;
-void main() {
-    int a[3];
-    printf("Hello Decaf\n");
-}

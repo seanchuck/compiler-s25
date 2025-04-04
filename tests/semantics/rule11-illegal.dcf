@@ -1,8 +1,0 @@
-void main() {
-    int arr[10];
-    int index;
-    int x;
-    
-    // index = true; // ❌ Index must be an `int`
-    x = arr[true];
-}

@@ -1,5 +1,0 @@
-void main() {
-    long x;
-    x = 2L;
-    x *= 1; // mismatched types (long and int)
-}

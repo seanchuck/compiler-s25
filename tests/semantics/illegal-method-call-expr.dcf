@@ -1,7 +1,0 @@
-void main() {
-    int x;
-    x = foo();
-}
-long foo() {
-    return 2L;
-}

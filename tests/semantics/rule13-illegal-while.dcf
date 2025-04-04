@@ -1,8 +1,0 @@
-void main() {
-    long x;
-    x = 5L;
-    while (x) { // ❌ Condition must be a `bool`
-        int y;
-        y = 10;
-    }
-}

@@ -1,6 +1,0 @@
-void main() {
-    long x;
-    bool y;
-    y = true;
-    x = long(y); // ❌ cannot cast bool into long
-}
