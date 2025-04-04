@@ -1,0 +1,6 @@
+int x[10];
+bool x[5];
+void main() {
+    long a[1];
+    int a[9];
+}

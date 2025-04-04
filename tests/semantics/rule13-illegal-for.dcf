@@ -1,0 +1,8 @@
+void main() {
+    int x;
+    int y;
+    y = 0;
+    for (x = 0; x; x++) {   // illegal since second expr isnt bool
+        y += 1;
+    }
+}

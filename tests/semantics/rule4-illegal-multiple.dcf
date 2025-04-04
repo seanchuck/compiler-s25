@@ -1,0 +1,10 @@
+void foo(int a, long b, bool c) {}
+void main() {
+    int x;
+    long y;
+    int z;
+    x = 5;
+    y = 7L;
+    z = 1;
+    foo(x, y, z);
+}

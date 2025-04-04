@@ -1,0 +1,5 @@
+void foo() {}
+void main() {
+    int x;
+    x = foo(); // ❌ `foo` does not return a value
+}

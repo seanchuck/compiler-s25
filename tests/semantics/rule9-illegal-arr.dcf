@@ -1,0 +1,6 @@
+int x[5];
+
+void main() {
+    x[4] = 9;
+    y[3] = true;   //errors since y isnt declared
+}

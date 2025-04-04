@@ -1,0 +1,4 @@
+void bar(int[] a) {}
+
+void main() {
+}

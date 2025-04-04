@@ -1,0 +1,3 @@
+import x;
+void main() {}
+int test(int y, long y) {}

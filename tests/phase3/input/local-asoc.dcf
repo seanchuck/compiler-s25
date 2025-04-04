@@ -1,0 +1,9 @@
+import printf;
+
+void main() {
+  int a;
+  a = 1 + 2 * 3 - 4 / 2;
+  // 1 + (2*3) - (4/2) = 1 + 6 - 2 = 5
+
+  printf("%d\n", a);
+}

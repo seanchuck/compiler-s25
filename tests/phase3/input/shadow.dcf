@@ -1,0 +1,11 @@
+import printf;
+
+void example(int a) {
+    a = 3;
+    printf("%d\n", a);
+}
+
+void main() {
+    int a;
+    example(4);
+}

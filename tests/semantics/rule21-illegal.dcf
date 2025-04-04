@@ -1,0 +1,6 @@
+void main() {
+    int x;
+    int y;
+    x = 2147483647; // legal inside int ramge
+    y = x + 2147483648; // illegal addition of literal too large
+}
