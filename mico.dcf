@@ -1,0 +1,25 @@
+import printf;
+
+int a() {
+    int b;
+    b = 3;
+
+    if (b == 3) {
+        return b;
+    }
+
+
+    return b;
+
+}
+
+void main() {
+    int x;
+    x = 3;
+
+    if (x > 0) {
+        printf("hi");
+    } else {
+        printf("low");
+    }
+}

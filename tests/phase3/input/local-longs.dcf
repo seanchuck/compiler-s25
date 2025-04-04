@@ -1,0 +1,10 @@
+import print;
+
+void main() {
+  long a;
+  long b;
+  a = 10000000000L;
+  b = a + 2345L;
+
+  print(int(b / 1000000000L)); // should print 10
+}

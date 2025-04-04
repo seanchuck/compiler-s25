@@ -1,0 +1,10 @@
+import print;
+
+void foo() {
+  print(42);
+  return;
+}
+
+void main() {
+  foo();
+}

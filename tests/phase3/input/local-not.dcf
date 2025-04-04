@@ -1,0 +1,12 @@
+import print;
+
+void main() {
+  bool a;
+  a = false;
+
+  if (!a) {
+    print(1);
+  } else {
+    print(0);
+  }
+}

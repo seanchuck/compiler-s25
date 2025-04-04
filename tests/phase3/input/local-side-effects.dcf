@@ -1,0 +1,12 @@
+import print;
+
+int foo(int x) {
+  print(x);
+  return x;
+}
+
+void main() {
+  int a;
+  a = foo(1) + foo(2);
+  print(a);
+}
