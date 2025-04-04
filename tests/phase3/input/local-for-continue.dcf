@@ -1,4 +1,4 @@
-import print;
+import printf;
 
 
 void main() {
@@ -7,6 +7,6 @@ void main() {
     if (i % 2 == 0) {
       continue;
     }
-    print(i);
+    printf(i);
   }
 }

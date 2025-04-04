@@ -1,13 +1,13 @@
-import print;
+import printf;
 
 bool cond() {
-  print(1);
+  printf(1);
   return true;
 }
 
 void main() {
   int i;
   for (i = 0; cond() && i < 3; i += 1) {
-    print(i);
+    printf(i);
   }
 }

@@ -1,7 +1,7 @@
-import print;
+import printf;
 
 void foo() {
-  print(42);
+  printf(42);
   return;
 }
 

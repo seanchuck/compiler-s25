@@ -1,4 +1,4 @@
-import print;
+import printf;
 
 int fib(int n) {
   if (n <= 1) {
@@ -8,5 +8,5 @@ int fib(int n) {
 }
 
 void main() {
-  print(fib(5));
+  printf(fib(5));
 }

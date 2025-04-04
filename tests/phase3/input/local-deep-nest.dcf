@@ -1,4 +1,4 @@
-import print;
+import printf;
 
 void main() {
   int x;
@@ -18,5 +18,5 @@ void main() {
     }
   }
 
-  print(x);
+  printf(x);
 }

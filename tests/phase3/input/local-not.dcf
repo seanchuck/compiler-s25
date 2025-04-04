@@ -1,12 +1,12 @@
-import print;
+import printf;
 
 void main() {
   bool a;
   a = false;
 
   if (!a) {
-    print(1);
+    printf(1);
   } else {
-    print(0);
+    printf(0);
   }
 }

@@ -1,16 +1,16 @@
-import print;
+import printf;
 
 void main() {
   int x;
   x = 5;
 
   if (x < 3) {
-    print(1);
+    printf(1);
   } else {
     if (x == 5) {
-        print(2);
+        printf(2);
     } else {
-        print(3);
+        printf(3);
     }
   } 
 }

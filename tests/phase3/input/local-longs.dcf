@@ -1,4 +1,4 @@
-import print;
+import printf;
 
 void main() {
   long a;
@@ -6,5 +6,5 @@ void main() {
   a = 10000000000L;
   b = a + 2345L;
 
-  print(int(b / 1000000000L)); // should print 10
+  printf(int(b / 1000000000L)); // should print 10
 }

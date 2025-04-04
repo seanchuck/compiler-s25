@@ -1,4 +1,4 @@
-import print;
+import printf;
 
 int n;
 int a[4];
@@ -27,8 +27,8 @@ void main() {
 
   insertionSort();
 
-  print(a[0]);
-  print(a[1]);
-  print(a[2]);
-  print(a[3]);
+  printf(a[0]);
+  printf(a[1]);
+  printf(a[2]);
+  printf(a[3]);
 }

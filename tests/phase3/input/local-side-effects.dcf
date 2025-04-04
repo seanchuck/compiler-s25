@@ -1,12 +1,12 @@
-import print;
+import printf;
 
 int foo(int x) {
-  print(x);
+  printf(x);
   return x;
 }
 
 void main() {
   int a;
   a = foo(1) + foo(2);
-  print(a);
+  printf(a);
 }
