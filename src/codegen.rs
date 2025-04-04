@@ -24,13 +24,24 @@ use std::collections::HashMap;
 //  - callee function epilogue
 //  - ret
 
-fn is_memory_operand(op: &X86Operand) -> bool {
-    match op {
-        X86Operand::Reg(_) => false,
-        X86Operand::Constant(_) => false,
-        _ => true, // RegInt, RegLabel, Address, Global, etc.
-    }
+fn is_register_operand(op: &X86Operand) -> bool {
+    matches!(op, X86Operand::Reg(_))
 }
+
+fn is_immediate_operand(op: &X86Operand) -> bool {
+    matches!(op, X86Operand::Constant(_))
+}
+
+fn is_memory_operand(op: &X86Operand) -> bool {
+    matches!(
+        op,
+        X86Operand::RegInt(..)
+            | X86Operand::RegLabel(..)
+            | X86Operand::Address(..)
+            | X86Operand::Global(_) // assuming globals refer to memory-located data
+    )
+}
+
 
 /// Returns the x86 operand corresponding to operand
 fn map_operand(
@@ -132,32 +143,21 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                     x86_instructions.push(X86Insn::Mov(arg_val, arg_reg));
                 }
 
-                // let num_stack_args = args.len().saturating_sub(6);
-        
-                // // Add padding if needed for 16-byte alignment before the call
-                // if num_stack_args % 2 != 0 {
-                //     x86_instructions.push(X86Insn::Sub(
-                //         X86Operand::Constant(8),
-                //         X86Operand::Reg(Register::Rsp),
-                //     ));
-                // }
+                // Arguments {7...n} go on stack, with last args going first; assume stack 16-aligned before call
+                let mut sp_offset = 0;
+                for arg in args.iter().skip(6) {
+                    let arg_val = map_operand(method_cfg, arg, x86_instructions);
+                    x86_instructions.push(X86Insn::Mov(
+                        arg_val.clone(),
+                        X86Operand::Reg(Register::Rax),
+                    ));
+                    x86_instructions.push(X86Insn::Mov(
+                        X86Operand::Reg(Register::Rax),
+                        X86Operand::RegInt(Register::Rsp, sp_offset),
+                    ));
 
-            // TODO: this may mess up 16-byte alignment
-            // Arguments {7...n} go on stack, with last args going first; assume stack 16-aligned before call
-            let mut sp_offset = 0;
-            for arg in args.iter().skip(6) {
-                let arg_val = map_operand(method_cfg, arg, x86_instructions);
-                x86_instructions.push(X86Insn::Mov(
-                    arg_val.clone(),
-                    X86Operand::Reg(Register::Rax),
-                ));
-                x86_instructions.push(X86Insn::Mov(
-                    X86Operand::Reg(Register::Rax),
-                    X86Operand::RegInt(Register::Rsp, sp_offset),
-                ));
-
-                sp_offset += 8;
-            }
+                    sp_offset += 8;
+                }
 
                 // Make the call
                 x86_instructions.push(X86Insn::Call(name.to_string()));
@@ -268,26 +268,67 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             | Instruction::Equal { left, right, dest }
             | Instruction::NotEqual { left, right, dest } => {
                 let mut left_op = map_operand(method_cfg, left, x86_instructions);
-                let right_op = map_operand(method_cfg, right, x86_instructions);
+                let mut right_op = map_operand(method_cfg, right, x86_instructions);
                 let dest_op = map_operand(method_cfg, dest, x86_instructions);
+                let mut swapped = false;
 
-                // cannot perform cmp on two memory locations
+                // handle illegal cmp: (mem, mem)
                 if is_memory_operand(&left_op) && is_memory_operand(&right_op) {
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), left_op.clone()));
+                    // move value into a register
+                    x86_instructions.push(X86Insn::Mov(left_op.clone(), X86Operand::Reg(Register::Rax)));
                     left_op = X86Operand::Reg(Register::Rax);
                 }
 
-                x86_instructions.push(X86Insn::Cmp(right_op, left_op)); // cmp right, left
+                // handle illegal cmp: (imm, imm),
+                if is_immediate_operand(&left_op) && is_immediate_operand(&right_op) {
+                    x86_instructions.push(X86Insn::Mov(left_op.clone(), X86Operand::Reg(Register::Rax)));
+                    left_op = X86Operand::Reg(Register::Rax);
+                }
+
+                // handle illegal cmp: (mem, imm), (reg, imm) --> imm must come first
+                if is_immediate_operand(&left_op) && !is_immediate_operand(&right_op) {
+                    // immediate must come first → flip
+                    std::mem::swap(&mut left_op, &mut right_op);
+                    swapped = true; // must swap the boolean operator since swapped operands!
+                }
+
+                // x86 swaps right and left for cmp
+                x86_instructions.push(X86Insn::Cmp(right_op, left_op));
 
                 let set_instr = match insn {
-                    Instruction::Greater { .. } => X86Insn::Setg(X86Operand::Reg(Register::Al)),
-                    Instruction::Less { .. } => X86Insn::Setl(X86Operand::Reg(Register::Al)),
-                    Instruction::LessEqual { .. } => X86Insn::Setle(X86Operand::Reg(Register::Al)),
-                    Instruction::GreaterEqual { .. } => X86Insn::Setge(X86Operand::Reg(Register::Al)),
+                    Instruction::Greater { .. } => {
+                        if swapped {
+                            X86Insn::Setl(X86Operand::Reg(Register::Al))
+                        } else {
+                            X86Insn::Setg(X86Operand::Reg(Register::Al))
+                        }
+                    }
+                    Instruction::Less { .. } => {
+                        if swapped {
+                            X86Insn::Setg(X86Operand::Reg(Register::Al))
+                        } else {
+                            X86Insn::Setl(X86Operand::Reg(Register::Al))
+                        }
+                    }
+                    Instruction::GreaterEqual { .. } => {
+                        if swapped {
+                            X86Insn::Setle(X86Operand::Reg(Register::Al))
+                        } else {
+                            X86Insn::Setge(X86Operand::Reg(Register::Al))
+                        }
+                    }
+                    Instruction::LessEqual { .. } => {
+                        if swapped {
+                            X86Insn::Setge(X86Operand::Reg(Register::Al))
+                        } else {
+                            X86Insn::Setle(X86Operand::Reg(Register::Al))
+                        }
+                    }
                     Instruction::Equal { .. } => X86Insn::Sete(X86Operand::Reg(Register::Al)),
                     Instruction::NotEqual { .. } => X86Insn::Setne(X86Operand::Reg(Register::Al)),
                     _ => unreachable!(),
                 };
+                
 
                 x86_instructions.push(set_instr);
                 x86_instructions.push(X86Insn::Movzbq(X86Operand::Reg(Register::Al), X86Operand::Reg(Register::Rax)));
