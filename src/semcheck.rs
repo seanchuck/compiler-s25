@@ -647,7 +647,7 @@ pub fn build_statement(
                 )
                 .expect("Failed to write output!");
             }
-            if scope
+            scope
                 .borrow_mut()
                 .insert(
                     var.clone(),
@@ -657,21 +657,21 @@ pub fn build_statement(
                         length: None,
                         span: span.clone(),
                     },
-                )
-                .is_none()
-            {
-                writeln!(
-                    writer,
-                    "{}",
-                    format_error_message(
-                        var,
-                        Some(span),
-                        "for loop variable not declared",
-                        context
-                    )
-                )
-                .expect("Failed to write output!");
-            }
+                );
+            //     .is_none()
+            // {
+            //     writeln!(
+            //         writer,
+            //         "{}",
+            //         format_error_message(
+            //             var,
+            //             Some(span),
+            //             "for loop variable not declared",
+            //             context
+            //         )
+            //     )
+            //     .expect("Failed to write output!");
+            // }
 
             let update_expr = match update.as_ref() {
                 AST::Statement(Statement::Assignment { location, .. }) => {
