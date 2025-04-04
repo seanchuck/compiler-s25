@@ -258,8 +258,8 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
         Instruction::Len { expr, dest } => {
                 let expr_op = map_operand(method_cfg, expr, x86_instructions);
                 let dest_op = map_operand(method_cfg, dest, x86_instructions);
-
-                x86_instructions.push(X86Insn::Mov(expr_op, dest_op));
+                x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Rax)));
+                x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
             }
         Instruction::Greater { left, right, dest }
             | Instruction::Less { left, right, dest }
