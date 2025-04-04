@@ -198,10 +198,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 // Signed division in x86:
                 // Dividend in RAX, sign-extended into RDX using CQO
                 x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
-                x86_instructions.push(X86Insn::Xor(
-                    X86Operand::Reg(Register::Rdx),
-                    X86Operand::Reg(Register::Rdx),
-                )); // TODO is sign extension in Rdx necessary? right now just zero it
+                x86_instructions.push(X86Insn::Cqto); // Sign extend rax into Rdx
                 x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx))); // Division cannot work on immediate, move to scratch reg
                 x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
                 x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
