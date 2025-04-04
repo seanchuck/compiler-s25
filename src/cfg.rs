@@ -1,11 +1,11 @@
-use crate::tac::*;
 /**
-Control flow graph (CFG) representation.
-
-Consists of basic blocks and directed edges
-between those basic blocks.
-**/
-use std::collections::BTreeMap;
+ Control flow graph (CFG) representation.
+ 
+ Consists of basic blocks and directed edges
+ between those basic blocks.
+ **/
+use std::collections::{BTreeMap, HashMap};
+use crate::tac::*;
 
 pub const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
 
@@ -20,24 +20,6 @@ pub struct CFG {
     // TODO: also increase stack size for function call with ore than 6 args
     pub stack_size: i64, // total space to allocate on the stack for this method
     pub locals: BTreeMap<String, Local>,
-}
-
-#[derive(Debug, Clone)]
-pub struct BasicBlock {
-    // Basic block is just a vector of instructions
-    pub instructions: Vec<Instruction>,
-    id: i32, // TODO: can add meaningful labels to each BB instead of referring to them by ID
-}
-
-pub struct Global {
-    pub name: String,
-    pub length: Option<i32>, // if array
-}
-
-#[derive(Debug, Clone)]
-pub struct Local {
-    stack_offset: i64,
-    length: Option<i64>, // if array
 }
 
 impl CFG {
@@ -105,6 +87,14 @@ impl CFG {
     }
 }
 
+
+#[derive(Debug, Clone)]
+pub struct BasicBlock {
+    // Basic block is just a vector of instructions
+    pub instructions: Vec<Instruction>,
+    id: i32, // TODO: can add meaningful labels to each BB instead of referring to them by ID
+}
+
 impl BasicBlock {
     pub fn new(id: i32) -> BasicBlock {
         BasicBlock {
@@ -124,4 +114,58 @@ impl BasicBlock {
     fn add_instruction(&mut self, instruction: Instruction) {
         self.instructions.push(instruction);
     }
+}
+
+
+#[derive(Clone)]
+pub struct CFGScope {
+    pub parent: Option<Box<CFGScope>>,
+    pub local_to_temp: HashMap<String, String>, // maps local variable to temp variable
+}
+
+impl CFGScope {
+    /// Returns this global variable, or the temp variable associated to this local variable
+    pub fn lookup_var(&self, var: String) -> Operand {
+        if let Some(temp) = self.local_to_temp.get(&var) {
+            Operand::LocalVar(temp.to_string())
+        } else if let Some(parent) = &self.parent {
+            parent.lookup_var(var)
+        } else {
+            // assume it is in the global scope
+            Operand::GlobalVar(var)
+        }
+    }
+
+    /// Returns this global array element, or the temp array element associated to this local array element
+    pub fn lookup_arr(&self, arr: String, idx: Operand) -> Operand {
+        if let Some(temp) = self.local_to_temp.get(&arr) {
+            Operand::LocalArrElement(temp.to_string(), Box::new(idx))
+        } else if let Some(parent) = &self.parent {
+            parent.lookup_arr(arr, idx)
+        } else {
+            // assume it is in the global scope
+            Operand::GlobalArrElement(arr, Box::new(idx))
+        }
+    }
+
+    /// Add a new local variable to the scope
+    pub fn add_local(&mut self, local: String, temp: String) {
+        self.local_to_temp.insert(local, temp);
+    }
+}
+
+pub struct Global {
+    pub name: String,
+    pub length: Option<i32>, // if array
+}
+
+#[derive(Debug, Clone)]
+pub struct Local {
+    stack_offset: i64,
+    length: Option<i64>, // if array
+}
+
+pub struct Loop {
+    pub break_to: i32,    // ID of basic block following the loop
+    pub continue_to: i32, // ID of loop's header basic block
 }

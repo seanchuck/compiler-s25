@@ -53,48 +53,6 @@ fn reset_counters() {
     });
 }
 
-struct Loop {
-    break_to: i32,    // ID of basic block following the loop
-    continue_to: i32, // ID of loop's header basic block
-}
-
-#[derive(Clone)]
-struct Scope {
-    parent: Option<Box<Scope>>,
-    local_to_temp: HashMap<String, String>, // maps local variable to temp variable
-}
-
-impl Scope {
-    /// Returns this global variable, or the temp variable associated to this local variable
-    fn lookup_var(&self, var: String) -> Operand {
-        if let Some(temp) = self.local_to_temp.get(&var) {
-            Operand::LocalVar(temp.to_string())
-        } else if let Some(parent) = &self.parent {
-            parent.lookup_var(var)
-        } else {
-            // assume it is in the global scope
-            Operand::GlobalVar(var)
-        }
-    }
-
-    /// Returns this global array element, or the temp array element associated to this local array element
-    fn lookup_arr(&self, arr: String, idx: Operand) -> Operand {
-        if let Some(temp) = self.local_to_temp.get(&arr) {
-            Operand::LocalArrElement(temp.to_string(), Box::new(idx))
-        } else if let Some(parent) = &self.parent {
-            parent.lookup_arr(arr, idx)
-        } else {
-            // assume it is in the global scope
-            Operand::GlobalArrElement(arr, Box::new(idx))
-        }
-    }
-
-    /// Add a new local variable to the scope
-    fn add_local(&mut self, local: String, temp: String) {
-        self.local_to_temp.insert(local, temp);
-    }
-}
-
 /// Helper to convert literal or identifier expressions into operands.
 /// The expression's evaluation starts at the end of cur_block.
 /// Returns the block at the end of expr's evaluation, and the Operand
@@ -103,7 +61,7 @@ fn destruct_expr(
     cfg: &mut CFG,
     expr: &SymExpr,
     mut cur_block_id: i32,
-    scope: &Scope,
+    scope: &CFGScope,
     strings: &mut Vec<String>,
 ) -> (i32, Operand) {
     match expr {
@@ -407,7 +365,7 @@ fn build_cond(
     mut cur_block_id: i32,
     next_true_block_id: i32,
     next_false_block_id: i32,
-    scope: &Scope,
+    scope: &CFGScope,
     strings: &mut Vec<String>,
 ) {
     match expr {
@@ -555,7 +513,7 @@ fn destruct_statement(
     mut cur_block_id: i32,
     statement: &SymStatement,
     cur_loop: Option<&Loop>,
-    scope: &mut Scope,
+    scope: &mut CFGScope,
     strings: &mut Vec<String>,
 ) -> i32 {
     match &*statement {
@@ -846,7 +804,7 @@ fn destruct_statement(
             cfg.add_block(&body_block);
             let next_block: BasicBlock; // the block after the whole if
 
-            let mut if_scope = Scope {
+            let mut if_scope = CFGScope {
                 parent: Some(Box::new(scope.clone())),
                 local_to_temp: HashMap::new(),
             };
@@ -858,7 +816,7 @@ fn destruct_statement(
 
                 next_block = BasicBlock::new(next_bblock_id());
 
-                let mut else_scope = Scope {
+                let mut else_scope = CFGScope {
                     parent: Some(Box::new(scope.clone())),
                     local_to_temp: HashMap::new(),
                 };
@@ -983,7 +941,7 @@ fn destruct_statement(
                 continue_to: header_id,
             };
 
-            let mut new_scope = Scope {
+            let mut new_scope = CFGScope {
                 parent: Some(Box::new(scope.clone())),
                 local_to_temp: HashMap::new(),
             };
@@ -1061,7 +1019,7 @@ fn destruct_statement(
                 continue_to: header_id,
             };
 
-            let mut new_scope = Scope {
+            let mut new_scope = CFGScope {
                 parent: Some(Box::new(scope.clone())),
                 local_to_temp: HashMap::new(),
             };
@@ -1167,7 +1125,6 @@ fn destruct_statement(
             cfg.add_instruction_to_block(cur_block_id, Instruction::Exit {exit_code: -1});
             cur_block_id
         }
-        _ => unreachable!(),
     }
 }
 
@@ -1178,7 +1135,7 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
 
     let mut method_cfg = CFG::new(method.name.clone());
 
-    let mut scope: Scope = Scope {
+    let mut scope: CFGScope = CFGScope {
         parent: None,
         local_to_temp: HashMap::new(),
     };
