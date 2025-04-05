@@ -1,0 +1,23 @@
+import printf;
+
+int do() {
+    if (1 > 2) {
+        if (0 == 1) {
+            printf("no\n");
+        } else {
+            printf("no\n");
+        }
+    } else {
+        if (0 == 1) {
+            printf("no\n");
+        } else {
+            printf("yes\n");
+        }
+    }
+
+    return 3;
+}
+
+void main() {
+    do();
+}

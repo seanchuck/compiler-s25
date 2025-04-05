@@ -300,7 +300,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 let set_instr = match insn {
                     Instruction::Greater { .. } => {
                         if swapped {
-                            X86Insn::Setl(X86Operand::Reg(Register::R11))
+                            X86Insn::Setl(X86Operand::Reg(Register::Al))
                         } else {
                             X86Insn::Setg(X86Operand::Reg(Register::Al))
                         }

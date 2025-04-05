@@ -1,0 +1,17 @@
+import printf;
+
+void do() {
+    if (1 < 2) {
+        if (0 == 1) {
+            printf("no\n");
+        } else {
+            printf("yes\n");
+        }
+    } else {
+        printf("no\n");
+    }
+}
+
+void main() {
+    do();
+}
