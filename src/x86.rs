@@ -14,6 +14,8 @@ pub enum X86Insn {
     Div(X86Operand),
     Cqto,
     Xor(X86Operand, X86Operand),
+    Or(X86Operand, X86Operand),
+    Shl(X86Operand, X86Operand),
     Call(String),
     Label(String),
     Jmp(String),
@@ -84,12 +86,13 @@ pub enum Register {
     R8,
     R9,
     R10,
+    R11,
     Rbp,
     Rsp,
     Rax,
     Al,
     Rip,
-    R11
+    Rbx
 }
 
 impl fmt::Display for Register {
@@ -102,12 +105,13 @@ impl fmt::Display for Register {
             Register::R8 => write!(f, "%r8"),
             Register::R9 => write!(f, "%r9"),
             Register::R10 => write!(f, "%r10"),
+            Register::R11 => write!(f, "%r11"),
             Register::Rbp => write!(f, "%rbp"),
             Register::Rsp => write!(f, "%rsp"),
             Register::Rax => write!(f, "%rax"),
             Register::Al => write!(f, "%al"),
             Register::Rip => write!(f, "%rip"),
-            Register::R11 => write!(f, "%r11"),
+            Register::Rbx => write!(f, "%rbx"),
         }
     }
 }
@@ -142,6 +146,9 @@ impl fmt::Display for X86Insn {
             X86Insn::Comm(name, size, alignment) => write!(f, ".comm {name}, {size}, {alignment}"),
             X86Insn::String(val) => write!(f, "    .string \"{val}\""),
             X86Insn::Global(val) => write!(f, ".globl {val}"),
+            X86Insn::Or(src, dst) => write!(f, "    orq {src}, {dst}"),
+            X86Insn::Shl(src, dst) => write!(f, "    shlq {src}, {dst}"),
+            
         }
     }
 }

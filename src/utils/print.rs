@@ -99,7 +99,10 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                                     }
                     Instruction::Exit { exit_code } => {
                                         println!("        exit({})", exit_code);
-                                    },
+                                    }
+                    Instruction::LoadConst { src, dest } => {
+                                        println!("        {dest} <- {src}");
+                                    }   
                 }
             }
         }

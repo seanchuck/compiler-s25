@@ -172,5 +172,10 @@ pub enum Instruction {
     // Runtime Exit
     Exit {
         exit_code: i64
+    },
+
+    LoadConst {
+        src: i64,
+        dest: Operand
     }
 }

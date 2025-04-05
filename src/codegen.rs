@@ -94,6 +94,14 @@ fn map_operand(
 /// Adds the x86 instructions corresponding to insn to x86_instructions
 fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut Vec<X86Insn>) {
     match insn {
+        Instruction::LoadConst{ src, dest } => {
+            x86_instructions.push(X86Insn::Mov(X86Operand::Constant(((src.clone() as u64) & 0xFFFFFFFF) as i64), X86Operand::Reg(Register::Rbx))); // lower 32 bits
+            x86_instructions.push(X86Insn::Mov(X86Operand::Constant(((src.clone() as u64) >> 32) as i64), X86Operand::Reg(Register::Rax))); // upper 32 bits
+            x86_instructions.push(X86Insn::Shl(X86Operand::Constant(32), X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Or(X86Operand::Reg(Register::Rax), X86Operand::Reg(Register::Rbx)));
+            let op = map_operand(method_cfg, dest, x86_instructions);
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rbx), op));
+        }
         Instruction::Add { left, right, dest } => {
                         let left_op = map_operand(method_cfg, left, x86_instructions);
                         let right_op = map_operand(method_cfg, right, x86_instructions);

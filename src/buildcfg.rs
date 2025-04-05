@@ -85,16 +85,68 @@ fn destruct_expr(
                 true => (cur_block_id, Operand::Const(1)),
                 false => (cur_block_id, Operand::Const(0)),
             },
-            Literal::Int(val) => (cur_block_id, Operand::Const(val.parse::<i64>().unwrap())),
-            Literal::HexInt(val) => (
-                cur_block_id,
-                Operand::Const(i64::from_str_radix(&val, 16).unwrap()),
-            ),
-            Literal::Long(val) => (cur_block_id, Operand::Const(val.parse::<i64>().unwrap())),
-            Literal::HexLong(val) => (
-                cur_block_id,
-                Operand::Const(i64::from_str_radix(&val, 16).unwrap()),
-            ),
+            Literal::Int(val) => {
+                let temp = fresh_temp();
+                let temp_op = Operand::LocalVar(temp.clone());
+                cfg.add_temp_var(temp.to_string(), None);
+
+                cfg.add_instruction_to_block(
+                    cur_block_id,
+                    Instruction::LoadConst {
+                        src: val.parse::<i64>().unwrap(),
+                        dest: temp_op.clone(),
+                    },
+                );
+
+                (cur_block_id, temp_op)
+            }
+            
+            Literal::HexInt(val) => {
+                let temp = fresh_temp();
+                let temp_op = Operand::LocalVar(temp.clone());
+                cfg.add_temp_var(temp.to_string(), None);
+
+                cfg.add_instruction_to_block(
+                    cur_block_id,
+                    Instruction::LoadConst {
+                        src: i64::from_str_radix(&val, 16).unwrap(),
+                        dest: temp_op.clone(),
+                    },
+                );
+
+                (cur_block_id, temp_op)
+            }
+            Literal::Long(val) => {
+                let temp = fresh_temp();
+                let temp_op = Operand::LocalVar(temp.clone());
+                cfg.add_temp_var(temp.to_string(), None);
+
+                cfg.add_instruction_to_block(
+                    cur_block_id,
+                    Instruction::LoadConst {
+                        src: val.parse::<i64>().unwrap(),
+                        dest: temp_op.clone(),
+                    },
+                );
+
+                (cur_block_id, temp_op)
+            }
+            
+            Literal::HexLong(val) => {
+                let temp = fresh_temp();
+                let temp_op = Operand::LocalVar(temp.clone());
+                cfg.add_temp_var(temp.to_string(), None);
+
+                cfg.add_instruction_to_block(
+                    cur_block_id,
+                    Instruction::LoadConst {
+                        src: i64::from_str_radix(&val, 16).unwrap(),
+                        dest: temp_op.clone(),
+                    },
+                );
+
+                (cur_block_id, temp_op)
+            }
             Literal::Char(val) => (cur_block_id, Operand::Const(*val as i64)),
         },
 
