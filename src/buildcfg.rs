@@ -1194,7 +1194,7 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
     }
 
     if method.return_type != Type::Void {
-        destruct_statement(
+        cur_block_id = destruct_statement(
             &mut method_cfg,
             cur_block_id,
             &SymStatement::Error,
@@ -1206,7 +1206,7 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
 
     // If we get to end of main, make sure that we have a return zero (put zero in rax to signify success)
     if method.name.clone() == "main" {
-        destruct_statement(
+        cur_block_id = destruct_statement(
             &mut method_cfg,
             cur_block_id,
             &SymStatement::Return {
@@ -1246,6 +1246,8 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
     if max_stack_args > 0 {
         method_cfg.stack_size += max_stack_args as i64 * 8;
     }
+
+    method_cfg.exit = cur_block_id;
 
     method_cfg
 }

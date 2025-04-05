@@ -19,13 +19,15 @@ void insertionSort() {
 }
 
 void main() {
+  int i;
+
   a[0] = 7;
   a[1] = 4;
   a[2] = 6;
   a[3] = 2;
   n = 4;
 
-  //insertionSort();    // Causing infinite loop right now. fix later
+  insertionSort();    // Causing infinite loop right now. fix later
 
   printf("%d\n", a[0]);
   printf("%d\n", a[1]);

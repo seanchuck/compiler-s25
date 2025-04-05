@@ -20,6 +20,7 @@ pub struct CFG {
     // TODO: also increase stack size for function call with ore than 6 args
     pub stack_size: i64, // total space to allocate on the stack for this method
     pub locals: BTreeMap<String, Local>,
+    pub exit: i32 // index of the last basic block
 }
 
 impl CFG {
@@ -29,6 +30,7 @@ impl CFG {
             blocks: BTreeMap::new(),
             stack_size: 0,
             locals: BTreeMap::new(),
+            exit: 0 // index of the last basic block
         }
     }
 

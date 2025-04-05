@@ -1,0 +1,29 @@
+import printf;
+
+int a[7];
+
+void main() {
+    int b[5];
+    int i;
+    
+    a[0] = 1;
+    a[1] = 2;
+    a[2] = 3;
+    a[3] = 4;
+    a[4] = 5;
+    a[5] = 6;
+    a[6] = 7;
+
+    b[0] = 8;
+    b[1] = 9;
+    b[2] = 10;
+    b[3] = 11;
+    b[4] = 12;
+    
+    for (i = 0; i < len(a); i++) {
+        printf("%d\n", a[i]);
+    }
+    for (i = 0; i < len(b); i++) {
+        printf("%d\n", b[i]);
+    }
+}

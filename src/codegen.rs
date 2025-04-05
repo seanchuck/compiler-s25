@@ -161,6 +161,9 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                     sp_offset += 8;
                 }
 
+                // Zero rax before call
+                x86_instructions.push(X86Insn::Mov(X86Operand::Constant(0), X86Operand::Reg(Register::Rax)));
+
                 // Make the call
                 x86_instructions.push(X86Insn::Call(name.to_string()));
 
@@ -297,7 +300,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 let set_instr = match insn {
                     Instruction::Greater { .. } => {
                         if swapped {
-                            X86Insn::Setl(X86Operand::Reg(Register::Al))
+                            X86Insn::Setl(X86Operand::Reg(Register::R11))
                         } else {
                             X86Insn::Setg(X86Operand::Reg(Register::Al))
                         }
@@ -401,15 +404,17 @@ fn generate_method_x86(method_name: &String, method_cfg: &mut CFG, globals: &Vec
         for insn in block.get_instructions() {
             add_instruction(method_cfg, &insn, &mut x86_instructions);
         }
-    }
 
-    // method epilogue
-    x86_instructions.push(X86Insn::Mov(
-        X86Operand::Reg(Register::Rbp),
-        X86Operand::Reg(Register::Rsp),
-    )); // move base pointer to stack pointer
-    x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
-    x86_instructions.push(X86Insn::Ret); // return to where function was called
+        if *id == method_cfg.exit {
+            // method epilogue
+            x86_instructions.push(X86Insn::Mov(
+                X86Operand::Reg(Register::Rbp),
+                X86Operand::Reg(Register::Rsp),
+            )); // move base pointer to stack pointer
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
+            x86_instructions.push(X86Insn::Ret); // return to where function was called
+        }
+    }
 
     x86_instructions
 }

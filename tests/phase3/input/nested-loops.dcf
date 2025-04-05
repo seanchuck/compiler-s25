@@ -1,0 +1,18 @@
+import printf;
+
+void loops() {
+  int i;
+
+  for (i = 0; i < 3; i += 1) {
+    int j;
+    j = 1;
+    while (j >= 0) {
+      printf("%d, %d\n", i, j);
+      j -= 1;
+    }
+  }
+}
+
+void main() {
+  loops();
+}
