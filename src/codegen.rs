@@ -3,6 +3,7 @@ use crate::tac::*;
 use crate::utils::print::print_cfg;
 use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
+use crate::cfg::Global;
 /**
 Generate x86 code from the Control flow graph.
 **/
@@ -42,7 +43,6 @@ fn is_memory_operand(op: &X86Operand) -> bool {
     )
 }
 
-
 /// Returns the x86 operand corresponding to operand
 fn map_operand(
     method_cfg: &CFG,
@@ -62,11 +62,13 @@ fn map_operand(
                 X86Operand::Reg(Register::R11),
             )); // store base address of array in rax
             x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(Register::R10))); // store index in r10
+            x86_instructions.push(X86Insn::Add(X86Operand::Constant(1), X86Operand::Reg(Register::R10))); // add one to index because first element is length
             X86Operand::Address(None, Some(Register::R11), Register::R10, ELEMENT_SIZE)
         }
         Operand::GlobalArrElement(arr, idx) => {
             let idx_op = map_operand(method_cfg, idx, x86_instructions);
             x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(Register::R10))); // store index in r10
+            x86_instructions.push(X86Insn::Add(X86Operand::Constant(1), X86Operand::Reg(Register::R10))); // add one to index because first element is length
             X86Operand::Address(Some(arr.to_string()), None, Register::R10, ELEMENT_SIZE)
         }
         Operand::Argument(pos) => {
@@ -357,7 +359,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
 
 /// Emit x86 code corresponding to the given CFG
 /// Returns a vector of strings of x86 instructions.
-fn generate_method_x86(method_name: &String, method_cfg: &mut CFG) -> Vec<X86Insn> {
+fn generate_method_x86(method_name: &String, method_cfg: &mut CFG, globals: &Vec<Global>) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
     if method_name == "main" {
@@ -381,6 +383,17 @@ fn generate_method_x86(method_name: &String, method_cfg: &mut CFG) -> Vec<X86Ins
         X86Operand::Constant(aligned_stack_size),
         X86Operand::Reg(Register::Rsp),
     )); // decrease stack pointer to allocate space on the stack
+
+    // global array lengths
+    if method_name == "main" {
+        for global in globals {
+            if global.length.is_some() {
+                // rax as working register
+                x86_instructions.push(X86Insn::Mov(X86Operand::Constant(i64::from(global.length.unwrap())), X86Operand::Reg(Register::Rax)));
+                x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), X86Operand::Global(global.name.to_string())));
+            }
+        }
+    }
 
     for (id, block) in method_cfg.get_blocks() {
         x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
@@ -413,17 +426,17 @@ pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::W
     let mut global_code: Vec<X86Insn> = Vec::new();
 
     // global variables
-    for global in globals {
+    for global in &globals {
         if global.length.is_some() {
             // allocate an extra element's worth of space to store the length of the array
             // 8 byte alignment for now...
             global_code.push(X86Insn::Comm(
-                global.name,
+                global.name.clone(),
                 ELEMENT_SIZE * i64::from(global.length.unwrap() + 1),
                 ELEMENT_SIZE,
             ));
         } else {
-            global_code.push(X86Insn::Comm(global.name, ELEMENT_SIZE, ELEMENT_SIZE));
+            global_code.push(X86Insn::Comm(global.name.to_string(), ELEMENT_SIZE, ELEMENT_SIZE));
         }
     }
 
@@ -438,7 +451,7 @@ pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::W
     // Generate a vector of x86 for each method
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, mut method_cfg) in method_cfgs {
-        let method_code = generate_method_x86(&method_name, &mut method_cfg);
+        let method_code = generate_method_x86(&method_name, &mut method_cfg, &globals);
         code.insert(method_name.clone(), method_code);
     }
 

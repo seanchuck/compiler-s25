@@ -1,0 +1,8 @@
+import printf;
+
+int a[5];
+
+void main() {
+    int b[7];
+    printf("%d, %d\n", len(a), len(b));
+}

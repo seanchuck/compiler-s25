@@ -1124,17 +1124,20 @@ fn destruct_statement(
 
             if length.is_some() {
                 // array
+                let int_val;
                 match length.as_ref().unwrap() {
                     Literal::Int(val) => {
-                        let int_val = val.parse::<i64>();
-                        cfg.add_temp_var(temp, Some(int_val.unwrap()));
+                        int_val = val.parse::<i64>();
+                        cfg.add_temp_var(temp.clone(), Some(int_val.clone().unwrap()));
                     }
                     Literal::HexInt(val) => {
-                        let int_val = i64::from_str_radix(&val, 16);
-                        cfg.add_temp_var(temp, Some(int_val.unwrap()));
+                        int_val = i64::from_str_radix(&val, 16);
+                        cfg.add_temp_var(temp.clone(), Some(int_val.clone().unwrap()));
                     }
                     _ => unreachable!(),
                 }
+
+                cfg.add_instruction_to_block(cur_block_id, Instruction::Assign{ src: Operand::Const(int_val.unwrap()), dest: Operand::LocalVar(temp) }); // set array length to first element of array
             } else {
                 // variable
                 cfg.add_temp_var(temp, None);
