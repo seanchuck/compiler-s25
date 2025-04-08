@@ -36,29 +36,34 @@ impl fmt::Display for Operand {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Instruction {
-    // BINARY OPERATIONS
+    // ARITHMETIC BINARY OPERATIONS
     // t <- X + Y
     Add {
+        typ: Type,
         left: Operand,
         right: Operand,
         dest: Operand,
     },
     Subtract {
+        typ: Type,
         left: Operand,
         right: Operand,
         dest: Operand,
     },
     Multiply {
+        typ: Type,
         left: Operand,
         right: Operand,
         dest: Operand,
     },
     Divide {
+        typ: Type,
         left: Operand,
         right: Operand,
         dest: Operand,
     },
     Modulo {
+        typ: Type,
         left: Operand,
         right: Operand,
         dest: Operand,
@@ -142,7 +147,6 @@ pub enum Instruction {
         src: Operand,
         dest: Operand,
     },
-
 
     // MEMORY
     LoadString {

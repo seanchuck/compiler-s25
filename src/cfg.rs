@@ -1,17 +1,20 @@
-use crate::tac::*;
+use crate::{ast::Type, tac::*};
+use std::collections::{BTreeMap, HashMap};
 /**
 Control flow graph (CFG) representation.
 
 Consists of basic blocks and directed edges
 between those basic blocks.
 **/
-use std::collections::{BTreeMap, HashMap};
 
 // #################################################
 // CONSTANTS
 // #################################################
 
 pub const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
+
+pub const INT_SIZE: i32 = 4; // 32 bits
+pub const LONG_SIZE: i32 = 8; // 64 bits
 
 // #################################################
 // STRUCT DEFINITIONS
@@ -25,9 +28,9 @@ pub struct CFG {
     pub blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
     // no need to store edges because basic blocks end with a jump/branch instruction
 
-    // TODO: also increase stack size for function call with ore than 6 args
+    // TODO: 
     pub stack_size: i64, // total space to allocate on the stack for this method
-    pub locals: BTreeMap<String, Local>,
+    pub locals: BTreeMap<String, Local>, // maps local variable names to their metadata
     pub exit: i32, // index of the last basic block
 }
 
@@ -72,10 +75,12 @@ impl CFG {
     }
 
     /// Allocate space on the stack for a new temp var
-    pub fn add_temp_var(&mut self, temp: String, length: Option<i64>) {
+    pub fn add_temp_var(&mut self, temp: String, typ: Type, length: Option<i64>) {
         let size: i64;
+
+        // TOOD: change size based on INT vs. LONG
         if length.is_some() {
-            // add one to store the array length
+            // add extra slot for arrays to store array length
             size = (length.unwrap() + 1) * ELEMENT_SIZE;
         } else {
             size = ELEMENT_SIZE;
@@ -87,6 +92,7 @@ impl CFG {
             Local {
                 stack_offset: -self.stack_size,
                 length,
+                typ
             },
         );
     }
@@ -101,6 +107,7 @@ impl CFG {
 pub struct CFGScope {
     pub parent: Option<Box<CFGScope>>,
     pub local_to_temp: HashMap<String, String>, // maps local variable to temp variable
+    
 }
 
 impl CFGScope {
@@ -165,12 +172,14 @@ impl BasicBlock {
 pub struct Global {
     pub name: String,
     pub length: Option<i32>, // if array
+    pub typ: Type
 }
 
 #[derive(Debug, Clone)]
 pub struct Local {
     stack_offset: i64,
     length: Option<i64>, // if array
+    pub typ: Type
 }
 
 pub struct Loop {

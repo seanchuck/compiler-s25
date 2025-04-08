@@ -1,13 +1,11 @@
 
-int add(int a, int b) {
-    return a + b;
-}
 
 void main() {
-    int a, b, c;
+    int a;
+    long b, c;
 
     a = 3;
-    b = 4;
-    
-    c = add(a,b);
+    b = 4L;
+
+    c = long(a) + b;
 }

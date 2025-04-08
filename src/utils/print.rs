@@ -18,8 +18,8 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
 
             for insn in block.get_instructions() {
                 match insn {
-                    Instruction::Add { left, right, dest } => {
-                        println!("        {dest} <- {left} + {right}");
+                    Instruction::Add { left, right, dest, typ } => {
+                        println!("        {dest}({typ}) <- {left} + {right}");
                     }
                     Instruction::Assign { src, dest } => {
                         println!("        {dest} <- {src}");
@@ -38,8 +38,8 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     } => {
                         println!("        {dest} <- {target_type}({expr})");
                     }
-                    Instruction::Divide { left, right, dest } => {
-                        println!("        {dest} <- {left} / {right}");
+                    Instruction::Divide { left, right, dest, typ } => {
+                        println!("        {dest}({typ}) <- {left} / {right}");
                     }
                     Instruction::Equal { left, right, dest } => {
                         println!("        {dest} <- {left} == {right}");
@@ -72,11 +72,11 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                             println!("        {name}({args_string})");
                         }
                     }
-                    Instruction::Modulo { left, right, dest } => {
-                        println!("        {dest} <- {left} % {right}");
+                    Instruction::Modulo { left, right, dest, typ } => {
+                        println!("        {dest}({typ}) <- {left} % {right}");
                     }
-                    Instruction::Multiply { left, right, dest } => {
-                        println!("        {dest} <- {left} * {right}");
+                    Instruction::Multiply { left, right, dest, typ } => {
+                        println!("        {dest}({typ}) <- {left} * {right}");
                     }
                     Instruction::Not { expr, dest } => {
                         println!("        {dest} <- !{expr}");
@@ -92,8 +92,8 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                             println!("        ret");
                         }
                     }
-                    Instruction::Subtract { left, right, dest } => {
-                        println!("        {dest} <- {left} - {right}");
+                    Instruction::Subtract { left, right, dest, typ } => {
+                        println!("        {dest}({typ}) <- {left} - {right}");
                     }
                     Instruction::UJmp { name, id } => {
                         println!("        ujmp {name}{id}");

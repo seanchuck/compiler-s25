@@ -540,7 +540,7 @@ fn check_continue(
     }
 }
 
-fn infer_expr_type(
+pub fn infer_expr_type(
     expr: &SymExpr,
     scope: &Scope,
     writer: &mut dyn std::io::Write,
