@@ -162,5 +162,6 @@ pub enum Instruction {
     LoadConst {
         src: i64,
         dest: Operand,
+        typ: Type
     },
 }

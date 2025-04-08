@@ -104,6 +104,7 @@ fn destruct_expr(
                     Instruction::LoadConst {
                         src: val.parse::<i64>().unwrap(),
                         dest: temp_op.clone(),
+                        typ: Type::Int
                     },
                 );
 
@@ -120,6 +121,7 @@ fn destruct_expr(
                     Instruction::LoadConst {
                         src: i64::from_str_radix(&val, 16).unwrap(),
                         dest: temp_op.clone(),
+                        typ: Type::Int
                     },
                 );
 
@@ -136,6 +138,7 @@ fn destruct_expr(
                     Instruction::LoadConst {
                         src: val.parse::<i64>().unwrap(),
                         dest: temp_op.clone(),
+                        typ: Type::Long
                     },
                 );
 
@@ -152,6 +155,7 @@ fn destruct_expr(
                     Instruction::LoadConst {
                         src: i64::from_str_radix(&val, 16).unwrap(),
                         dest: temp_op.clone(),
+                        typ: Type::Long
                     },
                 );
 

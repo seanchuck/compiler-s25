@@ -3,15 +3,16 @@ Data structures for x86 code generation.
 **/
 
 use std::fmt;
+use crate::ast::Type;
 
 #[derive(Debug, Clone)]
 pub enum X86Insn {
-    Mov(X86Operand, X86Operand),
+    Mov(X86Operand, X86Operand, Type),
     Movzbq(X86Operand, X86Operand),
-    Add(X86Operand, X86Operand),
-    Sub(X86Operand, X86Operand),
-    Mul(X86Operand, X86Operand),
-    Div(X86Operand),
+    Add(X86Operand, X86Operand, Type),
+    Sub(X86Operand, X86Operand, Type),
+    Mul(X86Operand, X86Operand, Type),
+    Div(X86Operand, Type),
     Cqto,
     Xor(X86Operand, X86Operand),
     Or(X86Operand, X86Operand),
@@ -92,6 +93,18 @@ pub enum Register {
     Rax,
     Al,
     Rip,
+    Ebx,
+    Edi,
+    Esi,
+    Edx,
+    Ecx,
+    R8d,
+    R9d,
+    R10d,
+    R11d,
+    Ebp,
+    Esp,
+    Eax,
     Rbx
 }
 
@@ -112,6 +125,18 @@ impl fmt::Display for Register {
             Register::Al => write!(f, "%al"),
             Register::Rip => write!(f, "%rip"),
             Register::Rbx => write!(f, "%rbx"),
+            Register::Ebx => write!(f, "%ebx"),
+            Register::Edi => write!(f, "%edi"),
+            Register::Esi => write!(f, "%esi"),
+            Register::Edx => write!(f, "%edx"),
+            Register::Ecx => write!(f, "%ecx"),
+            Register::R8d => write!(f, "%r8d"),
+            Register::R9d => write!(f, "%r9d"),
+            Register::R10d => write!(f, "%r10d"),
+            Register::R11d => write!(f, "%r11d"),
+            Register::Ebp => write!(f, "%ebp"),
+            Register::Esp => write!(f, "%esp"),
+            Register::Eax => write!(f, "%eax"),
         }
     }
 }
@@ -119,12 +144,12 @@ impl fmt::Display for Register {
 impl fmt::Display for X86Insn {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            X86Insn::Mov(src, dst) => write!(f, "    movq {}, {}", src, dst),
+            X86Insn::Mov(src, dst, typ) => write!(f, "    movq {}, {}", src, dst),
             X86Insn::Movzbq(src, dst) => write!(f, "    movzbq {}, {}", src, dst),
-            X86Insn::Add(src, dst) => write!(f, "    addq {}, {}", src, dst),
-            X86Insn::Sub(src, dst) => write!(f, "    subq {}, {}", src, dst),
-            X86Insn::Mul(src, dst) => write!(f, "    imul {}, {}", src, dst),
-            X86Insn::Div(divisor) => write!(f, "    idiv {}", divisor),
+            X86Insn::Add(src, dst, typ) => write!(f, "    addq {}, {}", src, dst),
+            X86Insn::Sub(src, dst, typ) => write!(f, "    subq {}, {}", src, dst),
+            X86Insn::Mul(src, dst, typ) => write!(f, "    imul {}, {}", src, dst),
+            X86Insn::Div(divisor, typ) => write!(f, "    idiv {}", divisor),
             X86Insn::Cqto => write!(f, "    cqto"),
             X86Insn::Xor(src, dst) => write!(f, "    xor {}, {}", src, dst),
             X86Insn::Call(label) => write!(f, "    call {}", label),
