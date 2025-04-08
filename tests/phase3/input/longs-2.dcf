@@ -1,0 +1,15 @@
+import printf;
+
+void main() {
+    //int x;
+    //int y;
+    //int z;
+    //int w;
+
+    //x = 5;
+    //y = 3;
+    //z = 2;
+    //w = y * z;
+
+    printf("%d\n", 5 + 3 * 2);
+}

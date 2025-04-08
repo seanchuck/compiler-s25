@@ -1,0 +1,12 @@
+import printf;
+
+void main() {
+    int a;
+    a = 0;
+
+    while (0 == 0 && a < 10) {
+        a += 1;
+    }
+
+    printf("%d\n", a);
+}

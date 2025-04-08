@@ -1,4 +1,4 @@
-# 6.1100 Decaf Compiler Rust Skeleton
+# 6.1100 Decaf Compiler -- Team 15
 
 In this repo you will find a skeleton for the Decaf compiler project. You may organize this project in any way you see fit as long as the build.sh and run.sh files build and run your compiler respectively.
 

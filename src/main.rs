@@ -3,19 +3,19 @@
 mod utils;
 
 mod ast;
+mod cfg;
 mod scope;
 mod symtable;
-mod token;
-mod cfg;
 mod tac;
+mod token;
 mod x86;
 
+mod buildcfg;
+mod codegen;
 mod parse;
 mod scan;
 mod semcheck;
 mod traverse;
-mod buildcfg;
-mod codegen;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {

@@ -26,16 +26,6 @@ pub struct SemanticContext {
     pub error_found: bool,
 }
 
-/// The root for the symbol table AST
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum SymNode {
-    Program(SymProgram),
-    Method(SymMethod),
-    Block(SymBlock),
-}
-
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct SymProgram {
     pub global_scope: Rc<RefCell<Scope>>, // Holds local vars and methods
@@ -44,7 +34,6 @@ pub struct SymProgram {
 }
 
 /// Represents a method in the IR
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct SymMethod {
     // pub is_import: bool,
@@ -65,7 +54,6 @@ pub struct SymBlock {
 }
 
 /// IR representation for statements
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum SymStatement {
     VarDecl {
@@ -78,7 +66,7 @@ pub enum SymStatement {
         target: SymExpr, //Now supports both `Identifier` and `ArrAccess`
         expr: SymExpr,
         span: Span,
-        op: AssignOp
+        op: AssignOp,
     },
     MethodCall {
         method_name: String,
@@ -114,13 +102,10 @@ pub enum SymStatement {
     Continue {
         span: Span,
     },
-    Error {
-        span: Span,
-    },
+    Error,
 }
 
 /// IR representation for expressions
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum SymExpr {
     Literal {

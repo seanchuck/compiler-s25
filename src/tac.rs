@@ -7,30 +7,29 @@ instructions that are simplified, and TAC.
 */
 
 use crate::ast::Type;
-use crate::token::Literal;
 use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Operand {
     GlobalVar(String),
     GlobalArrElement(String, Box<Operand>), // name and index
-    String(usize), // ID of string constant
+    String(i32),                            // ID of string constant
     LocalVar(String),
     LocalArrElement(String, Box<Operand>),
-    Const(Literal),
-    Argument(usize) // position of the argument
+    Const(i64),
+    Argument(i32), // position of the argument
 }
 
 impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Operand::Const(lit) => write!(f, "{}", lit),
+            Operand::Const(val) => write!(f, "{}", val),
             Operand::String(id) => write!(f, "str{}", id),
             Operand::GlobalVar(name) => write!(f, "{}", name),
             Operand::GlobalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
             Operand::LocalVar(name) => write!(f, "{}", name),
             Operand::LocalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
-            Operand::Argument(pos) => write!(f, "arg{}", pos)
+            Operand::Argument(pos) => write!(f, "arg{}", pos),
         }
     }
 }
@@ -65,24 +64,10 @@ pub enum Instruction {
         dest: Operand,
     },
     // And and Or not needed because of short-circuiting
-    // And {
-    //     left: Box<Operand>,
-    //     right: Box<Operand>,
-    //     dest: Box<Operand>,
-    // },
-    // Or {
-    //     left: Box<Operand>,
-    //     right: Box<Operand>,
-    //     dest: Box<Operand>,
-    // },
-
     // UNARY OPERATIONS
     // t <- !X
+
     // Neg not needed; replaced by subtraction from 0
-    // Neg {
-    //     expr: Box<Operand>,
-    //     dest: Box<Operand>,
-    // },
     Not {
         expr: Operand,
         dest: Operand,
@@ -139,61 +124,39 @@ pub enum Instruction {
     },
     UJmp {
         // unconditonal jump
-        id: i32, // ID of basic block to jump to
-    },
-    Cmp {
-        arg1: Operand,
-        arg2: Operand,
+        name: String, // Name of the method containing the Bblock
+        id: i32,      // ID of basic block to jump to
     },
     CJmp {
         // conditional jump
-        condition: Relation,
-        target_id: i32,  // ID of basic block to jump to if condition is true
+        name: String, // Name of the method containing the Bblock
+        condition: Operand,
+        id: i32, // ID of basic block to jump to if condition is true
     },
     Ret {
         value: Option<Operand>,
     },
 
     // SPECIAL
-    // ArrAccess {
-    //     array: Box<Operand>,
-    //     index: Box<Operand>,
-    //     dest: Box<Operand>,
-    // },
     Assign {
         src: Operand,
         dest: Operand,
     },
-    // Nop,
+
 
     // MEMORY
     LoadString {
         src: Operand,
         dest: Operand,
     },
-}
 
+    // Runtime Exit
+    Exit {
+        exit_code: i64,
+    },
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Relation {
-    BLT,
-    BGT,
-    BLE,
-    BGE,
-    BE,
-    BNE,
-}
-
-impl fmt::Display for Relation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self {
-            Relation::BLT => "BLT",
-            Relation::BGT => "BGT",
-            Relation::BLE => "BLE",
-            Relation::BGE => "BGE",
-            Relation::BE  => "BE",
-            Relation::BNE => "BNE",
-        };
-        write!(f, "{}", name)
-    }
+    LoadConst {
+        src: i64,
+        dest: Operand,
+    },
 }

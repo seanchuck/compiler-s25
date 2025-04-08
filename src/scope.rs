@@ -18,20 +18,19 @@ pub struct Scope {
     pub table: HashMap<String, TableEntry>,
     pub id: Option<String>, // for debugging purposes
     pub enclosing_block: Option<EnclosingBlock>, // can be a method_decl (main) or a block (while (){})
-                                          // can be recursively looked up
+                                                 // can be recursively looked up
 }
 
 #[derive(Debug, Clone)]
 pub enum EnclosingBlock {
     Method,
-    Loop
+    Loop,
 }
 
 /// Symbol table entry type, representing locally-
 /// declared variables or Method.
 /// Have just enough information to perform semantic
 /// check, without requiring, e.g., full method bodies.
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum TableEntry {
     Variable {
@@ -67,8 +66,12 @@ impl Scope {
     /// Add a child scope with a pointer back to the parent.
     /// Optionally, define the method this scope represents.
     pub fn add_child(parent: Rc<RefCell<Scope>>, enclosing_block: Option<EnclosingBlock>) -> Self {
-        let parent_id = parent.borrow().id.clone().unwrap_or_else(|| "??".to_string());
-    
+        let parent_id = parent
+            .borrow()
+            .id
+            .clone()
+            .unwrap_or_else(|| "??".to_string());
+
         Scope {
             table: HashMap::new(),
             parent: Some(parent),

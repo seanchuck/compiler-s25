@@ -25,7 +25,10 @@ mod tests {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
         if !stdout.is_empty() || !stderr.is_empty() {
-            eprintln!("Running test: {}\n--- STDOUT ---\n{}\n--- STDERR ---\n{}", file, stdout, stderr);
+            eprintln!(
+                "Running test: {}\n--- STDOUT ---\n{}\n--- STDERR ---\n{}",
+                file, stdout, stderr
+            );
         }
 
         // Determine what the expected outcome is based on the filename.

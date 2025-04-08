@@ -1,0 +1,11 @@
+import printf;
+
+int a;
+int b[3];
+
+void main() {
+    a = 1;
+    b[a] = 5;
+
+    printf("%d, %d\n", a, b[1]);
+}

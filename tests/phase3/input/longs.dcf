@@ -1,0 +1,19 @@
+import printf;
+
+long a;
+long b[2];
+
+void main() {
+    long c;
+    long d[3];
+
+    a = 1L;
+    b[0] = 2L;
+    b[1] = 3L;
+    c = 4L;
+    d[0] = 5L;
+    d[1] = 6L;
+    d[2] = 7L;
+
+    printf("%ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld\n", a, len(b), b[0], b[1], c, len(d), d[0], d[1], d[2]);
+}

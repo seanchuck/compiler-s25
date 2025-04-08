@@ -11,10 +11,9 @@ This may lead to BUGS(!) so be sure to check the validity.
     of packing stuff in enums, but whatever.
 */
 
-use std::fmt;
 use crate::token::{Literal, Span};
+use std::fmt;
 
-#[allow(dead_code)]
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum AST {
     Program {
@@ -62,7 +61,6 @@ pub enum AST {
     Empty,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub struct Param {
     pub typ: Type,
@@ -70,7 +68,6 @@ pub struct Param {
     pub span: Span,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum Statement {
     Assignment {
@@ -98,10 +95,6 @@ pub enum Statement {
         block: Box<AST>,
         span: Span,
     },
-    Update {
-        location: Box<AST>,
-        span: Span,
-    },
     While {
         condition: Box<AST>,
         block: Box<AST>,
@@ -119,7 +112,6 @@ pub enum Statement {
     },
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum Expr {
     UnaryExpr {

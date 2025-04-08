@@ -16,7 +16,6 @@ pub struct Span {
 
 /// Token is the main data structure used by the scanner.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
 pub enum Token {
     Keyword {
         value: Keyword,
@@ -61,7 +60,6 @@ pub enum Keyword {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
 pub enum Symbol {
     Operator(Operator),
     Punctuation(Punctuation),
@@ -125,7 +123,7 @@ impl fmt::Display for Literal {
             Literal::Long(x) => write!(f, "{}L", x),
             Literal::HexInt(x) => write!(f, "0x{}", x),
             Literal::HexLong(x) => write!(f, "0x{}L", x),
-            Literal::Bool(b) => write!(f, "{}", b)
+            Literal::Bool(b) => write!(f, "{}", b),
         }
     }
 }

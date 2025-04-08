@@ -1,11 +1,10 @@
 use crate::cfg::*;
-use crate::tac::*;
 use crate::scope::*;
 use crate::symtable::*;
+use crate::tac::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-
 
 /// Pretty-print the CFG
 pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
@@ -14,52 +13,105 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
     for (method_name, cfg) in method_cfgs {
         println!("\n{method_name}:");
 
-        for (id, block) in cfg.clone().get_blocks() {
+        for (id, block) in cfg.get_blocks() {
             println!("    {id}:");
 
             for insn in block.get_instructions() {
                 match insn {
-                    Instruction::Add { left, right, dest } => { println!("        {dest} <- {left} + {right}"); }
-                    Instruction::Assign { src, dest } => { println!("        {dest} <- {src}"); }
-                    Instruction::Cmp { arg1, arg2 } => { println!("        cmp {arg1}, {arg2}"); }
-                    Instruction::CJmp { condition, target_id } => { println!("        cjmp {condition}, {target_id}"); }
-                    Instruction::Cast { expr, dest, target_type } => { println!("        {dest} <- {target_type}({expr})"); }
-                    Instruction::Divide { left, right, dest } => { println!("        {dest} <- {left} / {right}"); }
-                    Instruction::Equal { left, right, dest } => { println!("        {dest} <- {left} == {right}"); }
-                    Instruction::Greater { left, right, dest } => { println!("        {dest} <- {left} > {right}"); }
-                    Instruction::GreaterEqual { left, right, dest } => { println!("        {dest} <- {left} >= {right}"); }
-                    Instruction::Len { expr, dest } => { println!("        {dest} <- len({expr})"); }
-                    Instruction::Less { left, right, dest } => { println!("        {dest} <- {left} < {right}"); }
-                    Instruction::LessEqual { left, right, dest } => { println!("        {dest} <- {left} <= {right}"); }
-                    Instruction::MethodCall { name, args, dest } => { 
-                        let args_string = args.iter().map(|op| op.to_string()).collect::<Vec<_>>().join(", ");
-                        if dest.is_some() { 
-                            let dest_string = dest.unwrap();
-                            println!("        {dest_string} <- {name}({args_string})"); 
-                        }
-                        else { println!("        {name}({args_string})"); }
+                    Instruction::Add { left, right, dest } => {
+                        println!("        {dest} <- {left} + {right}");
                     }
-                    Instruction::Modulo { left, right, dest } => { println!("        {dest} <- {left} % {right}"); }
-                    Instruction::Multiply { left, right, dest } => { println!("        {dest} <- {left} * {right}"); }
-                    Instruction::Not { expr, dest } => { println!("        {dest} <- !{expr}"); }
-                    Instruction::NotEqual { left, right, dest } => { println!("        {dest} <- {left} != {right}"); }
-                    Instruction::Ret { value } => { 
-                        if value.is_some() {
-                            let val_str = value.unwrap();
-                            println!("        ret {val_str}"); 
+                    Instruction::Assign { src, dest } => {
+                        println!("        {dest} <- {src}");
+                    }
+                    Instruction::CJmp {
+                        name,
+                        condition,
+                        id,
+                    } => {
+                        println!("        cjmp {condition}, {name}{id}");
+                    }
+                    Instruction::Cast {
+                        expr,
+                        dest,
+                        target_type,
+                    } => {
+                        println!("        {dest} <- {target_type}({expr})");
+                    }
+                    Instruction::Divide { left, right, dest } => {
+                        println!("        {dest} <- {left} / {right}");
+                    }
+                    Instruction::Equal { left, right, dest } => {
+                        println!("        {dest} <- {left} == {right}");
+                    }
+                    Instruction::Greater { left, right, dest } => {
+                        println!("        {dest} <- {left} > {right}");
+                    }
+                    Instruction::GreaterEqual { left, right, dest } => {
+                        println!("        {dest} <- {left} >= {right}");
+                    }
+                    Instruction::Len { expr, dest } => {
+                        println!("        {dest} <- len({expr})");
+                    }
+                    Instruction::Less { left, right, dest } => {
+                        println!("        {dest} <- {left} < {right}");
+                    }
+                    Instruction::LessEqual { left, right, dest } => {
+                        println!("        {dest} <- {left} <= {right}");
+                    }
+                    Instruction::MethodCall { name, args, dest } => {
+                        let args_string = args
+                            .iter()
+                            .map(|op| op.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        if dest.is_some() {
+                            let dest_string = dest.clone().unwrap();
+                            println!("        {dest_string} <- {name}({args_string})");
                         } else {
-                            println!("        ret"); 
+                            println!("        {name}({args_string})");
                         }
                     }
-                    Instruction::Subtract { left, right, dest } => { println!("        {dest} <- {left} - {right}"); }
-                    Instruction::UJmp { id } => { println!("        ujmp {id}"); }
-                    Instruction::LoadString { src, dest } => { println!("        {dest} <- {src}"); }
+                    Instruction::Modulo { left, right, dest } => {
+                        println!("        {dest} <- {left} % {right}");
+                    }
+                    Instruction::Multiply { left, right, dest } => {
+                        println!("        {dest} <- {left} * {right}");
+                    }
+                    Instruction::Not { expr, dest } => {
+                        println!("        {dest} <- !{expr}");
+                    }
+                    Instruction::NotEqual { left, right, dest } => {
+                        println!("        {dest} <- {left} != {right}");
+                    }
+                    Instruction::Ret { value } => {
+                        if value.is_some() {
+                            let val_str = value.clone().unwrap();
+                            println!("        ret {val_str}");
+                        } else {
+                            println!("        ret");
+                        }
+                    }
+                    Instruction::Subtract { left, right, dest } => {
+                        println!("        {dest} <- {left} - {right}");
+                    }
+                    Instruction::UJmp { name, id } => {
+                        println!("        ujmp {name}{id}");
+                    }
+                    Instruction::LoadString { src, dest } => {
+                        println!("        {dest} <- {src}");
+                    }
+                    Instruction::Exit { exit_code } => {
+                        println!("        exit({})", exit_code);
+                    }
+                    Instruction::LoadConst { src, dest } => {
+                        println!("        {dest} <- {src}");
+                    }
                 }
             }
         }
     }
 }
-
 
 // #################################################
 // PRETTY PRINT SYMBOL TABLE TREE
