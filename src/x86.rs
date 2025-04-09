@@ -7,6 +7,7 @@ use crate::ast::Type;
 
 #[derive(Debug, Clone)]
 pub enum X86Insn {
+    // Type differentiates between 32 and 64-bit instructions
     Mov(X86Operand, X86Operand, Type),
     Movzbq(X86Operand, X86Operand),
     Add(X86Operand, X86Operand, Type),
@@ -93,6 +94,7 @@ pub enum Register {
     Rax,
     Al,
     Rip,
+
     Ebx,
     Edi,
     Esi,
@@ -125,6 +127,7 @@ impl fmt::Display for Register {
             Register::Al => write!(f, "%al"),
             Register::Rip => write!(f, "%rip"),
             Register::Rbx => write!(f, "%rbx"),
+
             Register::Ebx => write!(f, "%ebx"),
             Register::Edi => write!(f, "%edi"),
             Register::Esi => write!(f, "%esi"),
@@ -143,13 +146,19 @@ impl fmt::Display for Register {
 
 impl fmt::Display for X86Insn {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let suffix = |typ: &Type| match typ {
+            Type::Int => "l",
+            Type::Long => "q",
+            _ => "q", // default to 64-bit
+        };
+        
         match self {
-            X86Insn::Mov(src, dst, typ) => write!(f, "    movq {}, {}", src, dst),
-            X86Insn::Movzbq(src, dst) => write!(f, "    movzbq {}, {}", src, dst),
-            X86Insn::Add(src, dst, typ) => write!(f, "    addq {}, {}", src, dst),
-            X86Insn::Sub(src, dst, typ) => write!(f, "    subq {}, {}", src, dst),
-            X86Insn::Mul(src, dst, typ) => write!(f, "    imul {}, {}", src, dst),
-            X86Insn::Div(divisor, typ) => write!(f, "    idiv {}", divisor),
+            X86Insn::Mov(src, dst, typ) => {write!(f, "    mov{} {}, {}", suffix(typ), src, dst)}
+            X86Insn::Movzbq(src, dst) => {write!(f, "    movzbq {}, {}", src, dst) }
+            X86Insn::Add(src, dst, typ) => {write!(f, "    add{} {}, {}", suffix(typ), src, dst) }
+            X86Insn::Sub(src, dst, typ) => {write!(f, "    sub{} {}, {}", suffix(typ), src, dst) }
+            X86Insn::Mul(src, dst, ..) => {write!(f, "    imul {}, {}", src, dst) } // `imul` has same mnemonic for int/long 
+            X86Insn::Div(divisor, ..) => {write!(f, "    idiv {}", divisor)}
             X86Insn::Cqto => write!(f, "    cqto"),
             X86Insn::Xor(src, dst) => write!(f, "    xor {}, {}", src, dst),
             X86Insn::Call(label) => write!(f, "    call {}", label),
@@ -173,7 +182,6 @@ impl fmt::Display for X86Insn {
             X86Insn::Global(val) => write!(f, ".globl {val}"),
             X86Insn::Or(src, dst) => write!(f, "    orq {src}, {dst}"),
             X86Insn::Shl(src, dst) => write!(f, "    shlq {src}, {dst}"),
-            
         }
     }
 }

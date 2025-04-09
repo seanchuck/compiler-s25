@@ -12,7 +12,7 @@ use std::fmt;
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Operand {
     GlobalVar(String),
-    GlobalArrElement(String, Box<Operand>), // name and index
+    GlobalArrElement(String, Box<Operand>, Type), // name and index
     String(i32),                            // ID of string constant
     LocalVar(String),
     LocalArrElement(String, Box<Operand>),
@@ -26,7 +26,7 @@ impl fmt::Display for Operand {
             Operand::Const(val) => write!(f, "{}", val),
             Operand::String(id) => write!(f, "str{}", id),
             Operand::GlobalVar(name) => write!(f, "{}", name),
-            Operand::GlobalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
+            Operand::GlobalArrElement(name, idx, typ) => write!(f, "{} {}[{}]", typ, name, idx),
             Operand::LocalVar(name) => write!(f, "{}", name),
             Operand::LocalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
             Operand::Argument(pos) => write!(f, "arg{}", pos),
@@ -83,6 +83,7 @@ pub enum Instruction {
         target_type: Type,
     },
     Len {
+        typ: Type, // is array type int or long
         expr: Operand,
         dest: Operand,
     },
@@ -123,8 +124,8 @@ pub enum Instruction {
     // CONTROL FLOW
     MethodCall {
         name: String,
-        args: Vec<Operand>, // Does not completely follow TAC as
-        // method call can have many arguments
+        args: Vec<Operand>,
+        return_type: Type,
         dest: Option<Operand>,
     },
     UJmp {
@@ -139,6 +140,7 @@ pub enum Instruction {
         id: i32, // ID of basic block to jump to if condition is true
     },
     Ret {
+        typ: Type,
         value: Option<Operand>,
     },
 

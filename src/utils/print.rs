@@ -50,7 +50,7 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     Instruction::GreaterEqual { left, right, dest } => {
                         println!("        {dest} <- {left} >= {right}");
                     }
-                    Instruction::Len { expr, dest } => {
+                    Instruction::Len { expr, dest, typ } => {
                         println!("        {dest} <- len({expr})");
                     }
                     Instruction::Less { left, right, dest } => {
@@ -59,7 +59,7 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     Instruction::LessEqual { left, right, dest } => {
                         println!("        {dest} <- {left} <= {right}");
                     }
-                    Instruction::MethodCall { name, args, dest } => {
+                    Instruction::MethodCall { name, args, dest, return_type } => {
                         let args_string = args
                             .iter()
                             .map(|op| op.to_string())
@@ -67,7 +67,7 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                             .join(", ");
                         if dest.is_some() {
                             let dest_string = dest.clone().unwrap();
-                            println!("        {dest_string} <- {name}({args_string})");
+                            println!("        {return_type}{dest_string} <- {name}({args_string})");
                         } else {
                             println!("        {name}({args_string})");
                         }
@@ -84,10 +84,10 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     Instruction::NotEqual { left, right, dest } => {
                         println!("        {dest} <- {left} != {right}");
                     }
-                    Instruction::Ret { value } => {
+                    Instruction::Ret { value, typ } => {
                         if value.is_some() {
                             let val_str = value.clone().unwrap();
-                            println!("        ret {val_str}");
+                            println!("        ret {typ} {val_str}");
                         } else {
                             println!("        ret");
                         }
@@ -104,8 +104,8 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     Instruction::Exit { exit_code } => {
                         println!("        exit({})", exit_code);
                     }
-                    Instruction::LoadConst { src, dest } => {
-                        println!("        {dest} <- {src}");
+                    Instruction::LoadConst { src, dest, typ } => {
+                        println!("        {typ} {dest} <- {src}");
                     }
                 }
             }

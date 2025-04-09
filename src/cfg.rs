@@ -1,5 +1,5 @@
-use crate::{ast::Type, tac::*};
-use std::collections::{BTreeMap, HashMap};
+use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*};
+use std::{cell::RefCell, collections::{BTreeMap, HashMap}, rc::Rc};
 /**
 Control flow graph (CFG) representation.
 
@@ -11,10 +11,9 @@ between those basic blocks.
 // CONSTANTS
 // #################################################
 
-pub const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
-
-pub const INT_SIZE: i32 = 4; // 32 bits
-pub const LONG_SIZE: i32 = 8; // 64 bits
+// pub const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
+pub const INT_SIZE: i64 = 4; // 32 bits
+pub const LONG_SIZE: i64 = 8; // 64 bits
 
 // #################################################
 // STRUCT DEFINITIONS
@@ -74,16 +73,26 @@ impl CFG {
         }
     }
 
+    pub fn get_element_size(&self, typ: Type) -> i64 {
+        match typ {
+            Type::Int => INT_SIZE,
+            Type::Long => LONG_SIZE,
+            Type::Bool => INT_SIZE,
+            Type::String => LONG_SIZE,
+            _=> LONG_SIZE // default to 64-bit
+        }
+    }
+
     /// Allocate space on the stack for a new temp var
     pub fn add_temp_var(&mut self, temp: String, typ: Type, length: Option<i64>) {
+        let element_size = self.get_element_size(typ.clone());
         let size: i64;
 
-        // TOOD: change size based on INT vs. LONG
         if length.is_some() {
             // add extra slot for arrays to store array length
-            size = (length.unwrap() + 1) * ELEMENT_SIZE;
+            size = (length.unwrap() + 1) * element_size;
         } else {
-            size = ELEMENT_SIZE;
+            size = element_size;
         }
 
         self.stack_size += size;
@@ -124,14 +133,18 @@ impl CFGScope {
     }
 
     /// Returns this global array element, or the temp array element associated to this local array element
-    pub fn lookup_arr(&self, arr: String, idx: Operand) -> Operand {
+    pub fn lookup_arr(&self, arr: String, idx: Operand, sym_scope: &Rc<RefCell<Scope>>) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&arr) {
             Operand::LocalArrElement(temp.to_string(), Box::new(idx))
         } else if let Some(parent) = &self.parent {
-            parent.lookup_arr(arr, idx)
+            parent.lookup_arr(arr, idx, sym_scope)
         } else {
             // assume it is in the global CFGScope
-            Operand::GlobalArrElement(arr, Box::new(idx))
+            let table_entry = sym_scope.borrow().lookup(&arr).expect("Array not defined in this scope");
+            let TableEntry::Variable {  typ, .. } = table_entry else {
+                panic!("Expected a variable, found something else!");
+            };
+            Operand::GlobalArrElement(arr, Box::new(idx), typ)
         }
     }
 

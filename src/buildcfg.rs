@@ -2,18 +2,16 @@
 Construct a control flow graph (CFG) from the
 symbol table IR.
 **/
-use crate::ast::*;
-use crate::cfg::*;
-use crate::scope::Scope;
-use crate::scope::TableEntry;
-use crate::semcheck::semcheck;
-use crate::symtable::SemanticContext;
-use crate::symtable::{SymExpr, SymMethod, SymProgram, SymStatement};
-use crate::tac::*;
-use crate::token::Literal;
-use crate::traverse::infer_expr_type;
-use crate::token::Span;
-use std::cell::Ref;
+use crate::{
+    ast::*,
+    cfg::*,
+    scope::{Scope, TableEntry},
+    semcheck::semcheck,
+    symtable::{SemanticContext, SymExpr, SymMethod, SymProgram, SymStatement},
+    tac::*,
+    token::{Literal, Span},
+    traverse::infer_expr_type,
+};
 use std::io;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
@@ -188,7 +186,7 @@ fn destruct_expr(
             cfg.add_instruction_to_block(
                 next_block_id,
                 Instruction::Assign {
-                    src: cfg_scope.lookup_arr(id.to_string(), index_operand),
+                    src: cfg_scope.lookup_arr(id.to_string(), index_operand, sym_scope),
                     dest: array_element.clone(),
                 },
             );
@@ -210,11 +208,11 @@ fn destruct_expr(
             let temp_method_result = Operand::LocalVar(temp.to_string());
 
             let table_entry = sym_scope.borrow().lookup(&method_name).expect("Method not found in scope!");
-            let TableEntry::Method { name, return_type, .. } = table_entry else {
+            let TableEntry::Method { return_type, .. } = table_entry else {
                 panic!("Expected a Method, found something else!");
             };
 
-            cfg.add_temp_var(temp, return_type, None);
+            cfg.add_temp_var(temp, return_type.clone(), None);
 
             cfg.add_instruction_to_block(
                 cur_block_id,
@@ -222,6 +220,7 @@ fn destruct_expr(
                     name: method_name.clone(),
                     args: arg_ops,
                     dest: Some(temp_method_result.clone()),
+                    return_type
                 },
             );
 
@@ -439,7 +438,13 @@ fn destruct_expr(
             cfg.add_temp_var(temp, Type::Int, None);
             let operand: Operand = cfg_scope.lookup_var(id.to_string());
 
+            let table_entry = sym_scope.borrow().lookup(id).expect("Array not found in scope!");
+            let TableEntry::Variable {  typ, .. } = table_entry else {
+                panic!("Expected a variable, found something else!");
+            };
+
             let instruction = Instruction::Len {
+                typ,
                 expr: operand,
                 dest: result.clone(),
             };
@@ -636,12 +641,12 @@ fn destruct_statement(
                                 cur_block_id,
                                 Instruction::Assign {
                                     src: rhs,
-                                    dest: cfg_scope.lookup_arr(id.to_string(), index_op),
+                                    dest: cfg_scope.lookup_arr(id.to_string(), index_op, sym_scope),
                                 },
                             );
                         }
                         AssignOp::PlusAssign => {
-                            let array_element = cfg_scope.lookup_arr(id.to_string(), index_op);
+                            let array_element = cfg_scope.lookup_arr(id.to_string(), index_op, sym_scope);
 
                             // load array element into a new temp
                             let array_temp = fresh_temp();
@@ -685,7 +690,7 @@ fn destruct_statement(
                             );
                         }
                         AssignOp::MinusAssign => {
-                            let array_element = cfg_scope.lookup_arr(id.to_string(), index_op);
+                            let array_element = cfg_scope.lookup_arr(id.to_string(), index_op, sym_scope);
 
                             // load array element into a new temp
                             let array_temp = fresh_temp();
@@ -728,7 +733,7 @@ fn destruct_statement(
                             );
                         }
                         AssignOp::MultiplyAssign => {
-                            let array_element = cfg_scope.lookup_arr(id.to_string(), index_op);
+                            let array_element = cfg_scope.lookup_arr(id.to_string(), index_op, sym_scope);
 
                             // load array element into a new temp
                             let array_temp = fresh_temp();
@@ -771,7 +776,7 @@ fn destruct_statement(
                             );
                         }
                         AssignOp::DivideAssign => {
-                            let array_element = cfg_scope.lookup_arr(id.to_string(), index_op);
+                            let array_element = cfg_scope.lookup_arr(id.to_string(), index_op, sym_scope);
 
                             // load array element into a new temp
                             let array_temp = fresh_temp();
@@ -814,7 +819,7 @@ fn destruct_statement(
                             );
                         }
                         AssignOp::ModuloAssign => {
-                            let array_element = cfg_scope.lookup_arr(id.to_string(), index_op);
+                            let array_element = cfg_scope.lookup_arr(id.to_string(), index_op, sym_scope);
 
                             // load array element into a new temp
                             let array_temp = fresh_temp();
@@ -921,11 +926,17 @@ fn destruct_statement(
                 arg_ops.push(arg_op);
             }
 
+            let table_entry = sym_scope.borrow().lookup(method_name).expect("Method not defined in scope");
+            let TableEntry::Method { return_type, .. }= table_entry else {
+                panic!("Expected a variable, found something else!");
+            };
+
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::MethodCall {
                     name: method_name.clone(),
                     args: arg_ops,
+                    return_type,
                     dest: None,
                 },
             );
@@ -1250,19 +1261,25 @@ fn destruct_statement(
             // code after the continue within this statement is unreachable
             UNREACHABLE_BLOCK
         }
-        SymStatement::Return { expr, .. } => {
+        SymStatement::Return { expr, ..} => {
             if expr.is_some() {
                 let operand: Operand;
                 (cur_block_id, operand) =
                     destruct_expr(cfg, &expr.clone().unwrap(), cur_block_id, cfg_scope, sym_scope, strings);
+
+                let mut dummy_context: SemanticContext = SemanticContext { filename: "dummy".to_string(), error_found: false };
+                let mut dummy_writer = io::sink();
+                let typ = infer_expr_type(expr.as_ref().unwrap(), &sym_scope.borrow(), &mut dummy_writer, &mut dummy_context).expect("Function has undefined return type");
+
                 cfg.add_instruction_to_block(
                     cur_block_id,
                     Instruction::Ret {
+                        typ,
                         value: Some(operand),
                     },
                 );
             } else {
-                cfg.add_instruction_to_block(cur_block_id, Instruction::Ret { value: None });
+                cfg.add_instruction_to_block(cur_block_id, Instruction::Ret { typ: Type::Void, value: None });
             }
 
             // code after the return within this statement is unreachable
