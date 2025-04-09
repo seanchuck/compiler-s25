@@ -8,6 +8,7 @@
  * @author 6.1100 Staff, last updated January 2024
  */
 use clap::Parser;
+use std::collections::HashSet;
 
 #[derive(Clone, clap::ValueEnum, Debug)]
 pub enum CompilerAction {
@@ -19,7 +20,20 @@ pub enum CompilerAction {
 }
 
 #[derive(Clone, clap::ValueEnum, Debug, PartialEq, Eq, Hash)]
-pub enum Optimization {}
+pub enum Optimization {
+    Cse,
+    Cp, 
+    Dce,
+    All,
+
+    // "Negative" variants of optimizations
+    #[clap(name = "-cse")]
+    NoCse,
+    #[clap(name = "-cp")]
+    NoCp,
+    #[clap(name = "-dce")]
+    NoDce,
+}
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -48,6 +62,42 @@ pub struct Args {
     /// Decaf file
     pub input: std::path::PathBuf,
 }
+
+impl Args {
+    // Resolve the CLI arguments into a hashset of desired optimizations
+    pub fn resolved_opts(&self) -> HashSet<Optimization> {
+        use Optimization::*;
+
+        let mut opts: HashSet<Optimization> = self.opt.iter().cloned().collect();
+
+        // If 'all' is present, start with all
+        if opts.contains(&All) {
+            opts.remove(&All);
+            opts.insert(Cse);
+            opts.insert(Dce);
+            opts.insert(Cp);
+        }
+
+        // Remove disabled opts
+        if opts.contains(&NoCse) {
+            opts.remove(&Cse);
+            opts.remove(&NoCse);
+        }
+
+        if opts.contains(&NoCp) {
+            opts.remove(&Cp);
+            opts.remove(&NoCp);
+        }
+
+        if opts.contains(&NoDce) {
+            opts.remove(&Dce);
+            opts.remove(&NoDce);
+        }
+
+        opts
+    }
+}
+
 
 pub fn parse() -> Args {
     Args::parse()

@@ -1,3 +1,5 @@
+use dataflow::optimize_dataflow;
+
 // Example usage: cargo run tests/hello.dcf -t <scan, parse,>
 // Additional packages: anyhow (error types), nom (parsing), clap (cli args)
 mod utils;
@@ -16,6 +18,7 @@ mod parse;
 mod scan;
 mod semcheck;
 mod traverse;
+mod dataflow;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
@@ -55,7 +58,8 @@ fn main() {
             semcheck::semcheck(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Assembly => {
-            codegen::generate_assembly(&input, &filename, &mut writer, args.debug);
+            let optimizations = args.resolved_opts();
+            codegen::generate_assembly(&input, &filename, &mut writer, optimizations, args.debug);
         }
     }
 }
