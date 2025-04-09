@@ -267,12 +267,12 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             match typ {
                 Type::Int => {
                     x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Eax), typ.clone()));
-                    x86_instructions.push(X86Insn::Mul(right_op, X86Operand::Reg(Register::Eax), typ.clone()));
+                    x86_instructions.push(X86Insn::Mul(right_op, X86Operand::Reg(Register::Eax)));
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, typ.clone()));
                 }
                 Type::Long => {
                     x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax), typ.clone()));
-                    x86_instructions.push(X86Insn::Mul(right_op, X86Operand::Reg(Register::Rax), typ.clone()));
+                    x86_instructions.push(X86Insn::Mul(right_op, X86Operand::Reg(Register::Rax)));
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, typ.clone()));
                 }
                 _ => panic!("Mul only works on numeric types")
@@ -290,7 +290,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                     x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Eax), typ.clone()));
                     x86_instructions.push(X86Insn::Cqto); // Sign extend rax into Rdx
                     x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Ecx), typ.clone())); // Division cannot work on immediate, move to scratch reg
-                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Ecx), typ.clone())); // Signed divide RDX:RAX by right_op
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Ecx))); // Signed divide RDX:RAX by right_op
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, typ.clone()));
                 }
                 Type::Long => {
@@ -299,7 +299,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                     x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax), typ.clone()));
                     x86_instructions.push(X86Insn::Cqto); // Sign extend rax into Rdx
                     x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx), typ.clone())); // Division cannot work on immediate, move to scratch reg
-                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx), typ.clone())); // Signed divide RDX:RAX by right_op
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, typ.clone()));
 
                 }
@@ -321,7 +321,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                         X86Operand::Reg(Register::Edx),
                     )); // zero RDX
                     x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Ecx), typ.clone())); // Division cannot work on immediate, move to scratch reg
-                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Ecx), typ.clone())); // Signed divide RDX:RAX by right_op
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Ecx))); // Signed divide RDX:RAX by right_op
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Edx), dest_op, typ.clone()));
                 }
                 Type::Long => {
@@ -332,7 +332,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                         X86Operand::Reg(Register::Rdx),
                     )); // zero RDX
                     x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx), typ.clone())); // Division cannot work on immediate, move to scratch reg
-                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx), typ.clone())); // Signed divide RDX:RAX by right_op
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op, typ.clone()));
                 }
                 _=> panic!("Modulo only defined for numeric types.")

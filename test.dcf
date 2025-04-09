@@ -2,10 +2,10 @@
 
 void main() {
     int a;
-    long b, c;
+    int b;
 
     a = 3;
-    b = 4L;
+    b = 4;
 
-    c = long(a) + b;
+    a = a+b;
 }

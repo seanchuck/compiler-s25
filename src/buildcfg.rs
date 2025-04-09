@@ -927,10 +927,12 @@ fn destruct_statement(
             }
 
             let table_entry = sym_scope.borrow().lookup(method_name).expect("Method not defined in scope");
-            let TableEntry::Method { return_type, .. }= table_entry else {
-                panic!("Expected a variable, found something else!");
+            let return_type = match table_entry {
+                TableEntry::Method { return_type, .. } => return_type,
+                TableEntry::Import { .. } => Type::Long,
+                _=> panic!("Expected a method or import, found something else! {:#?}", table_entry)
             };
-
+    
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::MethodCall {

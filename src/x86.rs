@@ -12,8 +12,8 @@ pub enum X86Insn {
     Movzbq(X86Operand, X86Operand),
     Add(X86Operand, X86Operand, Type),
     Sub(X86Operand, X86Operand, Type),
-    Mul(X86Operand, X86Operand, Type),
-    Div(X86Operand, Type),
+    Mul(X86Operand, X86Operand),
+    Div(X86Operand),
     Cqto,
     Xor(X86Operand, X86Operand),
     Or(X86Operand, X86Operand),
@@ -151,7 +151,7 @@ impl fmt::Display for X86Insn {
             Type::Long => "q",
             _ => "q", // default to 64-bit
         };
-        
+
         match self {
             X86Insn::Mov(src, dst, typ) => {write!(f, "    mov{} {}, {}", suffix(typ), src, dst)}
             X86Insn::Movzbq(src, dst) => {write!(f, "    movzbq {}, {}", src, dst) }
