@@ -11,7 +11,7 @@ between those basic blocks.
 // CONSTANTS
 // #################################################
 
-// pub const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
+pub const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
 pub const INT_SIZE: i64 = 4; // 32 bits
 pub const LONG_SIZE: i64 = 8; // 64 bits
 
@@ -85,7 +85,8 @@ impl CFG {
 
     /// Allocate space on the stack for a new temp var
     pub fn add_temp_var(&mut self, temp: String, typ: Type, length: Option<i64>) {
-        let element_size = self.get_element_size(typ.clone());
+        // let element_size = self.get_element_size(typ.clone());
+        let element_size = ELEMENT_SIZE;
         let size: i64;
 
         if length.is_some() {
