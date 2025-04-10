@@ -706,30 +706,14 @@ pub fn build_statement(
                     span: span.clone(),
                 },
             );
-            //     .is_none()
-            // {
-            //     writeln!(
-            //         writer,
-            //         "{}",
-            //         format_error_message(
-            //             var,
-            //             Some(span),
-            //             "for loop variable not declared",
-            //             context
-            //         )
-            //     )
-            //     .expect("Failed to write output!");
-            // }
 
+            // assignment location can be identifier or array location!
             let update_expr = match update.as_ref() {
                 AST::Statement(Statement::Assignment { location, .. }) => {
-                    if let AST::Identifier { .. } = location.as_ref() {
-                        build_statement(&update, Rc::clone(&scope), writer, context)
-                    } else {
-                        panic!(
-                            "For loop update must be an assignment to an identifier, got: {:#?}",
-                            location
-                        );
+                    match location.as_ref() {
+                        AST::Identifier { .. }
+                        | AST::Expr(Expr::ArrAccess { .. }) => build_statement(&update, Rc::clone(&scope), writer, context),
+                        _=> panic!("For loop update must be an assignment to an identifier, got: {:#?}", update)
                     }
                 }
                 _ => panic!(
