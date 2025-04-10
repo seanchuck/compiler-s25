@@ -1,0 +1,16 @@
+void main() {
+    int a, b, c, d;
+
+    a = 10;
+    b = a;     // b copies a
+    d = b;     // d also copies a via b
+
+    b = b + 1; // ❌ b is mutated here — breaks the b → a copy chain
+
+    // Now b is no longer a copy of a, and c = b + d + 5
+    // Even though d is still a copy of a, b is NOT
+    // So we cannot simplify this to c = a + a + 5
+    c = b + d + 5;
+
+    return;
+}
