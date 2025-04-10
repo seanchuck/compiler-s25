@@ -88,8 +88,8 @@ impl CFG {
     /// Allocate space on the stack for a new temp var
     pub fn add_temp_var(&mut self, temp: String, typ: Type, length: Option<i64>) {
         println!("looking at temp {} of type {:#?}", temp, typ);
-        // let element_size = self.get_element_size(typ.clone());
-        let element_size = LONG_SIZE;
+        let element_size = self.get_element_size(typ.clone());
+        // let element_size = LONG_SIZE;
         let size: i64;
 
         if length.is_some() {

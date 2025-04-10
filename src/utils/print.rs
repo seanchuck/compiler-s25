@@ -21,8 +21,8 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     Instruction::Add { left, right, dest, typ } => {
                         println!("        {dest}({typ}) <- {left} + {right}");
                     }
-                    Instruction::Assign { src, dest } => {
-                        println!("        {dest} <- {src}");
+                    Instruction::Assign { src, dest, typ } => {
+                        println!("        {dest}({typ}) <- {src}");
                     }
                     Instruction::CJmp {
                         name,
@@ -50,7 +50,7 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
                     Instruction::GreaterEqual { left, right, dest } => {
                         println!("        {dest} <- {left} >= {right}");
                     }
-                    Instruction::Len { expr, dest, typ } => {
+                    Instruction::Len { expr, dest, typ: _ } => {
                         println!("        {dest} <- len({expr})");
                     }
                     Instruction::Less { left, right, dest } => {

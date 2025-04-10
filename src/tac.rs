@@ -148,6 +148,7 @@ pub enum Instruction {
 
     // SPECIAL
     Assign {
+        typ: Type,
         src: Operand,
         dest: Operand,
     },

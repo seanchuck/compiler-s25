@@ -93,7 +93,7 @@ fn destruct_expr(
                 // TODO: change to type int
                 let temp = fresh_temp();
                 let temp_op = Operand::LocalVar(temp.clone());
-                cfg.add_temp_var(temp, Type::Long, None);
+                cfg.add_temp_var(temp, Type::Int, None);
 
                 println!("A");
 
@@ -103,7 +103,7 @@ fn destruct_expr(
                     Instruction::LoadConst {
                         src: val.parse::<i64>().unwrap(),
                         dest: temp_op.clone(),
-                        typ: Type::Long,
+                        typ: Type::Int,
                     },
                 );
 
@@ -113,7 +113,7 @@ fn destruct_expr(
             Literal::HexInt(val) => {
                 let temp = fresh_temp();
                 let temp_op = Operand::LocalVar(temp.clone());
-                cfg.add_temp_var(temp, Type::Long, None);
+                cfg.add_temp_var(temp, Type::Int, None);
 
                 // TODO: change to type int
                 cfg.add_instruction_to_block(
@@ -121,7 +121,7 @@ fn destruct_expr(
                     Instruction::LoadConst {
                         src: i64::from_str_radix(&val, 16).unwrap(),
                         dest: temp_op.clone(),
-                        typ: Type::Long,
+                        typ: Type::Int,
                     },
                 );
 
@@ -185,7 +185,7 @@ fn destruct_expr(
                 panic!("Expected a variable, found something else!");
             };
 
-            cfg.add_temp_var(temp, typ, None);
+            cfg.add_temp_var(temp, typ.clone(), None);
 
             // array index can be an expression
             let (next_block_id, index_operand) =
@@ -194,6 +194,7 @@ fn destruct_expr(
             cfg.add_instruction_to_block(
                 next_block_id,
                 Instruction::Assign {
+                    typ: typ,
                     src: cfg_scope.lookup_arr(id.to_string(), index_operand, sym_scope),
                     dest: array_element.clone(),
                 },
@@ -261,6 +262,7 @@ fn destruct_expr(
                     cfg.add_instruction_to_block(
                         next_true_block.get_id(),
                         Instruction::Assign {
+                            typ: Type::Bool,
                             src: Operand::Const(1),
                             dest: dest.clone(),
                         },
@@ -277,6 +279,7 @@ fn destruct_expr(
                     cfg.add_instruction_to_block(
                         next_false_block.get_id(),
                         Instruction::Assign {
+                            typ: Type::Bool,
                             src: Operand::Const(0),
                             dest: dest.clone(),
                         },
@@ -677,8 +680,16 @@ fn destruct_statement(
             target, expr, op, ..
         } => {
             let rhs: Operand;
-            (cur_block_id, rhs) =
+            (cur_block_id, rhs) =   // In this case, rhs is the operand which is the name fo the temp 
                 destruct_expr(cfg, expr, cur_block_id, cfg_scope, sym_scope, strings);
+            
+            let mut dummy_context: SemanticContext = SemanticContext {
+                filename: "dummy".to_string(),
+                error_found: false,
+            };
+            let mut dummy_writer = io::sink();
+
+            let target_typ = infer_expr_type(&target, &sym_scope.borrow(), &mut dummy_writer, &mut dummy_context).expect("expected type for target");
 
             // dest can either be an identifier or array element
             match target {
@@ -692,6 +703,7 @@ fn destruct_statement(
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
+                                    typ: target_typ.clone(),
                                     src: rhs,
                                     dest: cfg_scope.lookup_arr(id.to_string(), index_op, sym_scope),
                                 },
@@ -717,6 +729,7 @@ fn destruct_statement(
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
+                                    typ: target_typ.clone(),
                                     src: array_element.clone(),
                                     dest: array_element_temp.clone(),
                                 },
@@ -740,6 +753,7 @@ fn destruct_statement(
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
+                                    typ: target_typ.clone(),
                                     src: new_rhs,
                                     dest: array_element,
                                 },
@@ -764,6 +778,7 @@ fn destruct_statement(
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
+                                    typ: target_typ.clone(),
                                     src: array_element.clone(),
                                     dest: array_element_temp.clone(),
                                 },
@@ -787,6 +802,7 @@ fn destruct_statement(
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
+                                    typ: target_typ.clone(),
                                     src: new_rhs,
                                     dest: array_element,
                                 },
@@ -811,6 +827,7 @@ fn destruct_statement(
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
+                                    typ: target_typ.clone(),
                                     src: array_element.clone(),
                                     dest: array_element_temp.clone(),
                                 },
@@ -834,6 +851,7 @@ fn destruct_statement(
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
+                                    typ: target_typ.clone(),
                                     src: new_rhs,
                                     dest: array_element,
                                 },
@@ -858,6 +876,7 @@ fn destruct_statement(
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
+                                    typ: target_typ.clone(),
                                     src: array_element.clone(),
                                     dest: array_element_temp.clone(),
                                 },
@@ -881,6 +900,7 @@ fn destruct_statement(
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
+                                    typ: target_typ.clone(),
                                     src: new_rhs,
                                     dest: array_element,
                                 },
@@ -906,6 +926,7 @@ fn destruct_statement(
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
+                                    typ: target_typ.clone(),
                                     src: array_element.clone(),
                                     dest: array_element_temp.clone(),
                                 },
@@ -929,6 +950,7 @@ fn destruct_statement(
                             cfg.add_instruction_to_block(
                                 cur_block_id,
                                 Instruction::Assign {
+                                    typ: target_typ.clone(),
                                     src: new_rhs,
                                     dest: array_element,
                                 },
@@ -945,6 +967,7 @@ fn destruct_statement(
 
                     let instr = match op {
                         AssignOp::Assign => Instruction::Assign {
+                            typ: typ.clone(),
                             src: rhs,
                             dest: dest.clone(),
                         },
@@ -1237,6 +1260,11 @@ fn destruct_statement(
             cfg.add_block(&next_block);
 
             // for-loop initialization
+            let var_typ = if let TableEntry::Variable { typ, .. } = sym_scope.borrow().lookup(var).expect("couldn't find for loop variable") {
+                typ.clone()
+            } else {
+                panic!("Expected a variable, found something else!");
+            };
             let lhs = cfg_scope.lookup_var(var.to_string());
             let rhs: Operand;
             (cur_block_id, rhs) =
@@ -1244,6 +1272,7 @@ fn destruct_statement(
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::Assign {
+                    typ: var_typ,
                     src: rhs,
                     dest: lhs,
                 },
@@ -1422,6 +1451,7 @@ fn destruct_statement(
                 cfg.add_instruction_to_block(
                     cur_block_id,
                     Instruction::Assign {
+                        typ: Type::Int,
                         src: Operand::Const(int_val.unwrap()),
                         dest: Operand::LocalVar(temp),
                     },
@@ -1470,6 +1500,7 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
         method_cfg.add_instruction_to_block(
             cur_block_id,
             Instruction::Assign {
+                typ: typ.clone(),
                 src: Operand::Argument(pos as i32),
                 dest: Operand::LocalVar(temp),
             },

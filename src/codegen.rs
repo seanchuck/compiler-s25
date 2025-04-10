@@ -249,25 +249,17 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             // }
         }
 
-        Instruction::Assign { src, dest } => {
+        Instruction::Assign { src, dest, typ} => {
+            println!("Moving {:?} into {:?}", src, dest);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let src_op = map_operand(method_cfg, src, x86_instructions, globals);
 
-            let typ = dest_op.get_type();
             let reg = reg_for_type(Register::Rax, &typ);
+            
+            println!("Move has type {:?}", typ.clone());
 
-            // match typ {
-            //     Type::Int 
-            //     | Type::Bool => {
-            //         x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(reg), Type::Long));
-            //         x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg), dest_op, Type::Long));
-            //     }
-                // Type::Long => {
-                    x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(Register::Rax), Type::Long));
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
-            //     }
-            //     _=> panic!("Assign not defined for this type")
-            // }
+            x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(reg.clone()), typ.clone()));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), dest_op, typ.clone()));
         }
         
         Instruction::LoadString { src, dest } => {
