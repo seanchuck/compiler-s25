@@ -179,7 +179,7 @@ impl fmt::Display for X86Insn {
             X86Insn::Pop(op) => write!(f, "    popq {}", op),
             X86Insn::Ret => write!(f, "    ret"),
             X86Insn::Lea(src, dst) => write!(f, "    leaq {}, {}", src, dst),
-            X86Insn::Cmp(left, right) => write!(f, "    cmpq {}, {}", left, right),
+            X86Insn::Cmp(left, right) => write!(f, "    cmpl {}, {}", left, right),
             X86Insn::Jne(label) => writeln!(f, "    jne {}", label),
             X86Insn::Sete(dst) => write!(f, "    sete {}", dst),
             X86Insn::Setg(dst) => write!(f, "    setg {}", dst),

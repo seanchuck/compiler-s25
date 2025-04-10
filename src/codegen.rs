@@ -439,25 +439,26 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let mut swapped = false;
 
+            // All relational operation expressions are only for comparing integer expressions (from spec)
             // handle illegal cmp: (mem, mem)
             if is_memory_operand(&left_op) && is_memory_operand(&right_op) {
                 // move value into a register
                 x86_instructions.push(X86Insn::Mov(
                     left_op.clone(),
-                    X86Operand::Reg(Register::Rax),
-                    Type::Long
+                    X86Operand::Reg(Register::Eax),
+                    Type::Int
                 ));
-                left_op = X86Operand::Reg(Register::Rax);
+                left_op = X86Operand::Reg(Register::Eax);
             }
 
             // handle illegal cmp: (imm, imm),
             if is_immediate_operand(&left_op) && is_immediate_operand(&right_op) {
                 x86_instructions.push(X86Insn::Mov(
                     left_op.clone(),
-                    X86Operand::Reg(Register::Rax),
-                    Type::Long
+                    X86Operand::Reg(Register::Eax),
+                    Type::Int
                 ));
-                left_op = X86Operand::Reg(Register::Rax);
+                left_op = X86Operand::Reg(Register::Eax);
             }
 
             // handle illegal cmp: (mem, imm), (reg, imm) --> imm must come first
@@ -524,10 +525,10 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             let cond_op = map_operand(method_cfg, condition, x86_instructions, globals);
 
             // cmp condition, 0 → is condition true?
-            x86_instructions.push(X86Insn::Mov(cond_op, X86Operand::Reg(Register::Rax), Type::Long));
+            x86_instructions.push(X86Insn::Mov(cond_op, X86Operand::Reg(Register::Eax), Type::Int));
             x86_instructions.push(X86Insn::Cmp(
                 X86Operand::Constant(0),
-                X86Operand::Reg(Register::Rax),
+                X86Operand::Reg(Register::Eax),
             ));
             x86_instructions.push(X86Insn::Jne(label)); // jump if condition != 0
         }
