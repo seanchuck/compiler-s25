@@ -1501,7 +1501,7 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
             cur_block_id,
             Instruction::Assign {
                 typ: typ.clone(),
-                src: Operand::Argument(pos as i32),
+                src: Operand::Argument(pos as i32, typ.clone()),
                 dest: Operand::LocalVar(temp),
             },
         );

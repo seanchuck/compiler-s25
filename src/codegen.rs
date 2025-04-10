@@ -60,8 +60,8 @@ fn map_operand(
 
         Operand::LocalVar(temp) => {
             let typ = method_cfg.locals.get(temp).expect("missing temp in scope").typ.clone();
-            // X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), typ)
-            X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), Type::Long)
+            X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), typ)
+            // X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), Type::Long)
         }
 
         Operand::GlobalVar(val) => X86Operand::Global(val.to_string()),
@@ -123,14 +123,14 @@ fn map_operand(
             // }
         }
 
-        Operand::Argument(pos) => {
+        Operand::Argument(pos, typ) => {
             match pos {
-                0 => X86Operand::Reg(Register::Rdi),
-                1 => X86Operand::Reg(Register::Rsi),
-                2 => X86Operand::Reg(Register::Rdx),
-                3 => X86Operand::Reg(Register::Rcx),
-                4 => X86Operand::Reg(Register::R8),
-                5 => X86Operand::Reg(Register::R9),
+                0 => X86Operand::Reg(reg_for_type(Register::Rdi, typ)),
+                1 => X86Operand::Reg(reg_for_type(Register::Rsi, typ)),
+                2 => X86Operand::Reg(reg_for_type(Register::Rdx, typ)),
+                3 => X86Operand::Reg(reg_for_type(Register::Rcx, typ)),
+                4 => X86Operand::Reg(reg_for_type(Register::R8, typ)),
+                5 => X86Operand::Reg(reg_for_type(Register::R9, typ)),
                 _ => {
                     // Args are always the first local temps defined
                     // Should properly handle ints and longs
@@ -150,7 +150,7 @@ fn map_operand(
                     //         X86Operand::RegInt(Register::Rbp, offset, Type::Int)
                     //     }
                         // Type::Long => {
-                            X86Operand::RegInt(Register::Rbp, offset, Type::Long)
+                            X86Operand::RegInt(Register::Rbp, offset, typ.clone())
                     //     }
                     //     _=> panic!("Only numeric and bool args alllowed")
                     // }
@@ -259,7 +259,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             println!("Move has type {:?}", typ.clone());
 
             x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(reg.clone()), typ.clone()));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), dest_op, typ.clone()));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg), dest_op, typ.clone()));
         }
         
         Instruction::LoadString { src, dest } => {
@@ -282,7 +282,8 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             // First 6 args go in registers
             for (i, arg) in args.iter().take(6).enumerate() {
                 let arg_reg =
-                    map_operand(method_cfg, &Operand::Argument(i as i32), x86_instructions, globals);
+                    // TODO Is it allowed to just assume you move it into a larger register?
+                    map_operand(method_cfg, &Operand::Argument(i as i32, Type::Long), x86_instructions, globals);
                 let arg_val = map_operand(method_cfg, arg, x86_instructions, globals);
                 x86_instructions.push(X86Insn::Mov(arg_val, arg_reg, Type::Long));
             }

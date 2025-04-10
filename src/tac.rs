@@ -18,7 +18,7 @@ pub enum Operand {
     LocalVar(String),
     LocalArrElement(String, Box<Operand>),
     Const(i64),
-    Argument(i32), // position of the argument
+    Argument(i32, Type), // position of the argument and its type
 }
 
 impl fmt::Display for Operand {
@@ -30,7 +30,7 @@ impl fmt::Display for Operand {
             Operand::GlobalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
             Operand::LocalVar(name) => write!(f, "{}", name),
             Operand::LocalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
-            Operand::Argument(pos) => write!(f, "arg{}", pos),
+            Operand::Argument(pos, typ) => write!(f, "arg{}", pos),
         }
     }
 }
