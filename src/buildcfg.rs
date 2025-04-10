@@ -1353,6 +1353,6 @@ pub fn build_cfg(
     let mut strings: Vec<String> = Vec::new();
 
     // Generate a CFG for each method
-    let method_cfgs: HashMap<String, CFG> = destruct_program(&sym_tree, &mut strings);
+    let mut method_cfgs: HashMap<String, CFG> = destruct_program(&sym_tree, &mut strings);
     (method_cfgs, globals, strings)
 }

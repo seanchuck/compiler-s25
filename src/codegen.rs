@@ -1,7 +1,7 @@
-use crate::cfg::Global;
 /**
 Generate x86 code from the Control flow graph.
 **/
+use crate::cfg::Global;
 use crate::cfg::ELEMENT_SIZE;
 use crate::dataflow::optimize_dataflow;
 use crate::tac::*;
@@ -464,16 +464,15 @@ pub fn generate_assembly(
     debug: bool,
 ) {
     // Generate the method CFGS
-    let (method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
+    let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
 
     // Perform dataflow optimizations
-    optimize_dataflow(&method_cfgs, optimizations, debug);
+    optimize_dataflow(&mut method_cfgs, &optimizations, debug);
 
     if debug {
         print_cfg(&method_cfgs);
         println!("\n========== X86 Code ==========\n");
     }
-
 
     let mut global_code: Vec<X86Insn> = Vec::new();
 

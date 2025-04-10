@@ -1,5 +1,3 @@
-use dataflow::optimize_dataflow;
-
 // Example usage: cargo run tests/hello.dcf -t <scan, parse,>
 // Additional packages: anyhow (error types), nom (parsing), clap (cli args)
 mod utils;
