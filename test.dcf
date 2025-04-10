@@ -1,11 +1,13 @@
+import printf;
 
+void do_print(){
+    // Store some arrays to attempt to get it out of alignment
+    int a[1];
+    a[0] = 1;
+
+    printf("Hello Decaf %d\n", a[0]);
+}
 
 void main() {
-    int a;
-    int b;
-
-    a = 3;
-    b = 4;
-
-    a = a+b;
+    do_print();
 }

@@ -92,11 +92,14 @@ fn destruct_expr(
                 false => (cur_block_id, Operand::Const(0)),
             },
             Literal::Int(val) => {
+                // TODO: change to type int
                 let temp = fresh_temp();
                 let temp_op = Operand::LocalVar(temp.clone());
                 cfg.add_temp_var(temp, Type::Int, None);
 
+                println!("A");
 
+                // TODO: change to int?
                 cfg.add_instruction_to_block(
                     cur_block_id,
                     Instruction::LoadConst {
@@ -112,14 +115,15 @@ fn destruct_expr(
             Literal::HexInt(val) => {
                 let temp = fresh_temp();
                 let temp_op = Operand::LocalVar(temp.clone());
-                cfg.add_temp_var(temp, Type::Int, None);
+                cfg.add_temp_var(temp, Type::Long, None);
 
+                // TODO: change to type int
                 cfg.add_instruction_to_block(
                     cur_block_id,
                     Instruction::LoadConst {
                         src: i64::from_str_radix(&val, 16).unwrap(),
                         dest: temp_op.clone(),
-                        typ: Type::Int
+                        typ: Type::Long
                     },
                 );
 
@@ -130,6 +134,7 @@ fn destruct_expr(
                 let temp_op = Operand::LocalVar(temp.clone());
                 cfg.add_temp_var(temp, Type::Long, None);
 
+                println!("C");
 
                 cfg.add_instruction_to_block(
                     cur_block_id,
@@ -433,15 +438,16 @@ fn destruct_expr(
         }
 
         SymExpr::Len { id, .. } => {
-            let temp = fresh_temp();
-            let result = Operand::LocalVar(temp.to_string());
-            cfg.add_temp_var(temp, Type::Int, None);
-            let operand: Operand = cfg_scope.lookup_var(id.to_string());
-
+            // determine if operand array is type int or long
             let table_entry = sym_scope.borrow().lookup(id).expect("Array not found in scope!");
             let TableEntry::Variable {  typ, .. } = table_entry else {
                 panic!("Expected a variable, found something else!");
             };
+
+            let temp = fresh_temp();
+            let result = Operand::LocalVar(temp.to_string());
+            cfg.add_temp_var(temp, typ.clone(), None);
+            let operand: Operand = cfg_scope.lookup_var(id.to_string());
 
             let instruction = Instruction::Len {
                 typ,

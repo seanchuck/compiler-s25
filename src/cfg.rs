@@ -74,19 +74,22 @@ impl CFG {
     }
 
     pub fn get_element_size(&self, typ: Type) -> i64 {
+        println!("coming in as type {:#?}", typ);
         match typ {
-            Type::Int => INT_SIZE,
-            Type::Long => LONG_SIZE,
-            Type::Bool => INT_SIZE,
-            Type::String => LONG_SIZE,
-            _=> LONG_SIZE // default to 64-bit
+            Type::Int
+            | Type::Bool => INT_SIZE,
+
+            Type::Long
+            | Type::String
+            | _=> LONG_SIZE // default to 64-bit
         }
     }
 
     /// Allocate space on the stack for a new temp var
     pub fn add_temp_var(&mut self, temp: String, typ: Type, length: Option<i64>) {
-        // let element_size = self.get_element_size(typ.clone());
-        let element_size = ELEMENT_SIZE;
+        println!("looking at temp {}", temp);
+        let element_size = self.get_element_size(typ.clone());
+        // let element_size = ELEMENT_SIZE;
         let size: i64;
 
         if length.is_some() {

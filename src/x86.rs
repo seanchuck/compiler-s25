@@ -41,12 +41,23 @@ pub enum X86Insn {
 
 #[derive(Debug, Clone)]
 pub enum X86Operand {
+    // memory operands need type to determine how much to read
     Reg(Register),              // no offset
-    RegInt(Register, i64),      // integer offset
+    RegInt(Register, i64, Type),      // integer offset
     RegLabel(Register, String), // label offset
     Constant(i64),
     Global(String), // name of global constant
-    Address(Option<String>, Option<Register>, Register, i64), // reg1 + reg2 * scale, offset by label
+    Address(Option<String>, Option<Register>, Register, i64, Type), // reg1 + reg2 * scale, offset by label
+}
+
+impl X86Operand {
+    pub fn get_type(&self) -> Type {
+        match self {
+            X86Operand::RegInt(_, _, typ) => typ.clone(),
+            X86Operand::Address(_, _, _, _, typ) => typ.clone(),
+            _ => Type::Long, // default fallback
+        }
+    }
 }
 
 impl fmt::Display for X86Operand {
@@ -55,9 +66,9 @@ impl fmt::Display for X86Operand {
             X86Operand::Reg(reg) => write!(f, "{}", reg),
             X86Operand::Constant(val) => write!(f, "${}", val),
             X86Operand::Global(name) => write!(f, "{}", name),
-            X86Operand::RegInt(reg, offset) => write!(f, "{}({})", offset, reg),
+            X86Operand::RegInt(reg, offset, typ) => write!(f, "{}({})", offset, reg),
             X86Operand::RegLabel(reg, label) => write!(f, "{}({})", label, reg),
-            X86Operand::Address(label, reg1, reg2, scale) => {
+            X86Operand::Address(label, reg1, reg2, scale, typ) => {
                 write!(
                     f,
                     "{}({}, {}, {})",

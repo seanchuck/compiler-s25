@@ -11,7 +11,7 @@ pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
     println!("\n==================== CFG =======================");
 
     for (method_name, cfg) in method_cfgs {
-        println!("\n{method_name}:");
+        println!("\n{method_name} (stack size: {} bytes):", cfg.stack_size);
 
         for (id, block) in cfg.get_blocks() {
             println!("    {id}:");
