@@ -9,14 +9,14 @@ use crate::{
 };
 
 
-/// Invalidate the table entries for a variable whose
-/// value has been updated
+/// Invalidate the hash table entries for a variable whose
+/// value has been updated, so that we don't attempt to
+/// do copy propagation of stale values.
 fn invalidate(
     dest_name: &str,
     copy_to_src: &mut HashMap<String, String>,
     src_to_copies: &mut HashMap<String, HashSet<String>>,
 ) {
-    
     // Remove dest from its source's copy set
     if let Some(src) = copy_to_src.remove(dest_name) {
         if let Some(set) = src_to_copies.get_mut(&src) {
@@ -34,38 +34,44 @@ fn invalidate(
     println!("Invalidated mutated variable: {}", dest_name);
 }
 
-/// Recursively get the root source that a copy refers to
+/// Recursively get the root source that a copy refers to.
+/// Returns the input variable if it is not a copy of anything.
 fn get_root_source(
     var_name: &str,
     copy_to_src: &HashMap<String, String>,
 ) -> String {
-    let mut current = var_name;
+    let mut current: &str = var_name;
     while let Some(next) = copy_to_src.get(current) {
         current = next;
     }
     current.to_string()
 }
 
-
-fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>) {
+/// Takes an operand which is a direct copy and replaces it with 
+/// the source operand it is a copy of.
+/// Returns true iff a mutation occurred.
+fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, update_occurred: &mut bool) {
     // TODO: make sure this is properly mutating the CFG
     match op {
         Operand::LocalVar(name) => {
-            let root = get_root_source(name, copy_to_src);
-            if *name != root {
-                *op = Operand::LocalVar(root);
+            let root_src = get_root_source(name, copy_to_src);
+            // Check whether an upat
+            if *name != root_src {
+                *op = Operand::LocalVar(root_src);
+                *update_occurred = true;
             }
         }
 
         Operand::GlobalVar(name) => {
-            let root = get_root_source(name, copy_to_src);
-            if *name != root {
-                *op = Operand::GlobalVar(root);
+            let root_src = get_root_source(name, copy_to_src);
+            if *name != root_src {
+                *op = Operand::GlobalVar(root_src);
+                *update_occurred = true;
             }
         }
 
         Operand::LocalArrElement(_, index) | Operand::GlobalArrElement(_, index) => {
-            substitute_operand(index, copy_to_src);
+            substitute_operand(index, copy_to_src, update_occurred);
         }
 
         _ => {
@@ -73,7 +79,6 @@ fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>) {
         }
     }
 }
-
 
 
 fn copy_propagation(method_cfg: &mut CFG) -> bool {
@@ -86,6 +91,7 @@ fn copy_propagation(method_cfg: &mut CFG) -> bool {
 
     // Maps a copy to its source
     // b = a; --> copy_to_src = {b : a} = {dest : src}
+    let mut update_occured = false;
     let mut copy_to_src: HashMap<String, String> = HashMap::new();
 
     // Maps src to set
@@ -136,8 +142,8 @@ fn copy_propagation(method_cfg: &mut CFG) -> bool {
                 | Instruction::GreaterEqual { left, right, dest }
                 | Instruction::Equal { left, right, dest }
                 | Instruction::NotEqual { left, right, dest } => {
-                    substitute_operand(left, &copy_to_src);
-                    substitute_operand(right, &copy_to_src);
+                    substitute_operand(left, &copy_to_src, &mut update_occured);
+                    substitute_operand(right, &copy_to_src, &mut update_occured);
             
                     let dest_name = dest.get_name().unwrap().to_owned();
                     invalidate(&dest_name, &mut copy_to_src, &mut src_to_copies);
@@ -146,7 +152,7 @@ fn copy_propagation(method_cfg: &mut CFG) -> bool {
                 Instruction::Not { expr, dest }
                 | Instruction::Len { expr, dest }
                 | Instruction::Cast { expr, dest, .. } => {
-                    substitute_operand(expr, &copy_to_src);
+                    substitute_operand(expr, &copy_to_src, &mut update_occured);
             
                     let dest_name = dest.get_name().unwrap().to_owned();
                     invalidate(&dest_name, &mut copy_to_src, &mut src_to_copies);
@@ -161,7 +167,7 @@ fn copy_propagation(method_cfg: &mut CFG) -> bool {
                 Instruction::MethodCall { args, dest, .. } => {
                     // Always try to propagate copies in the arguments
                     for arg in args {
-                        substitute_operand(arg, &copy_to_src);
+                        substitute_operand(arg, &copy_to_src, &mut update_occured);
                     }
                 
                     // Now handle the destination if it exists
@@ -201,7 +207,7 @@ fn copy_propagation(method_cfg: &mut CFG) -> bool {
 
 
     // make a table mapping var_to_temp
-    false
+    update_occured
 }
 
 fn dead_code_elimination(cfg: &mut CFG) -> bool {
