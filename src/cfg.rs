@@ -11,7 +11,6 @@ between those basic blocks.
 // CONSTANTS
 // #################################################
 
-pub const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
 pub const INT_SIZE: i64 = 4; // 32 bits
 pub const LONG_SIZE: i64 = 8; // 64 bits
 
@@ -30,6 +29,7 @@ pub struct CFG {
     // TODO: 
     pub stack_size: i64, // total space to allocate on the stack for this method
     pub locals: BTreeMap<String, Local>, // maps local variable names to their metadata
+    pub param_to_temp: BTreeMap<i32, String>, // maps param number to local temp var
     pub exit: i32, // index of the last basic block
 }
 
@@ -40,6 +40,7 @@ impl CFG {
             blocks: BTreeMap::new(),
             stack_size: 0,
             locals: BTreeMap::new(),
+            param_to_temp: BTreeMap::new(),
             exit: 0, // index of the last basic block
         }
     }
@@ -88,7 +89,7 @@ impl CFG {
     pub fn add_temp_var(&mut self, temp: String, typ: Type, length: Option<i64>) {
         println!("looking at temp {} of type {:#?}", temp, typ);
         // let element_size = self.get_element_size(typ.clone());
-        let element_size = ELEMENT_SIZE;
+        let element_size = LONG_SIZE;
         let size: i64;
 
         if length.is_some() {
@@ -121,7 +122,6 @@ impl CFG {
 pub struct CFGScope {
     pub parent: Option<Box<CFGScope>>,
     pub local_to_temp: HashMap<String, String>, // maps local variable to temp variable
-    
 }
 
 impl CFGScope {
@@ -149,7 +149,7 @@ impl CFGScope {
             let TableEntry::Variable {  typ, .. } = table_entry else {
                 panic!("Expected a variable, found something else!");
             };
-            Operand::GlobalArrElement(arr, Box::new(idx), typ)
+            Operand::GlobalArrElement(arr, Box::new(idx))
         }
     }
 
@@ -195,8 +195,8 @@ pub struct Global {
 
 #[derive(Debug, Clone)]
 pub struct Local {
-    stack_offset: i64,
-    length: Option<i64>, // if array
+    pub stack_offset: i64,
+    pub length: Option<i64>, // if array
     pub typ: Type
 }
 

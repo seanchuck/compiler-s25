@@ -9,10 +9,11 @@ instructions that are simplified, and TAC.
 use crate::ast::Type;
 use std::fmt;
 
+// Types for operands can be looked up using their name in a
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Operand {
     GlobalVar(String),
-    GlobalArrElement(String, Box<Operand>, Type), // name and index
+    GlobalArrElement(String, Box<Operand>), // name and index
     String(i32),                            // ID of string constant
     LocalVar(String),
     LocalArrElement(String, Box<Operand>),
@@ -26,13 +27,14 @@ impl fmt::Display for Operand {
             Operand::Const(val) => write!(f, "{}", val),
             Operand::String(id) => write!(f, "str{}", id),
             Operand::GlobalVar(name) => write!(f, "{}", name),
-            Operand::GlobalArrElement(name, idx, typ) => write!(f, "{} {}[{}]", typ, name, idx),
+            Operand::GlobalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
             Operand::LocalVar(name) => write!(f, "{}", name),
             Operand::LocalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
             Operand::Argument(pos) => write!(f, "arg{}", pos),
         }
     }
 }
+
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Instruction {
