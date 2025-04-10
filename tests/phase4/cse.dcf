@@ -1,0 +1,10 @@
+void main() {
+    int result;
+    int temp1;
+    int temp2;
+
+    temp1 = 2 * 3;
+    temp2 = 2 * 3;  // Same expression as above
+    result = temp1 + temp2;
+    return;
+}

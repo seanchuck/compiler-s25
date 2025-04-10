@@ -34,6 +34,19 @@ impl fmt::Display for Operand {
     }
 }
 
+impl Operand {
+    pub fn get_name(&self) -> Option<&str> {
+        match self {
+            Operand::GlobalVar(name) => Some(name),
+            Operand::GlobalArrElement(name, _) => Some(name),
+            Operand::LocalVar(name) => Some(name),
+            Operand::LocalArrElement(name, _) => Some(name),
+            _ => None,
+        }
+    }
+}
+
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Instruction {
     // BINARY OPERATIONS

@@ -1,0 +1,12 @@
+void main() {
+    int a, b, c, d;
+
+
+    a = 10;
+    b = a;     // Copy propagation: b can be replaced with a
+    d = b; // d can also be replaced with a
+
+    b = b + 1;
+    c = b + d + 5; // Eventually: c = a + 5
+    return;
+}
