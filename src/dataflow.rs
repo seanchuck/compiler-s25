@@ -8,7 +8,7 @@ use crate::{
 };
 
 
-fn constant_propagation(cfg: &mut CFG) -> bool {
+fn copy_propagation(cfg: &mut CFG) -> bool {
     false
 }
 
@@ -41,7 +41,7 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
         // TODO: ordering?
         if optimizations.contains(&Optimization::Cp) {
             for (method, cfg) in method_cfgs.iter_mut() {
-                if constant_propagation(cfg) {
+                if copy_propagation(cfg) {
                     fixed_point = false;
                     if debug {
                         println!("Constant propagation changed {}", method);
