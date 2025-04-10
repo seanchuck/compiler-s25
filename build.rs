@@ -10,11 +10,11 @@ fn main() {
     let mut f = File::create(&dest_path).expect("Could not create generated_tests.rs");
 
     // Directory containing semantic test files.
-    let test_dir = "tests/semantics";
+    let test_dir = "tests/phase2";
 
     // Collect all .dcf files from the directory.
     let mut test_files: Vec<_> = fs::read_dir(test_dir)
-        .expect("Unable to read tests/semantics directory")
+        .expect("Unable to read tests/phase2 directory")
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let path = entry.path();
