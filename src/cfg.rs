@@ -74,7 +74,6 @@ impl CFG {
     }
 
     pub fn get_element_size(&self, typ: Type) -> i64 {
-        println!("coming in as type {:#?}", typ);
         match typ {
             Type::Int
             | Type::Bool => INT_SIZE,
@@ -87,9 +86,9 @@ impl CFG {
 
     /// Allocate space on the stack for a new temp var
     pub fn add_temp_var(&mut self, temp: String, typ: Type, length: Option<i64>) {
-        println!("looking at temp {}", temp);
-        let element_size = self.get_element_size(typ.clone());
-        // let element_size = ELEMENT_SIZE;
+        println!("looking at temp {} of type {:#?}", temp, typ);
+        // let element_size = self.get_element_size(typ.clone());
+        let element_size = ELEMENT_SIZE;
         let size: i64;
 
         if length.is_some() {
@@ -98,6 +97,8 @@ impl CFG {
         } else {
             size = element_size;
         }
+
+        println!("going to allocate {size} bytes for {temp}");
 
         self.stack_size += size;
         self.locals.insert(

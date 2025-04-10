@@ -41,7 +41,7 @@ pub enum X86Insn {
 
 #[derive(Debug, Clone)]
 pub enum X86Operand {
-    // memory operands need type to determine how much to read
+    // memory operands need type to determine how much to read/write
     Reg(Register),              // no offset
     RegInt(Register, i64, Type),      // integer offset
     RegLabel(Register, String), // label offset

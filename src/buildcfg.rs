@@ -95,7 +95,7 @@ fn destruct_expr(
                 // TODO: change to type int
                 let temp = fresh_temp();
                 let temp_op = Operand::LocalVar(temp.clone());
-                cfg.add_temp_var(temp, Type::Int, None);
+                cfg.add_temp_var(temp, Type::Long, None);
 
                 println!("A");
 
@@ -105,7 +105,7 @@ fn destruct_expr(
                     Instruction::LoadConst {
                         src: val.parse::<i64>().unwrap(),
                         dest: temp_op.clone(),
-                        typ: Type::Int
+                        typ: Type::Long
                     },
                 );
 
