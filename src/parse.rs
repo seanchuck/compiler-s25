@@ -858,6 +858,7 @@ fn parse_increment_decrement(input: TokenSlice) -> IResult<TokenSlice, AST> {
                     })),
                     op,
                     span,
+                    inc_dec: true // will use this to promote "1" to long if needed during semantics
                 }),
             ))
         }
@@ -906,6 +907,7 @@ fn parse_assignexpr(input: TokenSlice) -> IResult<TokenSlice, AST> {
                 expr: Box::new(expr),
                 op,
                 span,
+                inc_dec: false
             })
         }),
     ))
@@ -930,6 +932,7 @@ fn parse_assign_to_location(input: TokenSlice) -> IResult<TokenSlice, AST> {
             expr,
             op,
             span: full_span,
+            inc_dec: false
         }),
     ))
 }
@@ -956,12 +959,14 @@ fn parse_statement(input: TokenSlice) -> IResult<TokenSlice, AST> {
                     expr,
                     op,
                     span,
+                    inc_dec: false
                 }) => {
                     AST::Statement(Statement::Assignment {
                         location,
                         expr,
                         op,
                         span,
+                        inc_dec: false
                     }) // Preserve span
                 }
                 _ => assign, // Pass through if it's something else

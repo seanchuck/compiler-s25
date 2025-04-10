@@ -75,6 +75,7 @@ pub enum Statement {
         expr: Box<AST>,
         op: AssignOp,
         span: Span,
+        inc_dec: bool
     },
     MethodCall {
         method_name: String,

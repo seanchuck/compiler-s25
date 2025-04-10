@@ -492,6 +492,23 @@ pub fn build_block(
     }
 }
 
+/// Promote the integer involved in the literal to a Long if necessary
+pub fn fix_inc_dec(expr: &AST, var_type: &Type) -> Option<Box<AST>> {
+    if let AST::Expr(Expr::Literal {
+        lit: Literal::Int(val),
+        span,
+    }) = expr
+    {
+        if val == "1" && matches!(var_type, Type::Long) {
+            return Some(Box::new(AST::Expr(Expr::Literal {
+                lit: Literal::Long("1".to_string()),
+                span: span.clone(),
+            })));
+        }
+    }
+    None
+}
+
 /// Convert AST statements into
 pub fn build_statement(
     statement: &AST,
@@ -505,24 +522,39 @@ pub fn build_statement(
             expr,
             op,
             span,
+            inc_dec,
         }) => {
             match location.as_ref() {
                 // Plain variable assignment (x = 3;)
                 AST::Identifier { id, span: id_span } => {
                     check_used_before_decl(id, scope.clone(), span, writer, context);
 
-                    if let Some(entry) = scope.borrow().lookup(id) {
-                        SymStatement::Assignment {
-                            target: SymExpr::Identifier {
-                                entry: entry.clone(),
-                                span: id_span.clone(),
-                            },
-                            expr: build_expr(expr, Rc::clone(&scope), writer, context),
-                            span: span.clone(),
-                            op: op.clone(),
-                        }
+                    // Fix the increment/decrement by promoting the long as needed
+                    let Some(entry) = scope.borrow().lookup(id) else {
+                        return SymStatement::Error;
+                    };
+                    let var_type = match entry {
+                        TableEntry::Variable { ref typ, .. } => typ,
+                        _ => unreachable!(),
+                    };
+                    let fixed = if *inc_dec {
+                        fix_inc_dec(expr, &var_type)
                     } else {
-                        SymStatement::Error
+                        None
+                    };
+                    let expr_ref: &AST = match fixed {
+                        Some(ref boxed) => boxed.as_ref(),
+                        None => expr,
+                    };
+
+                    SymStatement::Assignment {
+                        target: SymExpr::Identifier {
+                            entry: entry.clone(),
+                            span: id_span.clone(),
+                        },
+                        expr: build_expr(expr_ref, Rc::clone(&scope), writer, context),
+                        span: span.clone(),
+                        op: op.clone(),
                     }
                 }
 
@@ -530,9 +562,27 @@ pub fn build_statement(
                 AST::Expr(Expr::ArrAccess { id, index: _, span }) => {
                     check_used_before_decl(id, scope.clone(), span, writer, context);
 
+                    // Fix increment/decrements (same as above)
+                    let Some(entry) = scope.borrow().lookup(id) else {
+                        return SymStatement::Error;
+                    };
+                    let var_type = match entry {
+                        TableEntry::Variable { ref typ, .. } => typ,
+                        _ => unreachable!(),
+                    };
+                    let fixed = if *inc_dec {
+                        fix_inc_dec(expr, var_type)
+                    } else {
+                        None
+                    };
+                    let expr_ref: &AST = match fixed {
+                        Some(ref boxed) => boxed.as_ref(),
+                        None => expr,
+                    };
+
                     SymStatement::Assignment {
                         target: build_expr(location, Rc::clone(&scope), writer, context),
-                        expr: build_expr(expr, Rc::clone(&scope), writer, context),
+                        expr: build_expr(expr_ref, Rc::clone(&scope), writer, context),
                         span: span.clone(),
                         op: op.clone(),
                     }
@@ -647,17 +697,15 @@ pub fn build_statement(
                 )
                 .expect("Failed to write output!");
             }
-            scope
-                .borrow_mut()
-                .insert(
-                    var.clone(),
-                    TableEntry::Variable {
-                        name: var.clone(),
-                        typ: var_typ, // TODO: Determine type dynamically
-                        length: None,
-                        span: span.clone(),
-                    },
-                );
+            scope.borrow_mut().insert(
+                var.clone(),
+                TableEntry::Variable {
+                    name: var.clone(),
+                    typ: var_typ, // TODO: Determine type dynamically
+                    length: None,
+                    span: span.clone(),
+                },
+            );
             //     .is_none()
             // {
             //     writeln!(
