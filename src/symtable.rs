@@ -63,7 +63,7 @@ pub enum SymStatement {
         span: Span,
     },
     Assignment {
-        target: SymExpr, //Now supports both `Identifier` and `ArrAccess`
+        target: SymExpr, // Now supports both `Identifier` and `ArrAccess`
         expr: SymExpr,
         span: Span,
         op: AssignOp,
