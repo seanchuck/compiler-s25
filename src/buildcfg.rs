@@ -1087,6 +1087,7 @@ fn destruct_statement(
                     strings,
                 );
 
+                // Note: use then_block sym_scope
                 for statement in &then_block.statements {
                     body_block_id = destruct_statement(
                         cfg,
@@ -1094,7 +1095,7 @@ fn destruct_statement(
                         &statement,
                         cur_loop,
                         &mut if_scope,
-                        sym_scope,
+                        &then_block.scope,
                         strings,
                     );
                 }
@@ -1116,7 +1117,7 @@ fn destruct_statement(
                         statement,
                         cur_loop,
                         &mut else_scope,
-                        sym_scope,
+                        &else_block.clone().unwrap().scope,
                         strings,
                     );
                 }
@@ -1148,7 +1149,7 @@ fn destruct_statement(
                         statement,
                         cur_loop,
                         &mut if_scope,
-                        sym_scope,
+                        &then_block.scope,
                         strings,
                     );
                 }
@@ -1214,7 +1215,7 @@ fn destruct_statement(
                     statement,
                     Some(&next_loop),
                     &mut new_scope,
-                    sym_scope,
+                    &block.scope,
                     strings,
                 );
             }
@@ -1260,19 +1261,21 @@ fn destruct_statement(
             //     panic!("Expected a variable, found something else!");
             // };
 
-            let mut dummy_context: SemanticContext = SemanticContext {
-                filename: "dummy".to_string(),
-                error_found: false,
-            };
-            let mut dummy_writer = io::sink();
-            let var_typ = infer_expr_type(init, &sym_scope.borrow(), &mut dummy_writer, &mut dummy_context).expect("couldnt get expr type");
-
-            // let var_entry = sym_scope.borrow().lookup(&var).expect("Did not find for loop variable");
-            // let var_typ = if let TableEntry::Variable { typ, .. } = var_entry {
-            //     typ.clone()
-            // } else {
-            //     panic!("Expected a variable, found something else!");
+            // let mut dummy_context: SemanticContext = SemanticContext {
+            //     filename: "dummy".to_string(),
+            //     error_found: false,
             // };
+            // let mut dummy_writer = io::sink();
+            // let var_typ = infer_expr_type(init, &sym_scope.borrow(), &mut dummy_writer, &mut dummy_context).expect("couldnt get expr type");
+
+            let var_entry = sym_scope.borrow().lookup(&var).expect(format!("Did not find for loop variable {}", var).as_str());
+            let var_typ = if let TableEntry::Variable { typ, .. } = var_entry {
+                typ.clone()
+            } else {
+                panic!("Expected a variable, found something else!");
+            };
+
+            // assert_eq!(var_typ, var_typ2, "vars should be equal: {:#?}, {:#}", var_typ, var_typ2);
 
             //TODO SEAN FIGURE OUT WHY TEH ABOVE CODE DOESNT WORK I have the workaround but its inelligant
 
@@ -1330,7 +1333,7 @@ fn destruct_statement(
                     statement,
                     Some(&next_loop),
                     &mut new_scope,
-                    sym_scope,
+                    &block.scope,
                     strings,
                 );
             }
