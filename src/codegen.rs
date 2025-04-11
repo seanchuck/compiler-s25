@@ -392,12 +392,12 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
 
             let reg = reg_for_type(Register::Rax, &Type::Bool);
             // Move expr to RAX (or any scratch reg), xor with 1
-            x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(reg.clone()), Type::Long));
+            x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(reg.clone()), Type::Bool));
             x86_instructions.push(X86Insn::Xor(
                 X86Operand::Constant(1),
                 X86Operand::Reg(reg.clone()),
             ));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax.clone()), dest_op, Type::Bool));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), dest_op, Type::Bool));
         }
         Instruction::Cast {
             expr,
