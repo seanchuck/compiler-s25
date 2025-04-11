@@ -485,11 +485,13 @@ fn destruct_expr(
 
             let temp = fresh_temp();
             let result = Operand::LocalVar(temp.to_string(), Type::Int);
-            cfg.add_temp_var(temp, typ.clone(), None);
+
+            //allocate only for int for the temp to hold length
+            cfg.add_temp_var(temp, Type::Int, None);
             let operand: Operand = cfg_scope.lookup_var(id.to_string(), typ.clone());
 
             let instruction = Instruction::Len {
-                typ,
+                typ: Type::Int,
                 expr: operand,
                 dest: result.clone(),
             };
@@ -1465,9 +1467,9 @@ fn destruct_statement(
                 cfg.add_instruction_to_block(
                     cur_block_id,
                     Instruction::Assign {
-                        typ: Type::Int,
+                        typ: typ.clone(),
                         src: Operand::Const(int_val.unwrap(), Type::Int),
-                        dest: Operand::LocalVar(temp, Type::Int),   // IS this right that teh local var type is Int?
+                        dest: Operand::LocalVar(temp, typ.clone()),   // IS this right that teh local var type is Int?
                     },
                 ); // set array length to first element of array
             } else {

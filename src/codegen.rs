@@ -233,12 +233,25 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let src_op = map_operand(method_cfg, src, x86_instructions, globals);
 
-            let reg = reg_for_type(Register::Rax, &typ);
-            
-            println!("Move has type {:?}", typ.clone());
+            // // Reason that this matters is because we might have src as an array and we are using full
+            // // 64 bits for the length if its long array, so we must move using src typ then only take
+            // // The necessary dest bits for the final move
+            let src_typ = src.get_type();
+            let dest_typ = dest.get_type();
 
-            x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(reg.clone()), typ.clone()));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg), dest_op, typ.clone()));
+            let src_reg = reg_for_type(Register::Rax, &src_typ);
+            let dst_reg = reg_for_type(Register::Rax, &dest_typ);
+            
+            println!("Move has type {:?} -> {:?}", src_typ, dest_typ);
+
+
+            x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(src_reg.clone()), src_typ.clone()));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(dst_reg), dest_op, dest_typ.clone()));
+
+            // let reg = reg_for_type(Register::Rax, &typ);
+            // x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(reg.clone()), typ.clone()));
+            // x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg), dest_op, typ.clone()));
+
         }
         
         Instruction::LoadString { src, dest } => {
@@ -273,12 +286,15 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
 
             // Arguments {7...n} go on stack, with last args going first; assume stack 16-aligned before call
             let mut sp_offset = 0;
-            for arg in args.iter().skip(6) {
+            for (i, arg) in args.iter().skip(6).enumerate() {
+                let arg_typ = arg.get_type();
                 let arg_val = map_operand(method_cfg, arg, x86_instructions, globals);
+
+                let reg = reg_for_type(Register::Rax, &arg_typ);
                 x86_instructions.push(X86Insn::Mov(
                     arg_val.clone(),
-                    X86Operand::Reg(Register::Rax),
-                    Type::Long
+                    X86Operand::Reg(reg),
+                    arg_typ
                 ));
                 x86_instructions.push(X86Insn::Mov(
                     X86Operand::Reg(Register::Rax),
@@ -411,7 +427,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
                 crate::ast::Type::Int => {
                     // TODO implement this when we differentiate ints and longs
                     x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Rax), Type::Long));
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
                 }
                 crate::ast::Type::Long => {
                     // TODO implement this when we differentiate ints and longs
@@ -422,21 +438,20 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             }
         }
         Instruction::Len { expr, dest, typ } => {
-            // match typ {
-            //     Type::Int => {
-            //         let expr_op = map_operand(method_cfg, expr, x86_instructions);
-            //         let dest_op = map_operand(method_cfg, dest, x86_instructions);
-            //         x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Eax), Type::Int));
-            //         x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
-            //     }
-                // Type::Long => {
-                    let expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
-                    let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
-                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Eax), Type::Int));
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
-                // }
-                // _=> unreachable!()
-            // }
+                let expr_typ = expr.get_type();
+                let dest_typ = dest.get_type();
+
+                let expr_reg = reg_for_type(Register::Rax, &expr_typ);
+                let dest_reg = reg_for_type(Register::Rax, &dest_typ);
+
+                let expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
+                let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
+                println!("Putting length from {:?} into {:?}, dest has type: {:?}", expr, dest, dest_typ);
+
+                // First move is dependent on entry sizes for the array. second will always produce an integer
+                x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(expr_reg), expr_typ.clone()));
+                x86_instructions.push(X86Insn::Mov(X86Operand::Reg(dest_reg), dest_op, dest_typ));
         }
         Instruction::Greater { left, right, dest }
         | Instruction::Less { left, right, dest }

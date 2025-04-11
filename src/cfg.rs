@@ -108,6 +108,8 @@ impl CFG {
         println!("going to allocate {size} bytes for {temp}");
 
         self.stack_size += size;
+
+        println!("Offset for temp: {} is at - {}. It uses {} bytes", temp, self.stack_size, size);
         self.locals.insert(
             temp,
             Local {
