@@ -12,24 +12,38 @@ use std::fmt;
 // Types for operands can be looked up using their name in a
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Operand {
-    GlobalVar(String),
-    GlobalArrElement(String, Box<Operand>), // name and index
-    String(i32),                            // ID of string constant
-    LocalVar(String),
-    LocalArrElement(String, Box<Operand>),
-    Const(i64),
+    GlobalVar(String, Type),
+    GlobalArrElement(String, Box<Operand>, Type), // name and index
+    String(i32, Type),                            // ID of string constant
+    LocalVar(String, Type),
+    LocalArrElement(String, Box<Operand>, Type),
+    Const(i64, Type),
     Argument(i32, Type), // position of the argument and its type
+}
+
+impl Operand {
+    pub fn get_type(& self) -> Type {
+        match self {
+            Operand::GlobalVar(_, typ) => typ.clone(),
+            Operand::GlobalArrElement(_, _, typ) => typ.clone(),
+            Operand::String(_, typ) => typ.clone(),
+            Operand::LocalVar(_, typ) => typ.clone(),
+            Operand::LocalArrElement(_, _, typ) => typ.clone(),
+            Operand::Const(_, typ) => typ.clone(),
+            Operand::Argument(_, typ) => typ.clone(),
+        }
+    }
 }
 
 impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Operand::Const(val) => write!(f, "{}", val),
-            Operand::String(id) => write!(f, "str{}", id),
-            Operand::GlobalVar(name) => write!(f, "{}", name),
-            Operand::GlobalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
-            Operand::LocalVar(name) => write!(f, "{}", name),
-            Operand::LocalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
+            Operand::Const(val, _) => write!(f, "{}", val),
+            Operand::String(id, _) => write!(f, "str{}", id),
+            Operand::GlobalVar(name, _) => write!(f, "{}", name),
+            Operand::GlobalArrElement(name, idx, _) => write!(f, "{}[{}]", name, idx),
+            Operand::LocalVar(name, _) => write!(f, "{}", name),
+            Operand::LocalArrElement(name, idx, _) => write!(f, "{}[{}]", name, idx),
             Operand::Argument(pos, typ) => write!(f, "arg{}", pos),
         }
     }

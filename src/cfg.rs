@@ -19,6 +19,12 @@ pub const LONG_SIZE: i64 = 8; // 64 bits
 // #################################################
 
 #[derive(Debug, Clone)]
+pub struct Temp {
+    pub name: String,
+    pub typ: Type
+}
+
+#[derive(Debug, Clone)]
 pub struct CFG {
     // BTreeMap is hash map that allows constant iteration order
     // entry block has ID 0
@@ -29,7 +35,7 @@ pub struct CFG {
     // TODO: 
     pub stack_size: i64, // total space to allocate on the stack for this method
     pub locals: BTreeMap<String, Local>, // maps local variable names to their metadata
-    pub param_to_temp: BTreeMap<i32, String>, // maps param number to local temp var
+    pub param_to_temp: BTreeMap<i32, Temp>, // maps param number to local temp var
     pub exit: i32, // index of the last basic block
 }
 
@@ -116,6 +122,15 @@ impl CFG {
     pub fn get_stack_offset(&self, temp: &String) -> i64 {
         self.locals.get(temp).unwrap().stack_offset
     }
+
+    // Get type of a parameter
+    pub fn get_param_type(&self, idx: i32) -> Type {
+        println!("Method: {} , trying to find the argument {}", self.name, idx);
+        println!("Param to temp {:?}", self.param_to_temp);
+        let param_temp = self.param_to_temp.get(&idx).expect("couldnt find param temp");
+        let param_typ = param_temp.typ.clone();
+        param_typ
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -126,30 +141,30 @@ pub struct CFGScope {
 
 impl CFGScope {
     /// Returns this global variable, or the temp variable associated to this local variable
-    pub fn lookup_var(&self, var: String) -> Operand {
+    pub fn lookup_var(&self, var: String, typ: Type) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&var) {
-            Operand::LocalVar(temp.to_string())
+            Operand::LocalVar(temp.to_string(), typ.clone())
         } else if let Some(parent) = &self.parent {
-            parent.lookup_var(var)
+            parent.lookup_var(var ,typ.clone())
         } else {
             // assume it is in the global CFGScope
-            Operand::GlobalVar(var)
+            Operand::GlobalVar(var, typ.clone())
         }
     }
 
     /// Returns this global array element, or the temp array element associated to this local array element
-    pub fn lookup_arr(&self, arr: String, idx: Operand, sym_scope: &Rc<RefCell<Scope>>) -> Operand {
+    pub fn lookup_arr(&self, arr: String, idx: Operand, sym_scope: &Rc<RefCell<Scope>>, typ: Type) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&arr) {
-            Operand::LocalArrElement(temp.to_string(), Box::new(idx))
+            Operand::LocalArrElement(temp.to_string(), Box::new(idx), typ.clone())
         } else if let Some(parent) = &self.parent {
-            parent.lookup_arr(arr, idx, sym_scope)
+            parent.lookup_arr(arr, idx, sym_scope, typ.clone())
         } else {
             // assume it is in the global CFGScope
             let table_entry = sym_scope.borrow().lookup(&arr).expect("Array not defined in this scope");
             let TableEntry::Variable {  typ, .. } = table_entry else {
                 panic!("Expected a variable, found something else!");
             };
-            Operand::GlobalArrElement(arr, Box::new(idx))
+            Operand::GlobalArrElement(arr, Box::new(idx), typ.clone())
         }
     }
 

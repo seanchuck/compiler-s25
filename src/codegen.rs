@@ -56,17 +56,17 @@ fn map_operand(
     globals: &HashMap<String, Global>
 ) -> X86Operand {
     match operand {
-        Operand::Const(val) => X86Operand::Constant(*val),
+        Operand::Const(val, typ) => X86Operand::Constant(*val),
 
-        Operand::LocalVar(temp) => {
+        Operand::LocalVar(temp, typ) => {
             let typ = method_cfg.locals.get(temp).expect("missing temp in scope").typ.clone();
             X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), typ)
             // X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), Type::Long)
         }
 
-        Operand::GlobalVar(val) => X86Operand::Global(val.to_string()),
+        Operand::GlobalVar(val, typ) => X86Operand::Global(val.to_string()),
 
-        Operand::LocalArrElement(arr, idx) => {
+        Operand::LocalArrElement(arr, idx, typ) => {
             let array_typ: Type = method_cfg.locals.get(arr).expect("expected array entry").typ.clone();
             let idx_op = map_operand(method_cfg, idx, x86_instructions, globals);
 
@@ -98,7 +98,7 @@ fn map_operand(
             // }
         }
 
-        Operand::GlobalArrElement(arr, idx) => {
+        Operand::GlobalArrElement(arr, idx, typ) => {
             let array_typ: Type = globals.get(arr).expect("Global array not defined!").typ.clone();
             let idx_op = map_operand(method_cfg, idx, x86_instructions, globals);
 
@@ -134,8 +134,8 @@ fn map_operand(
                 _ => {
                     // Args are always the first local temps defined
                     // Should properly handle ints and longs
-                    let temp_name = method_cfg.param_to_temp.get(pos).expect("Param mapping does not exist");
-                    let local = method_cfg.locals.get(temp_name);
+                    let temp_name = method_cfg.param_to_temp.get(pos).expect("Param mapping does not exist").name.clone();
+                    let local = method_cfg.locals.get(&temp_name);
                     let Some(Local { typ, .. }) = local else {
                         panic!("Expected a variable, found something else!");
                     };
@@ -157,26 +157,26 @@ fn map_operand(
                 }
             }
         }
-        Operand::String(idx) => X86Operand::RegLabel(Register::Rip, format!("str{idx}")),
+        Operand::String(idx, typ) => X86Operand::RegLabel(Register::Rip, format!("str{idx}")),
     }
 }
 
 
 // Adds the x86 instructions corresponding to insn to x86_instructions
-fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut Vec<X86Insn>, globals: &HashMap<String, Global>) {
+fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut Vec<X86Insn>, globals: &HashMap<String, Global>, method_cfgs: &HashMap<String, CFG>) {
     match insn {
         Instruction::LoadConst { src, dest, typ } => {
-            // match typ {
-            //     Type::Int => {
-            //         println!("INT");
-            //         let dest_location = map_operand(method_cfg, dest, x86_instructions, globals);
-            //         x86_instructions.push(X86Insn::Mov(
-            //             X86Operand::Constant(src.clone()),
-            //             dest_location,
-            //             Type::Int
-            //         ));
-            //     }
-                // Type::Long => {
+            match typ {
+                Type::Int => {
+                    println!("INT");
+                    let dest_location = map_operand(method_cfg, dest, x86_instructions, globals);
+                    x86_instructions.push(X86Insn::Mov(
+                        X86Operand::Constant(src.clone()),
+                        dest_location,
+                        Type::Int
+                    ));
+                }
+                Type::Long => {
                     println!("LONG");
                     // Must load uppper and lower 32 bits separately since assembler doesn't 
                     // support loading a 64-bit constant directly
@@ -200,9 +200,9 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                     ));
                     let dest_location = map_operand(method_cfg, dest, x86_instructions, globals);
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rbx), dest_location, Type::Long));
-            //     }
-            //     _=> panic!("Load const only defined for numeric types")
-            // }
+                }
+                _=> panic!("Load const only defined for numeric types")
+            }
         }
 
         Instruction::Add { left, right, dest, typ } => {
@@ -278,14 +278,18 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 None => X86Operand::Reg(Register::Rax),
             };
 
+            println!("Trying to find method with name {}", name);
+            // let called_method = method_cfgs.get(name).expect("Couldnt find method that was called");
+
             // Setup arguments
             // First 6 args go in registers
+            println!("Calling method {}, with args {:?}", name, args);
             for (i, arg) in args.iter().take(6).enumerate() {
+                let arg_typ = arg.get_type();
                 let arg_reg =
-                    // TODO Is it allowed to just assume you move it into a larger register?
-                    map_operand(method_cfg, &Operand::Argument(i as i32, Type::Long), x86_instructions, globals);
+                    map_operand(method_cfg, &Operand::Argument(i as i32, arg_typ.clone()), x86_instructions, globals);
                 let arg_val = map_operand(method_cfg, arg, x86_instructions, globals);
-                x86_instructions.push(X86Insn::Mov(arg_val, arg_reg, Type::Long));
+                x86_instructions.push(X86Insn::Mov(arg_val, arg_reg, arg_typ));
             }
 
             // Arguments {7...n} go on stack, with last args going first; assume stack 16-aligned before call
@@ -550,6 +554,7 @@ fn generate_method_x86(
     method_name: &String,
     method_cfg: &mut CFG,
     globals: &HashMap<String, Global>,
+    method_cfgs: &HashMap<String, CFG>
 ) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
@@ -600,7 +605,7 @@ fn generate_method_x86(
         x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
 
         for insn in block.get_instructions() {
-            add_instruction(method_cfg, &insn, &mut x86_instructions, globals);
+            add_instruction(method_cfg, &insn, &mut x86_instructions, globals, method_cfgs);
         }
 
         if *id == method_cfg.exit {
@@ -657,8 +662,9 @@ pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::W
 
     // Generate a vector of x86 for each method
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
-    for (method_name, mut method_cfg) in method_cfgs {
-        let method_code = generate_method_x86(&method_name, &mut method_cfg, &globals);
+    for (method_name, method_cfg) in &method_cfgs {
+        let mut method_cfg = method_cfg.clone();
+        let method_code = generate_method_x86(method_name, &mut method_cfg, &globals, &method_cfgs);
         code.insert(method_name.clone(), method_code);
     }
 
