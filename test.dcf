@@ -1,13 +1,21 @@
+int foo(int x) {
+  int y;
+  y = 0;
 
-int add(int a, int b) {
-    return a + b;
+  if (x < 5) {
+    y = 1;
+  } else {
+    y = 2;
+  }
+
+  while (y < 10) {
+    y = y + 1;
+  }
+
+  return y;
 }
 
 void main() {
-    int a, b, c;
-
-    a = 3;
-    b = 4;
-    
-    c = add(a,b);
+  int z;
+  z = foo(3);
 }

@@ -1,13 +1,13 @@
 void main() {
-    int a, b, c;
+    int a, b, c, x, y;
 
     a = 10;
     b = a;
 
-    if (cond) {
-        int x = 0;  // does NOT affect b
+    if (a > 9) {
+        x = 0;  // does NOT affect b
     } else {
-        int y = 1;  // does NOT affect b
+        y = 1;  // does NOT affect b
     }
 
     c = b + 5;  // ✅ b is still a copy of a — safe to propagate

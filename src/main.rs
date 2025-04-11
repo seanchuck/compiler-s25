@@ -9,6 +9,7 @@ mod symtable;
 mod tac;
 mod token;
 mod x86;
+mod state;
 
 mod buildcfg;
 mod codegen;
