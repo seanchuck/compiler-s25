@@ -30,19 +30,20 @@ fn is_memory_operand(op: &X86Operand) -> bool {
 /// Gets the correct size scratch register for the given type
 fn reg_for_type(reg: Register, typ: &Type) -> Register {
     match (reg.clone(), typ) {
-        (Register::Rax, Type::Int) => Register::Eax,
-        (Register::R10, Type::Int) => Register::R10d,
-        (Register::R11, Type::Int) => Register::R11d,
-        (Register::R8, Type::Int) => Register::R8d,
-        (Register::R9, Type::Int) => Register::R9d,
-        (Register::Rcx, Type::Int) => Register::Ecx,
-        (Register::Rdx, Type::Int) => Register::Edx,
-        (Register::Rsi, Type::Int) => Register::Esi,
-        (Register::Rdi, Type::Int) => Register::Edi,
-        (Register::Rbx, Type::Int) => Register::Ebx,
-        (Register::Rbp, Type::Int) => Register::Ebp,
-        (Register::Rsp, Type::Int) => Register::Esp,
         (_, Type::Long) => reg,
+        (_, Type::String) => reg,
+        (Register::Rax, _) => Register::Eax,
+        (Register::R10, _) => Register::R10d,
+        (Register::R11, _) => Register::R11d,
+        (Register::R8, _) => Register::R8d,
+        (Register::R9, _) => Register::R9d,
+        (Register::Rcx, _) => Register::Ecx,
+        (Register::Rdx, _) => Register::Edx,
+        (Register::Rsi, _) => Register::Esi,
+        (Register::Rdi, _) => Register::Edi,
+        (Register::Rbx, _) => Register::Ebx,
+        (Register::Rbp, _) => Register::Ebp,
+        (Register::Rsp, _) => Register::Esp,
         _ => reg,
     }
 }

@@ -160,6 +160,7 @@ impl fmt::Display for X86Insn {
         let suffix = |typ: &Type| match typ {
             Type::Int => "l",
             Type::Long => "q",
+            Type::Bool => "l",
             _ => "q", // default to 64-bit
         };
 
