@@ -94,8 +94,6 @@ fn destruct_expr(
                 let temp_op = Operand::LocalVar(temp.clone(), Type::Int);
                 cfg.add_temp_var(temp, Type::Int, None);
 
-                println!("A");
-
                 cfg.add_instruction_to_block(
                     cur_block_id,
                     Instruction::LoadConst {
@@ -128,8 +126,6 @@ fn destruct_expr(
                 let temp = fresh_temp();
                 let temp_op = Operand::LocalVar(temp.clone(), Type::Long);
                 cfg.add_temp_var(temp, Type::Long, None);
-
-                println!("C");
 
                 cfg.add_instruction_to_block(
                     cur_block_id,
@@ -220,22 +216,14 @@ fn destruct_expr(
             }
 
             let method_entry = sym_scope.borrow().lookup(method_name).expect("Couldnt find called method");
-            let return_type = if let TableEntry::Method { name, return_type, params, span } = method_entry {
-                return_type
-            } else {
-                panic!("Expected method entry found something else")
+            let return_type = match method_entry {
+                TableEntry::Method { name: _, return_type, .. } => return_type,
+                TableEntry::Import { .. } => Type::Int, //All external functions are treated as if they return int
+                _ => panic!("cannot call non method or import")
             };
 
             let temp = fresh_temp();
-            let temp_method_result = Operand::LocalVar(temp.to_string(), return_type);
-
-            let table_entry = sym_scope
-                .borrow()
-                .lookup(&method_name)
-                .expect("Method not found in scope!");
-            let TableEntry::Method { return_type, .. } = table_entry else {
-                panic!("Expected a Method, found something else!");
-            };
+            let temp_method_result = Operand::LocalVar(temp.to_string(), return_type.clone());
 
             cfg.add_temp_var(temp, return_type.clone(), None);
 
@@ -1264,11 +1252,30 @@ fn destruct_statement(
             cfg.add_block(&next_block);
 
             // for-loop initialization
-            let var_typ = if let TableEntry::Variable { typ, .. } = sym_scope.borrow().lookup(var).expect("couldn't find for loop variable") {
-                typ.clone()
-            } else {
-                panic!("Expected a variable, found something else!");
+            // println!("Looking for for loop variable {}", var);
+            // println!("Looking in scope {:?}", sym_scope);
+            // let var_typ = if let TableEntry::Variable { typ, .. } = sym_scope.borrow().lookup(var).expect("couldn't find for loop variable") {
+            //     typ.clone()
+            // } else {
+            //     panic!("Expected a variable, found something else!");
+            // };
+
+            let mut dummy_context: SemanticContext = SemanticContext {
+                filename: "dummy".to_string(),
+                error_found: false,
             };
+            let mut dummy_writer = io::sink();
+            let var_typ = infer_expr_type(init, &sym_scope.borrow(), &mut dummy_writer, &mut dummy_context).expect("couldnt get expr type");
+
+            // let var_entry = sym_scope.borrow().lookup(&var).expect("Did not find for loop variable");
+            // let var_typ = if let TableEntry::Variable { typ, .. } = var_entry {
+            //     typ.clone()
+            // } else {
+            //     panic!("Expected a variable, found something else!");
+            // };
+
+            //TODO SEAN FIGURE OUT WHY TEH ABOVE CODE DOESNT WORK I have the workaround but its inelligant
+
             let lhs = cfg_scope.lookup_var(var.to_string(), var_typ.clone());
             let rhs: Operand;
             (cur_block_id, rhs) =
