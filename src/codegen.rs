@@ -315,19 +315,21 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             // Make the call
             x86_instructions.push(X86Insn::Call(name.to_string()));
 
+            let return_reg = reg_for_type(Register::Rax, return_type);
+
             // Move the result into `dest` if necessary
             match dest_op {
                 X86Operand::Reg(Register::Rax) => {}
-                _ => x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long)),
+                _ => x86_instructions.push(X86Insn::Mov(X86Operand::Reg(return_reg), dest_op, return_type.clone())),
             }
         }
         Instruction::Ret { value, typ } => {
             // TODO: uncomment
-            // let return_reg = reg_for_type(Register::Rax, &typ);
-            let return_reg = Register::Rax;
+            let return_reg = reg_for_type(Register::Rax, &typ);
+            // let return_reg = Register::Rax;
             if let Some(value) = value {
                 let value_reg = map_operand(method_cfg, value, x86_instructions, globals);
-                x86_instructions.push(X86Insn::Mov(value_reg, X86Operand::Reg(return_reg), Type::Long));
+                x86_instructions.push(X86Insn::Mov(value_reg, X86Operand::Reg(return_reg), typ.clone()));
             }
 
             // Function prologue
