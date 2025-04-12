@@ -94,9 +94,9 @@ fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, u
             let root_src = get_root_source(name, copy_to_src);
             // Check whether an udpate occurred
             if *name != root_src {
-                // if debug {
+                if debug {
                     println!("Replacing {} with {}", name, root_src);
-                // }
+                }
 
                 *op = Operand::LocalVar(root_src.clone());
                 *update_occurred = true;
@@ -234,32 +234,94 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                     // Apply the copy prop if operands are copies of another block
                     substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
                     substitute_operand(dest, &copy_to_src, &mut update_occurred, debug);
-    
+
                     // Kill copies that use dest, since this assignment updates its values
                     if let Operand::LocalVar(dest_name) = dest {
                         invalidate(dest_name, &mut copy_to_src, &mut src_to_copies, debug);
 
-                        // Gen[B] : if this is a direct assignment, add to tables
+                        // Gen[B]: this is a direct assignment (a = b), add to tables
                         if let Operand::LocalVar(src_name) = src {
                             copy_to_src.insert(dest_name.clone(), src_name.clone());
                             src_to_copies.entry(src_name.clone()).or_default().insert(dest_name.clone());
                         }
                     }
                 }
-    
-                // TODO: handle other mutating instructions
+
+                // Arithmetic and relational ops
+                Instruction::Add { left, right, dest } 
+                | Instruction::Subtract { left, right, dest }
+                | Instruction::Multiply { left, right, dest }
+                | Instruction::Divide { left, right, dest }
+                | Instruction::Modulo { left, right, dest } 
+                | Instruction::Greater { left, right, dest }
+                | Instruction::Less { left, right, dest }
+                | Instruction::LessEqual { left, right, dest }
+                | Instruction::GreaterEqual { left, right, dest }
+                | Instruction::Equal { left, right, dest }
+                | Instruction::NotEqual { left, right, dest }=> {
+                    substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
+
+                    // Invalidate the destination since its value is updated
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+
+                }
+
+                Instruction::MethodCall { name, args, dest } => {
+                    // Try to copy prop on each of the arguments
+                    for arg in args {
+                        substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
+                    }
+                    
+                    // Invalidate the destination since its value is updated
+                    if dest.is_some() {
+                        invalidate(&dest.clone().unwrap().to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                    }
+                }
+
+
+
+                // Instruction::Not { expr, dest }
+                // | Instruction::Cast { expr, dest, target_type }
+                // | Instruction::Len { expr, dest } => todo!(),
+
+
+                Instruction::LoadString { src, dest } => {
+                    substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
+
+                    // Invalidate the destination since its value is updated
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                }
+
+                | Instruction::LoadConst { src, dest } => {
+                    // let mut const_op = Operand::Const(*src);
+                    // substitute_operand(&mut const_op, &copy_to_src, &mut update_occurred, debug);
+
+                    // Invalidate the destination since its value is updated
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                }
+
+
+                // Instruction::UJmp { name, id } => todo!(),
+                // Instruction::CJmp { name, condition, id } => todo!(),
+                // Instruction::Ret { value } => todo!(),
+                // Instruction::Exit { exit_code } => todo!(),
+
                 _ => {
+                    // UJmp, CJmp, Ret, and Exit have no effect
+                    // TODO: update to do nothing? shoudl be fine, get_dest will return None
+                    
                     // Conservatively invalidate any destinations that are written to (e.g., in arithmetic)
                     let dest = get_dest(instr);
                     if let Some(dest) = dest {
                         invalidate(&dest, &mut copy_to_src, &mut src_to_copies, debug);
                     }
-                }
+            }
             }
         }
     
         // OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
-        let out_copies = copy_to_src.clone();
+        let out_copies: HashMap<String, String> = copy_to_src.clone();
     
         // Update maps if either IN or OUT changed
         if in_map.get(&block_id) != Some(&in_copies) || out_map.get(&block_id) != Some(&out_copies) {
