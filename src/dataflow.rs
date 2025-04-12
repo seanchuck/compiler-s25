@@ -10,37 +10,6 @@ use crate::{
 };
 
 
-    // // standard (src is not redefined)
-    // a = 3;
-    // b = a // {b : a}
-    // c = b // {b : a, c : a}
-    // d = c // {b : a, c : a, d : a }
-    // e = b + c;
-
-    // e = a + a;
-
-    // // advanced (src is redefined)
-    // a = 3;
-    // b = a // {b : a}
-    // c = b // {b : a, c : a}
-    // a = 4;
-    // d = c // {b : a, c : a, d : a }
-    // e = b + c;
-    // e = a + a;
-
-
-        // As soon as src is changed, wipe values of set
-    // a = 3; b = a; c = a;
-    // a = 4; --> wipe the set!
-
-    // As soon as copy value is changed, update its value
-    // a = 3; b = a; c = a; --> src_to_copies = {a: [b, c]}
-    // b = 4; --> remove b from src_to_copies, update copy_to_src
-
-    // Single pass (or need 2?)
-
-
-
 /// Invalidate the hash table entries for a variable whose
 /// value has been updated, so that we don't attempt to
 /// do copy propagation of stale values.
@@ -88,9 +57,9 @@ fn get_root_source(
 /// replace it with the source operand. Otherwise, this has no effect.
 /// Returns true iff a mutation occurred.
 fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, update_occurred: &mut bool, debug: bool) {
-    // TODO: make sure this is properly mutating the CFG
     match op {
         Operand::LocalVar(name) => {
+            // Substitute with the original source
             let root_src = get_root_source(name, copy_to_src);
             // Check whether an udpate occurred
             if *name != root_src {
@@ -106,9 +75,9 @@ fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, u
         Operand::GlobalVar(name) => {
             let root_src = get_root_source(name, copy_to_src);
             if *name != root_src {
-                // if debug {
+                if debug {
                     println!("Replacing {} with {}", name, root_src);
-                // }
+                }
 
                 *op = Operand::GlobalVar(root_src);
                 *update_occurred = true;
@@ -185,7 +154,6 @@ fn get_dest(instr: &Instruction) -> Option<String> {
 }
 
 
-
 // Worklist equations for copy propagation:
 //      IN[B]  = ⋂ OUT[P] for all predecessors P of B
 //      OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
@@ -193,11 +161,6 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
     // Compute predecessor and successor graphs
     let cfg_preds = compute_predecessors(&method_cfg);
     let cfg_succs = compute_successors(&method_cfg);
-
-    // if debug {
-    //     println!("preds are: {:#?}", cfg_preds);
-    //     println!("succs are {:#?}", cfg_succs);
-    // }
 
     // Copies that are valid going in to this block; hashmap keyed by block_id
     let mut in_map: HashMap<i32, CopyMap> = HashMap::new();
@@ -232,8 +195,8 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
             match instr {
                 Instruction::Assign { src, dest } => {
                     // Apply the copy prop if operands are copies of another block
-                    substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
-                    substitute_operand(dest, &copy_to_src, &mut update_occurred, debug);
+                    // substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
+                    // substitute_operand(dest, &copy_to_src, &mut update_occurred, debug);
 
                     // Kill copies that use dest, since this assignment updates its values
                     if let Operand::LocalVar(dest_name) = dest {
@@ -247,7 +210,7 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                     }
                 }
 
-                // Arithmetic and relational ops
+                // Binary operations: arithmetic and relational 
                 Instruction::Add { left, right, dest } 
                 | Instruction::Subtract { left, right, dest }
                 | Instruction::Multiply { left, right, dest }
@@ -259,18 +222,31 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                 | Instruction::GreaterEqual { left, right, dest }
                 | Instruction::Equal { left, right, dest }
                 | Instruction::NotEqual { left, right, dest }=> {
-                    substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
-                    substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
+                    // substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
+                    // substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
 
                     // Invalidate the destination since its value is updated
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
-
                 }
 
-                Instruction::MethodCall { name, args, dest } => {
+                // Unary operations
+                Instruction::Not { expr, dest } => {
+                    // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                }
+                Instruction::Cast { expr, dest, .. } => {
+                    // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                }
+                Instruction::Len { expr, dest } => {
+                    // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                }
+
+                Instruction::MethodCall {args, dest , ..} => {
                     // Try to copy prop on each of the arguments
                     for arg in args {
-                        substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
+                        // substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
                     }
                     
                     // Invalidate the destination since its value is updated
@@ -279,44 +255,25 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                     }
                 }
 
-
-
-                // Instruction::Not { expr, dest }
-                // | Instruction::Cast { expr, dest, target_type }
-                // | Instruction::Len { expr, dest } => todo!(),
-
-
-                Instruction::LoadString { src, dest } => {
-                    substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
-
+                // Can't really do copy prop on either of these
+                Instruction::LoadString { dest, .. } => {
+                    // Invalidate the destination since its value is updated
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                }
+                Instruction::LoadConst {dest, .. } => {
                     // Invalidate the destination since its value is updated
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                 }
 
-                | Instruction::LoadConst { src, dest } => {
-                    // let mut const_op = Operand::Const(*src);
-                    // substitute_operand(&mut const_op, &copy_to_src, &mut update_occurred, debug);
-
-                    // Invalidate the destination since its value is updated
-                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
-                }
-
-
-                // Instruction::UJmp { name, id } => todo!(),
-                // Instruction::CJmp { name, condition, id } => todo!(),
-                // Instruction::Ret { value } => todo!(),
-                // Instruction::Exit { exit_code } => todo!(),
-
-                _ => {
+                _ => { 
                     // UJmp, CJmp, Ret, and Exit have no effect
-                    // TODO: update to do nothing? shoudl be fine, get_dest will return None
-                    
-                    // Conservatively invalidate any destinations that are written to (e.g., in arithmetic)
+                    // Conservatively attempt to invalidate any destinations that are written, but shouldn't
+                    // be any for any of these
                     let dest = get_dest(instr);
                     if let Some(dest) = dest {
                         invalidate(&dest, &mut copy_to_src, &mut src_to_copies, debug);
                     }
-            }
+                }
             }
         }
     

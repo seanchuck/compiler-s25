@@ -156,7 +156,6 @@ pub enum Instruction {
         dest: Operand,
     },
 
-
     // MEMORY
     LoadString {
         src: Operand,
