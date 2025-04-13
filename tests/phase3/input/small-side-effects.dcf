@@ -1,0 +1,37 @@
+import printf;
+
+int get_int(int num) {
+    printf("%d\n", num);
+    return num;
+}
+
+long get_long(long num) {
+    printf("%ld\n", num);
+    return num;
+}
+
+void main () {
+    int a;
+    long b;
+    int i;
+
+    a = 10;
+    b = -10000000L;
+    i = -4;
+
+    // a += get_int(i);  // -4, a = 6
+    // a -= get_int(i) - get_int(a - 3);  // -4, 3, a = 13
+    // a *= get_int(i) * get_int(a * 5);  // -4, 65, a = -3380
+    // a /= (get_int(i * 21) / get_int(7)) + get_int(15);  // -84, 7, 15, a = -1126
+    // a += get_int((a+1) * 100);  // -112500, a = -113626
+    // a %= (get_int(i * 41) % get_int(18)) + get_int(15);  // -164, 18, 15, a = -6
+
+    a = -6;
+
+    b += get_long(long(i));  // -4
+    b -= get_long(long(i)) - get_long(long(a) - 3L);  // -4, 
+    b *= get_long(long(i)) * get_long(long(a) * 5L);
+    b /= (get_long(long(i) * 21L) / get_long(7L)) + get_long(15L);
+    b += get_long((long(a)+1L) * 100L);
+    b %= (get_long(long(i) * 41L) % get_long(18L)) + get_long(15L);
+}
