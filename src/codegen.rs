@@ -537,7 +537,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
                 X86Operand::Reg(Register::Al),
                 X86Operand::Reg(Register::Rax),
             ));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
         }
         Instruction::UJmp { name, id } => {
             let label = format!("{}{}", name, id);
