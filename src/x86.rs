@@ -10,10 +10,11 @@ pub enum X86Insn {
     // Type differentiates between 32 and 64-bit instructions
     Mov(X86Operand, X86Operand, Type),
     Movzbq(X86Operand, X86Operand),
+    Movsxd(X86Operand, X86Operand),
     Add(X86Operand, X86Operand, Type),
     Sub(X86Operand, X86Operand, Type),
     Mul(X86Operand, X86Operand),
-    Div(X86Operand),
+    Div(X86Operand, Type),
     Cdq,
     Cqto,
     Xor(X86Operand, X86Operand),
@@ -168,10 +169,11 @@ impl fmt::Display for X86Insn {
         match self {
             X86Insn::Mov(src, dst, typ) => {write!(f, "    mov{} {}, {}", suffix(typ), src, dst)}
             X86Insn::Movzbq(src, dst) => {write!(f, "    movzbq {}, {}", src, dst) }
+            X86Insn::Movsxd(src, dst) => write!(f, "    movsxd {}, {}", src, dst),
             X86Insn::Add(src, dst, typ) => {write!(f, "    add{} {}, {}", suffix(typ), src, dst) }
             X86Insn::Sub(src, dst, typ) => {write!(f, "    sub{} {}, {}", suffix(typ), src, dst) }
             X86Insn::Mul(src, dst, ..) => {write!(f, "    imul {}, {}", src, dst) } // `imul` has same mnemonic for int/long 
-            X86Insn::Div(divisor, ..) => {write!(f, "    idiv {}", divisor)}
+            X86Insn::Div(divisor, typ) => {write!(f, "    idiv {}", divisor)}
             X86Insn::Cdq => write!(f, "    cdq"),
             X86Insn::Cqto => write!(f, "    cqto"),
             X86Insn::Xor(src, dst) => write!(f, "    xor {}, {}", src, dst),

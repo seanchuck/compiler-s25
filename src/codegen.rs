@@ -364,7 +364,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
                     x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Eax), Type::Int));
                     x86_instructions.push(X86Insn::Cdq); // Sign-extend EAX into EDX
                     x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Ecx), Type::Int));
-                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Ecx))); // Divide EDX:EAX by ECX
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Ecx), Type::Int)); // Divide EDX:EAX by ECX
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
                 }
                 Type::Long => {
@@ -373,7 +373,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
                     x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax), Type::Long));
                     x86_instructions.push(X86Insn::Cqto); // Sign-extend RAX into RDX
                     x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx), Type::Long));
-                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Divide RDX:RAX by RCX
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx), Type::Long)); // Divide RDX:RAX by RCX
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
                 }
                 _ => panic!("Divide only supported for int or long types"),
@@ -386,20 +386,20 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
         
             match typ {
                 Type::Int => {
-                    // Signed modulo 32-bit: dividend in EAX, sign-extended into EDX using CDQ
-                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Eax), Type::Int)); // EAX = left
-                    x86_instructions.push(X86Insn::Cdq); // sign-extend EAX into EDX
-                    x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Ecx), Type::Int)); // ECX = right
-                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Ecx))); // EDX:EAX / ECX
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Edx), dest_op, Type::Int)); // result = EDX
+                    // Signed modulo in x86 (32-bit): dividend in EAX, sign-extended into EDX using CDQ
+                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Eax), Type::Int));
+                    x86_instructions.push(X86Insn::Cdq); // Sign-extend EAX into EDX
+                    x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Ecx), Type::Int));
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Ecx), Type::Int));
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Edx), dest_op, Type::Int));
                 }
                 Type::Long => {
-                    // Signed modulo 64-bit: dividend in RAX, sign-extended into RDX using CQO
-                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax), Type::Long)); // RAX = left
-                    x86_instructions.push(X86Insn::Cqto); // sign-extend RAX into RDX
-                    x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx), Type::Long)); // RCX = right
-                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // RDX:RAX / RCX
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op, Type::Long)); // result = RDX
+                    // Signed modulo in x86 (64-bit): dividend in RAX, sign-extended into RDX using CQO
+                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax), Type::Long));
+                    x86_instructions.push(X86Insn::Cqto); // Sign-extend RAX into RDX
+                    x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx), Type::Long));
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx), Type::Long));
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op, Type::Long));
                 }
                 _ => panic!("Modulo only supported for int or long types"),
             }
@@ -427,13 +427,12 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
 
             match target_type {
                 crate::ast::Type::Int => {
-                    // TODO implement this when we differentiate ints and longs
-                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Rax), Type::Long));
+                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Eax), Type::Int));
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
                 }
                 crate::ast::Type::Long => {
-                    // TODO implement this when we differentiate ints and longs
-                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Rax), Type::Long));
+                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Eax), Type::Int));
+                    x86_instructions.push(X86Insn::Movsxd(X86Operand::Reg(Register::Eax), X86Operand::Reg(Register::Rax)));
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
                 }
                 _ => panic!("Shouldnt get here, cannot cast non int or long value"),
