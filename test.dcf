@@ -1,13 +1,8 @@
-
-int add(int a, int b) {
-    return a + b;
-}
-
 void main() {
-    int a, b, c;
-
-    a = 3;
-    b = 4;
-    
-    c = add(a,b);
+    int i;
+    for (i = 0 ; i < 3; i++) {
+        int a;
+        for ( a = 0 ; a < 3; a++) {
+        }
+    }
 }

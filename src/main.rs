@@ -16,7 +16,6 @@ mod parse;
 mod scan;
 mod semcheck;
 mod traverse;
-mod dataflow;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {
@@ -56,8 +55,7 @@ fn main() {
             semcheck::semcheck(&input, &filename, &mut writer, args.debug);
         }
         utils::cli::CompilerAction::Assembly => {
-            let optimizations = args.resolved_opts();
-            codegen::generate_assembly(&input, &filename, &mut writer, optimizations, args.debug);
+            codegen::generate_assembly(&input, &filename, &mut writer, args.debug);
         }
     }
 }

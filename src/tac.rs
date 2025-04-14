@@ -9,56 +9,77 @@ instructions that are simplified, and TAC.
 use crate::ast::Type;
 use std::fmt;
 
+// Types for operands can be looked up using their name in a
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Operand {
-    GlobalVar(String),
-    GlobalArrElement(String, Box<Operand>), // name and index
-    String(i32),                            // ID of string constant
-    LocalVar(String),
-    LocalArrElement(String, Box<Operand>),
-    Const(i64),
-    Argument(i32), // position of the argument
+    GlobalVar(String, Type),
+    GlobalArrElement(String, Box<Operand>, Type), // name and index
+    String(i32, Type),                            // ID of string constant
+    LocalVar(String, Type),
+    LocalArrElement(String, Box<Operand>, Type),
+    Const(i64, Type),
+    Argument(i32, Type), // position of the argument and its type
+}
+
+impl Operand {
+    pub fn get_type(& self) -> Type {
+        match self {
+            Operand::GlobalVar(_, typ) => typ.clone(),
+            Operand::GlobalArrElement(_, _, typ) => typ.clone(),
+            Operand::String(_, typ) => typ.clone(),
+            Operand::LocalVar(_, typ) => typ.clone(),
+            Operand::LocalArrElement(_, _, typ) => typ.clone(),
+            Operand::Const(_, typ) => typ.clone(),
+            Operand::Argument(_, typ) => typ.clone(),
+        }
+    }
 }
 
 impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Operand::Const(val) => write!(f, "{}", val),
-            Operand::String(id) => write!(f, "str{}", id),
-            Operand::GlobalVar(name) => write!(f, "{}", name),
-            Operand::GlobalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
-            Operand::LocalVar(name) => write!(f, "{}", name),
-            Operand::LocalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
-            Operand::Argument(pos) => write!(f, "arg{}", pos),
+            Operand::Const(val, typ) => write!(f, "({}){}", typ, val),
+            Operand::String(id, _) => write!(f, "str{}", id),
+            Operand::GlobalVar(name, typ) => write!(f, "({}){}", typ, name),
+            Operand::GlobalArrElement(name, idx, typ) => write!(f, "({}){}[{}]", typ, name, idx),
+            Operand::LocalVar(name, typ) => write!(f, "({}){}", typ, name),
+            Operand::LocalArrElement(name, idx, typ) => write!(f, "({}){}[{}]", typ, name, idx),
+            Operand::Argument(pos, typ) => write!(f, "({})arg{}", typ, pos),
         }
     }
 }
 
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Instruction {
-    // BINARY OPERATIONS
+    // ARITHMETIC BINARY OPERATIONS
     // t <- X + Y
     Add {
+        typ: Type,
         left: Operand,
         right: Operand,
         dest: Operand,
     },
     Subtract {
+        typ: Type,
         left: Operand,
         right: Operand,
         dest: Operand,
     },
     Multiply {
+        typ: Type,
         left: Operand,
         right: Operand,
         dest: Operand,
     },
     Divide {
+        typ: Type,
         left: Operand,
         right: Operand,
         dest: Operand,
     },
     Modulo {
+        typ: Type,
         left: Operand,
         right: Operand,
         dest: Operand,
@@ -78,6 +99,7 @@ pub enum Instruction {
         target_type: Type,
     },
     Len {
+        typ: Type, // is array type int or long
         expr: Operand,
         dest: Operand,
     },
@@ -118,8 +140,8 @@ pub enum Instruction {
     // CONTROL FLOW
     MethodCall {
         name: String,
-        args: Vec<Operand>, // Does not completely follow TAC as
-        // method call can have many arguments
+        args: Vec<Operand>,
+        return_type: Type,
         dest: Option<Operand>,
     },
     UJmp {
@@ -134,15 +156,16 @@ pub enum Instruction {
         id: i32, // ID of basic block to jump to if condition is true
     },
     Ret {
+        typ: Type,
         value: Option<Operand>,
     },
 
     // SPECIAL
     Assign {
+        typ: Type,
         src: Operand,
         dest: Operand,
     },
-
 
     // MEMORY
     LoadString {
@@ -158,5 +181,6 @@ pub enum Instruction {
     LoadConst {
         src: i64,
         dest: Operand,
+        typ: Type
     },
 }

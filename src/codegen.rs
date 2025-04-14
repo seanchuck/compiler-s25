@@ -1,16 +1,17 @@
 /**
-Generate x86 code from the Control flow graph.
-**/
-use crate::cfg::Global;
-use crate::cfg::ELEMENT_SIZE;
-use crate::dataflow::optimize_dataflow;
+ Generate x86 code from the Control flow graph.
+ **/
+use crate::cfg::{Global, Local};
+use crate::cfg::{INT_SIZE, LONG_SIZE};
+use crate::ast::Type;
 use crate::tac::*;
-use crate::utils::cli::Optimization;
 use crate::utils::print::print_cfg;
 use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
+use core::panic;
+use std::any::Any;
 use std::collections::HashMap;
-use std::collections::HashSet;
+
 
 fn is_immediate_operand(op: &X86Operand) -> bool {
     matches!(op, X86Operand::Constant(_))
@@ -26,145 +27,279 @@ fn is_memory_operand(op: &X86Operand) -> bool {
     )
 }
 
+/// Gets the correct size scratch register for the given type
+fn reg_for_type(reg: Register, typ: &Type) -> Register {
+    match (reg.clone(), typ) {
+        (_, Type::Long) => reg,
+        (_, Type::String) => reg,
+        (Register::Rax, _) => Register::Eax,
+        (Register::R10, _) => Register::R10d,
+        (Register::R11, _) => Register::R11d,
+        (Register::R8, _) => Register::R8d,
+        (Register::R9, _) => Register::R9d,
+        (Register::Rcx, _) => Register::Ecx,
+        (Register::Rdx, _) => Register::Edx,
+        (Register::Rsi, _) => Register::Esi,
+        (Register::Rdi, _) => Register::Edi,
+        (Register::Rbx, _) => Register::Ebx,
+        (Register::Rbp, _) => Register::Ebp,
+        (Register::Rsp, _) => Register::Esp,
+        _ => reg,
+    }
+}
+
+
 /// Returns the x86 operand corresponding to operand
 fn map_operand(
     method_cfg: &CFG,
     operand: &Operand,
     x86_instructions: &mut Vec<X86Insn>,
+    globals: &HashMap<String, Global>
 ) -> X86Operand {
     match operand {
-        Operand::Const(val) => X86Operand::Constant(*val),
-        Operand::LocalVar(temp) => {
-            X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp))
+        Operand::Const(val, typ) => X86Operand::Constant(*val),
+
+        Operand::LocalVar(temp, typ) => {
+            let typ = method_cfg.locals.get(temp).expect("missing temp in scope").typ.clone();
+            X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), typ)
+            // X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), Type::Long)
         }
-        Operand::GlobalVar(val) => X86Operand::Global(val.to_string()),
-        Operand::LocalArrElement(arr, idx) => {
-            let idx_op = map_operand(method_cfg, idx, x86_instructions);
+
+        Operand::GlobalVar(val, typ) => X86Operand::Global(val.to_string()),
+
+        Operand::LocalArrElement(arr, idx, typ) => {
+            let array_typ: Type = method_cfg.locals.get(arr).expect("expected array entry").typ.clone();
+            let idx_op = map_operand(method_cfg, idx, x86_instructions, globals);
+
+            let index_reg: Register = reg_for_type(Register::R10, &Type::Int);
+
+            // Load base address of array into R11
             x86_instructions.push(X86Insn::Lea(
-                X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(arr)),
+                X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(arr), Type::Long),
                 X86Operand::Reg(Register::R11),
-            )); // store base address of array in rax
-            x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(Register::R10))); // store index in r10
+            ));
+
+            // Move index into R10 (64-bit regardless of int or long)
+            x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(index_reg.clone()), Type::Int));
+
+            // add one to index because first element is length
             x86_instructions.push(X86Insn::Add(
                 X86Operand::Constant(1),
-                X86Operand::Reg(Register::R10),
-            )); // add one to index because first element is length
-            X86Operand::Address(None, Some(Register::R11), Register::R10, ELEMENT_SIZE)
+                X86Operand::Reg(index_reg.clone()),
+                Type::Int,
+            ));
+
+            let element_size = if array_typ == Type::Long {
+                LONG_SIZE
+            } else {
+                INT_SIZE
+            };
+
+
+            // must use 64 bit version of index reg for addressing purposes
+            X86Operand::Address(None, Some(Register::R11), Register::R10, element_size, array_typ)
+
         }
-        Operand::GlobalArrElement(arr, idx) => {
-            let idx_op = map_operand(method_cfg, idx, x86_instructions);
-            x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(Register::R10))); // store index in r10
+
+        Operand::GlobalArrElement(arr, idx, typ) => {
+            let array_typ: Type = globals.get(arr).expect("Global array not defined!").typ.clone();
+            let idx_op = map_operand(method_cfg, idx, x86_instructions, globals);
+
+            let index_reg: Register = reg_for_type(Register::R10, &Type::Int);
+
+            x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(index_reg.clone()), Type::Int)); // store index in r10d
+           
             x86_instructions.push(X86Insn::Add(
                 X86Operand::Constant(1),
-                X86Operand::Reg(Register::R10),
+                X86Operand::Reg(index_reg.clone()),
+                Type::Int
             )); // add one to index because first element is length
-            X86Operand::Address(Some(arr.to_string()), None, Register::R10, ELEMENT_SIZE)
+
+            let element_size = if array_typ == Type::Long {
+                LONG_SIZE
+            } else {
+                INT_SIZE
+            };
+
+            X86Operand::Address(Some(arr.to_string()), None, Register::R10, element_size, typ.clone())
         }
-        Operand::Argument(pos) => {
+
+        Operand::Argument(pos, typ) => {
             match pos {
-                0 => X86Operand::Reg(Register::Rdi),
-                1 => X86Operand::Reg(Register::Rsi),
-                2 => X86Operand::Reg(Register::Rdx),
-                3 => X86Operand::Reg(Register::Rcx),
-                4 => X86Operand::Reg(Register::R8),
-                5 => X86Operand::Reg(Register::R9),
-                n => {
+                0 => X86Operand::Reg(reg_for_type(Register::Rdi, typ)),
+                1 => X86Operand::Reg(reg_for_type(Register::Rsi, typ)),
+                2 => X86Operand::Reg(reg_for_type(Register::Rdx, typ)),
+                3 => X86Operand::Reg(reg_for_type(Register::Rcx, typ)),
+                4 => X86Operand::Reg(reg_for_type(Register::R8, typ)),
+                5 => X86Operand::Reg(reg_for_type(Register::R9, typ)),
+                _ => {
+                    // Args are always the first local temps defined
+                    // Should properly handle ints and longs
+                    let temp_name = method_cfg.param_to_temp.get(pos).expect("Param mapping does not exist").name.clone();
+                    let local = method_cfg.locals.get(&temp_name);
+                    let Some(Local { typ, .. }) = local else {
+                        panic!("Expected a variable, found something else!");
+                    };
+                    
                     // Only used for callee retrieving operand, caller pushes without using map_operand!
-                    // 16 byte offset because: old_rbp and ra stored betweeen new_rbp and args
-                    let offset = 16 + ((n - 6) as i64 * 8);
-                    X86Operand::RegInt(Register::Rbp, offset)
+                    // 16 byte offset beca, globalsuse: old_rbp and ra stored betweeen new_rbp and args
+                    let offset = 16 + ((pos - 6) as i64 * 8);
+
+                    // match typ {
+                    //     Type::Int 
+                    //     |Type::Bool => {
+                    //         X86Operand::RegInt(Register::Rbp, offset, Type::Int)
+                    //     }
+                        // Type::Long => {
+                            X86Operand::RegInt(Register::Rbp, offset, typ.clone())
+                    //     }
+                    //     _=> panic!("Only numeric and bool args alllowed")
+                    // }
                 }
             }
         }
-        Operand::String(idx) => X86Operand::RegLabel(Register::Rip, format!("str{idx}")),
+        Operand::String(idx, typ) => X86Operand::RegLabel(Register::Rip, format!("str{idx}")),
     }
 }
 
-/// Adds the x86 instructions corresponding to insn to x86_instructions
-fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut Vec<X86Insn>) {
+
+// Adds the x86 instructions corresponding to insn to x86_instructions
+fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut Vec<X86Insn>, globals: &HashMap<String, Global>, method_cfgs: &HashMap<String, CFG>) {
     match insn {
-        Instruction::LoadConst { src, dest } => {
-            x86_instructions.push(X86Insn::Mov(
-                X86Operand::Constant(((src.clone() as u64) & 0xFFFFFFFF) as i64),
-                X86Operand::Reg(Register::Rbx),
-            )); // lower 32 bits
-            x86_instructions.push(X86Insn::Mov(
-                X86Operand::Constant(((src.clone() as u64) >> 32) as i64),
-                X86Operand::Reg(Register::Rax),
-            )); // upper 32 bits
-            x86_instructions.push(X86Insn::Shl(
-                X86Operand::Constant(32),
-                X86Operand::Reg(Register::Rax),
-            ));
-            x86_instructions.push(X86Insn::Or(
-                X86Operand::Reg(Register::Rax),
-                X86Operand::Reg(Register::Rbx),
-            ));
-            let op = map_operand(method_cfg, dest, x86_instructions);
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rbx), op));
+        Instruction::LoadConst { src, dest, typ } => {
+            match typ {
+                Type::Int => {
+                    println!("INT");
+                    let dest_location = map_operand(method_cfg, dest, x86_instructions, globals);
+                    x86_instructions.push(X86Insn::Mov(
+                        X86Operand::Constant(src.clone()),
+                        dest_location,
+                        Type::Int
+                    ));
+                }
+                Type::Long => {
+                    println!("LONG");
+                    // Must load uppper and lower 32 bits separately since assembler doesn't 
+                    // support loading a 64-bit constant directly
+                    x86_instructions.push(X86Insn::Mov(
+                        X86Operand::Constant(((src.clone() as u64) & 0xFFFFFFFF) as i64),
+                        X86Operand::Reg(Register::Rbx),
+                        Type::Long
+                    )); // lower 32 bits
+                    x86_instructions.push(X86Insn::Mov(
+                        X86Operand::Constant(((src.clone() as u64) >> 32) as i64),
+                        X86Operand::Reg(Register::Rax),
+                        Type::Long
+                    )); // upper 32 bits
+                    x86_instructions.push(X86Insn::Shl(
+                        X86Operand::Constant(32),
+                        X86Operand::Reg(Register::Rax),
+                    ));
+                    x86_instructions.push(X86Insn::Or(
+                        X86Operand::Reg(Register::Rax),
+                        X86Operand::Reg(Register::Rbx),
+                    ));
+                    let dest_location = map_operand(method_cfg, dest, x86_instructions, globals);
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rbx), dest_location, Type::Long));
+                }
+                _=> panic!("Load const only defined for numeric types")
+            }
         }
-        Instruction::Add { left, right, dest } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions);
-            let right_op = map_operand(method_cfg, right, x86_instructions);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions);
 
-            // rax as working register
-            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Add(right_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
-        }
-        Instruction::Subtract { left, right, dest } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions);
-            let right_op = map_operand(method_cfg, right, x86_instructions);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+        Instruction::Add { left, right, dest, typ } => {
+            let left_op = map_operand(method_cfg, left, x86_instructions, globals);
+            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
 
-            // rax as working register
-            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Sub(right_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+            let reg = reg_for_type(Register::Rax, &typ);
+            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(reg.clone()), typ.clone()));
+            x86_instructions.push(X86Insn::Add(right_op, X86Operand::Reg(reg.clone()), typ.clone()));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), dest_op, typ.clone()));
         }
-        Instruction::Assign { src, dest } => {
-            let dest_op = map_operand(method_cfg, dest, x86_instructions);
-            let src_op = map_operand(method_cfg, src, x86_instructions);
 
-            x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+        Instruction::Subtract { left, right, dest, typ } => {
+            let left_op = map_operand(method_cfg, left, x86_instructions, globals);
+            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
+            let reg = reg_for_type(Register::Rax, &typ);
+            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(reg.clone()), typ.clone()));
+            x86_instructions.push(X86Insn::Sub(right_op, X86Operand::Reg(reg.clone()), typ.clone()));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), dest_op, typ.clone()));
         }
+
+        Instruction::Assign { src, dest, typ} => {
+            println!("Moving {:?} into {:?}", src, dest);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+            let src_op = map_operand(method_cfg, src, x86_instructions, globals);
+
+            // // Reason that this matters is because we might have src as an array and we are using full
+            // // 64 bits for the length if its long array, so we must move using src typ then only take
+            // // The necessary dest bits for the final move
+            let src_typ = src.get_type();
+            let dest_typ = dest.get_type();
+
+            let src_reg = reg_for_type(Register::Rax, &src_typ);
+            let dst_reg = reg_for_type(Register::Rax, &dest_typ);
+            
+            println!("Move has type {:?} -> {:?}", src_typ, dest_typ);
+
+
+            x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(src_reg.clone()), src_typ.clone()));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(dst_reg), dest_op, dest_typ.clone()));
+
+            // let reg = reg_for_type(Register::Rax, &typ);
+            // x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(reg.clone()), typ.clone()));
+            // x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg), dest_op, typ.clone()));
+
+        }
+        
         Instruction::LoadString { src, dest } => {
-            let dest_op = map_operand(method_cfg, dest, x86_instructions);
-            let src_op = map_operand(method_cfg, src, x86_instructions);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+            let src_op = map_operand(method_cfg, src, x86_instructions, globals);
 
-            // rax as working register
+            // string is always the full 64 bits
             x86_instructions.push(X86Insn::Lea(src_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
         }
-        Instruction::MethodCall { name, args, dest } => {
+
+        Instruction::MethodCall { name, args, dest, return_type } => {
             // Determine the destination operand
             let dest_op = match dest {
-                Some(d) => map_operand(method_cfg, d, x86_instructions),
+                Some(d) => map_operand(method_cfg, d, x86_instructions, globals),
                 None => X86Operand::Reg(Register::Rax),
             };
 
+            println!("Trying to find method with name {}", name);
+            // let called_method = method_cfgs.get(name).expect("Couldnt find method that was called");
+
             // Setup arguments
             // First 6 args go in registers
+            println!("Calling method {}, with args {:?}", name, args);
             for (i, arg) in args.iter().take(6).enumerate() {
+                let arg_typ = arg.get_type();
                 let arg_reg =
-                    map_operand(method_cfg, &Operand::Argument(i as i32), x86_instructions);
-                let arg_val = map_operand(method_cfg, arg, x86_instructions);
-                x86_instructions.push(X86Insn::Mov(arg_val, arg_reg));
+                    map_operand(method_cfg, &Operand::Argument(i as i32, arg_typ.clone()), x86_instructions, globals);
+                let arg_val = map_operand(method_cfg, arg, x86_instructions, globals);
+                x86_instructions.push(X86Insn::Mov(arg_val, arg_reg, arg_typ));
             }
 
             // Arguments {7...n} go on stack, with last args going first; assume stack 16-aligned before call
             let mut sp_offset = 0;
-            for arg in args.iter().skip(6) {
-                let arg_val = map_operand(method_cfg, arg, x86_instructions);
+            for (i, arg) in args.iter().skip(6).enumerate() {
+                let arg_typ = arg.get_type();
+                let arg_val = map_operand(method_cfg, arg, x86_instructions, globals);
+
+                let reg = reg_for_type(Register::Rax, &arg_typ);
                 x86_instructions.push(X86Insn::Mov(
                     arg_val.clone(),
-                    X86Operand::Reg(Register::Rax),
+                    X86Operand::Reg(reg),
+                    arg_typ
                 ));
                 x86_instructions.push(X86Insn::Mov(
                     X86Operand::Reg(Register::Rax),
-                    X86Operand::RegInt(Register::Rsp, sp_offset),
+                    X86Operand::RegInt(Register::Rsp, sp_offset, Type::Long),
+                    Type::Long
                 ));
 
                 sp_offset += 8;
@@ -174,104 +309,150 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             x86_instructions.push(X86Insn::Mov(
                 X86Operand::Constant(0),
                 X86Operand::Reg(Register::Rax),
+                Type::Long
             ));
 
             // Make the call
             x86_instructions.push(X86Insn::Call(name.to_string()));
 
+            let return_reg = reg_for_type(Register::Rax, return_type);
+
             // Move the result into `dest` if necessary
             match dest_op {
                 X86Operand::Reg(Register::Rax) => {}
-                _ => x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op)),
+                _ => x86_instructions.push(X86Insn::Mov(X86Operand::Reg(return_reg), dest_op, return_type.clone())),
             }
         }
-        Instruction::Ret { value } => {
+        Instruction::Ret { value, typ } => {
+            // TODO: uncomment
+            let return_reg = reg_for_type(Register::Rax, &typ);
+            // let return_reg = Register::Rax;
             if let Some(value) = value {
-                let value_reg = map_operand(method_cfg, value, x86_instructions);
-                x86_instructions.push(X86Insn::Mov(value_reg, X86Operand::Reg(Register::Rax)));
+                let value_reg = map_operand(method_cfg, value, x86_instructions, globals);
+                x86_instructions.push(X86Insn::Mov(value_reg, X86Operand::Reg(return_reg), typ.clone()));
             }
+
+            // Function prologue
             x86_instructions.push(X86Insn::Mov(
                 X86Operand::Reg(Register::Rbp),
                 X86Operand::Reg(Register::Rsp),
+                Type::Long
             ));
             x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp)));
             x86_instructions.push(X86Insn::Ret);
         }
-        Instruction::Multiply { left, right, dest } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions);
-            let right_op = map_operand(method_cfg, right, x86_instructions);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+        Instruction::Multiply { left, right, dest, typ } => {
+            let left_op = map_operand(method_cfg, left, x86_instructions, globals);
+            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
 
-            // rax as working register
-            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Mul(right_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+            let reg = reg_for_type(Register::Rax, &typ);
+            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(reg.clone()), typ.clone()));
+            x86_instructions.push(X86Insn::Mul(right_op, X86Operand::Reg(reg.clone())));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), dest_op, typ.clone()));
         }
-        Instruction::Divide { left, right, dest } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions);
-            let right_op = map_operand(method_cfg, right, x86_instructions);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions);
-
-            // Signed division in x86:
-            // Dividend in RAX, sign-extended into RDX using CQO
-            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Cqto); // Sign extend rax into Rdx
-            x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx))); // Division cannot work on immediate, move to scratch reg
-            x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
-        }
-        Instruction::Modulo { left, right, dest } => {
-            let left_op: X86Operand = map_operand(method_cfg, left, x86_instructions);
-            let right_op = map_operand(method_cfg, right, x86_instructions);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+        Instruction::Divide { left, right, dest, typ } => {
+            let left_op = map_operand(method_cfg, left, x86_instructions, globals);
+            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
 
             // Signed division in x86:
-            // Dividend in RAX, sign-extended into RDX using CQO
-            x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Cqto); // Sign extend rax into Rdx
-            x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx))); // Division cannot work on immediate, move to scratch reg
-            x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op)); // remainder in %rdx
+            match typ {
+                Type::Int => {
+                    // 32-bit signed division:
+                    // Dividend in EAX, sign-extended into EDX using CDQ
+                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Eax), Type::Int));
+                    x86_instructions.push(X86Insn::Cdq); // Sign-extend EAX into EDX
+                    x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Ecx), Type::Int));
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Ecx), Type::Int)); // Divide EDX:EAX by ECX
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
+                }
+                Type::Long => {
+                    // 64-bit signed division:
+                    // Dividend in RAX, sign-extended into RDX using CQO
+                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax), Type::Long));
+                    x86_instructions.push(X86Insn::Cqto); // Sign-extend RAX into RDX
+                    x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx), Type::Long));
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx), Type::Long)); // Divide RDX:RAX by RCX
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
+                }
+                _ => panic!("Divide only supported for int or long types"),
+            }
         }
+        Instruction::Modulo { left, right, dest, typ } => {
+            let left_op: X86Operand = map_operand(method_cfg, left, x86_instructions, globals);
+            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+        
+            match typ {
+                Type::Int => {
+                    // Signed modulo in x86 (32-bit): dividend in EAX, sign-extended into EDX using CDQ
+                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Eax), Type::Int));
+                    x86_instructions.push(X86Insn::Cdq); // Sign-extend EAX into EDX
+                    x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Ecx), Type::Int));
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Ecx), Type::Int));
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Edx), dest_op, Type::Int));
+                }
+                Type::Long => {
+                    // Signed modulo in x86 (64-bit): dividend in RAX, sign-extended into RDX using CQO
+                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax), Type::Long));
+                    x86_instructions.push(X86Insn::Cqto); // Sign-extend RAX into RDX
+                    x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx), Type::Long));
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx), Type::Long));
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op, Type::Long));
+                }
+                _ => panic!("Modulo only supported for int or long types"),
+            }
+        }        
         Instruction::Not { expr, dest } => {
-            let expr_op = map_operand(method_cfg, expr, x86_instructions);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+            let expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
 
+            let reg = reg_for_type(Register::Rax, &Type::Bool);
             // Move expr to RAX (or any scratch reg), xor with 1
-            x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(reg.clone()), Type::Bool));
             x86_instructions.push(X86Insn::Xor(
                 X86Operand::Constant(1),
-                X86Operand::Reg(Register::Rax),
+                X86Operand::Reg(reg.clone()),
             ));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), dest_op, Type::Bool));
         }
         Instruction::Cast {
             expr,
             dest,
             target_type,
         } => {
-            let expr_op = map_operand(method_cfg, expr, x86_instructions);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+            let expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
 
             match target_type {
                 crate::ast::Type::Int => {
-                    // TODO implement this when we differentiate ints and longs
-                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Rax)));
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Eax), Type::Int));
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
                 }
                 crate::ast::Type::Long => {
-                    // TODO implement this when we differentiate ints and longs
-                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Rax)));
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Eax), Type::Int));
+                    x86_instructions.push(X86Insn::Movsxd(X86Operand::Reg(Register::Eax), X86Operand::Reg(Register::Rax)));
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
                 }
                 _ => panic!("Shouldnt get here, cannot cast non int or long value"),
             }
         }
-        Instruction::Len { expr, dest } => {
-            let expr_op = map_operand(method_cfg, expr, x86_instructions);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions);
-            x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Rax)));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+        Instruction::Len { expr, dest, typ } => {
+                let expr_typ = expr.get_type();
+                let dest_typ = dest.get_type();
+
+                let expr_reg = reg_for_type(Register::Rax, &expr_typ);
+                let dest_reg = reg_for_type(Register::Rax, &dest_typ);
+
+                let expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
+                let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
+                println!("Putting length from {:?} into {:?}, dest has type: {:?}", expr, dest, dest_typ);
+
+                // First move is dependent on entry sizes for the array. second will always produce an integer
+                x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(expr_reg), expr_typ.clone()));
+                x86_instructions.push(X86Insn::Mov(X86Operand::Reg(dest_reg), dest_op, dest_typ));
         }
         Instruction::Greater { left, right, dest }
         | Instruction::Less { left, right, dest }
@@ -279,28 +460,31 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
         | Instruction::GreaterEqual { left, right, dest }
         | Instruction::Equal { left, right, dest }
         | Instruction::NotEqual { left, right, dest } => {
-            let mut left_op = map_operand(method_cfg, left, x86_instructions);
-            let mut right_op = map_operand(method_cfg, right, x86_instructions);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions);
+            let mut left_op = map_operand(method_cfg, left, x86_instructions, globals);
+            let mut right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let mut swapped = false;
 
+            // All relational operation expressions are only for comparing integer expressions (from spec)
             // handle illegal cmp: (mem, mem)
             if is_memory_operand(&left_op) && is_memory_operand(&right_op) {
                 // move value into a register
                 x86_instructions.push(X86Insn::Mov(
                     left_op.clone(),
-                    X86Operand::Reg(Register::Rax),
+                    X86Operand::Reg(Register::Eax),
+                    Type::Int
                 ));
-                left_op = X86Operand::Reg(Register::Rax);
+                left_op = X86Operand::Reg(Register::Eax);
             }
 
             // handle illegal cmp: (imm, imm),
             if is_immediate_operand(&left_op) && is_immediate_operand(&right_op) {
                 x86_instructions.push(X86Insn::Mov(
                     left_op.clone(),
-                    X86Operand::Reg(Register::Rax),
+                    X86Operand::Reg(Register::Eax),
+                    Type::Int
                 ));
-                left_op = X86Operand::Reg(Register::Rax);
+                left_op = X86Operand::Reg(Register::Eax);
             }
 
             // handle illegal cmp: (mem, imm), (reg, imm) --> imm must come first
@@ -352,7 +536,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
                 X86Operand::Reg(Register::Al),
                 X86Operand::Reg(Register::Rax),
             ));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
         }
         Instruction::UJmp { name, id } => {
             let label = format!("{}{}", name, id);
@@ -364,13 +548,13 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             id,
         } => {
             let label = format!("{}{}", name, id);
-            let cond_op = map_operand(method_cfg, condition, x86_instructions);
+            let cond_op = map_operand(method_cfg, condition, x86_instructions, globals);
 
             // cmp condition, 0 → is condition true?
-            x86_instructions.push(X86Insn::Mov(cond_op, X86Operand::Reg(Register::Rax)));
+            x86_instructions.push(X86Insn::Mov(cond_op, X86Operand::Reg(Register::Eax), Type::Int));
             x86_instructions.push(X86Insn::Cmp(
                 X86Operand::Constant(0),
-                X86Operand::Reg(Register::Rax),
+                X86Operand::Reg(Register::Eax),
             ));
             x86_instructions.push(X86Insn::Jne(label)); // jump if condition != 0
         }
@@ -378,6 +562,7 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             x86_instructions.push(X86Insn::Mov(
                 X86Operand::Constant(*exit_code),
                 X86Operand::Reg(Register::Rax),
+                Type::Long
             ));
             x86_instructions.push(X86Insn::Exit);
         }
@@ -389,7 +574,8 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
 fn generate_method_x86(
     method_name: &String,
     method_cfg: &mut CFG,
-    globals: &Vec<Global>,
+    globals: &HashMap<String, Global>,
+    method_cfgs: &HashMap<String, CFG>
 ) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
@@ -404,6 +590,7 @@ fn generate_method_x86(
     x86_instructions.push(X86Insn::Mov(
         X86Operand::Reg(Register::Rsp),
         X86Operand::Reg(Register::Rbp),
+        Type::Long
     )); // copy stack pointer to base pointer
 
     // Round up to the next 16-byte alignment
@@ -413,30 +600,33 @@ fn generate_method_x86(
     x86_instructions.push(X86Insn::Sub(
         X86Operand::Constant(aligned_stack_size),
         X86Operand::Reg(Register::Rsp),
+        Type::Long
     )); // decrease stack pointer to allocate space on the stack
 
     // global array lengths
     if method_name == "main" {
-        for global in globals {
+        for global in globals.values() {
             if global.length.is_some() {
                 // rax as working register
                 x86_instructions.push(X86Insn::Mov(
                     X86Operand::Constant(i64::from(global.length.unwrap())),
                     X86Operand::Reg(Register::Rax),
+                    Type::Long,
                 ));
                 x86_instructions.push(X86Insn::Mov(
                     X86Operand::Reg(Register::Rax),
-                    X86Operand::Global(global.name.to_string()),
+                    X86Operand::Global(global.name.clone()),
+                    Type::Long,
                 ));
             }
         }
-    }
+    }    
 
     for (id, block) in method_cfg.get_blocks() {
         x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
 
         for insn in block.get_instructions() {
-            add_instruction(method_cfg, &insn, &mut x86_instructions);
+            add_instruction(method_cfg, &insn, &mut x86_instructions, globals, method_cfgs);
         }
 
         if *id == method_cfg.exit {
@@ -444,6 +634,7 @@ fn generate_method_x86(
             x86_instructions.push(X86Insn::Mov(
                 X86Operand::Reg(Register::Rbp),
                 X86Operand::Reg(Register::Rsp),
+                Type::Long
             )); // move base pointer to stack pointer
             x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
             x86_instructions.push(X86Insn::Ret); // return to where function was called
@@ -454,19 +645,9 @@ fn generate_method_x86(
 }
 
 /// Generate x86 assembly code from the CFG/
-pub fn generate_assembly(
-    file: &str,
-    filename: &str,
-    writer: &mut dyn std::io::Write,
-    optimizations: HashSet<Optimization>,
-    debug: bool,
-) {
+pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::Write, debug: bool) {
     // Generate the method CFGS
-    let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
-
-    // Perform dataflow optimizations
-    optimize_dataflow(&mut method_cfgs, &optimizations, debug);
-
+    let (method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
     if debug {
         print_cfg(&method_cfgs);
         println!("\n========== X86 Code ==========\n");
@@ -475,24 +656,23 @@ pub fn generate_assembly(
     let mut global_code: Vec<X86Insn> = Vec::new();
 
     // global variables
-    for global in &globals {
+    for global in globals.values() {
         if global.length.is_some() {
             // allocate an extra element's worth of space to store the length of the array
-            // 8 byte alignment for now...
             global_code.push(X86Insn::Comm(
                 global.name.clone(),
-                ELEMENT_SIZE * i64::from(global.length.unwrap() + 1),
-                ELEMENT_SIZE,
+                LONG_SIZE * i64::from(global.length.unwrap() + 1),
+                LONG_SIZE,
             ));
         } else {
             global_code.push(X86Insn::Comm(
-                global.name.to_string(),
-                ELEMENT_SIZE,
-                ELEMENT_SIZE,
+                global.name.clone(),
+                LONG_SIZE,
+                LONG_SIZE,
             ));
         }
     }
-
+    
     // strings
     for (idx, string) in strings.iter().enumerate() {
         global_code.push(X86Insn::Label(format!("str{idx}")));
@@ -503,8 +683,9 @@ pub fn generate_assembly(
 
     // Generate a vector of x86 for each method
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
-    for (method_name, mut method_cfg) in method_cfgs {
-        let method_code = generate_method_x86(&method_name, &mut method_cfg, &globals);
+    for (method_name, method_cfg) in &method_cfgs {
+        let mut method_cfg = method_cfg.clone();
+        let method_code = generate_method_x86(method_name, &mut method_cfg, &globals, &method_cfgs);
         code.insert(method_name.clone(), method_code);
     }
 
@@ -517,6 +698,7 @@ pub fn generate_assembly(
         for instr in method_code {
             writeln!(writer, "{}", instr).expect("Failed to write instruction!");
         }
+
         writeln!(writer).expect("Failed to write newline between methods!");
     }
 }

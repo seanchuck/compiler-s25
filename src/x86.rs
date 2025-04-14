@@ -3,15 +3,19 @@ Data structures for x86 code generation.
 **/
 
 use std::fmt;
+use crate::ast::Type;
 
 #[derive(Debug, Clone)]
 pub enum X86Insn {
-    Mov(X86Operand, X86Operand),
+    // Type differentiates between 32 and 64-bit instructions
+    Mov(X86Operand, X86Operand, Type),
     Movzbq(X86Operand, X86Operand),
-    Add(X86Operand, X86Operand),
-    Sub(X86Operand, X86Operand),
+    Movsxd(X86Operand, X86Operand),
+    Add(X86Operand, X86Operand, Type),
+    Sub(X86Operand, X86Operand, Type),
     Mul(X86Operand, X86Operand),
-    Div(X86Operand),
+    Div(X86Operand, Type),
+    Cdq,
     Cqto,
     Xor(X86Operand, X86Operand),
     Or(X86Operand, X86Operand),
@@ -39,12 +43,23 @@ pub enum X86Insn {
 
 #[derive(Debug, Clone)]
 pub enum X86Operand {
+    // memory operands need type to determine how much to read/write
     Reg(Register),              // no offset
-    RegInt(Register, i64),      // integer offset
+    RegInt(Register, i64, Type),      // integer offset
     RegLabel(Register, String), // label offset
     Constant(i64),
     Global(String), // name of global constant
-    Address(Option<String>, Option<Register>, Register, i64), // reg1 + reg2 * scale, offset by label
+    Address(Option<String>, Option<Register>, Register, i64, Type), // reg1 + reg2 * scale, offset by label
+}
+
+impl X86Operand {
+    pub fn get_type(&self) -> Type {
+        match self {
+            X86Operand::RegInt(_, _, typ) => typ.clone(),
+            X86Operand::Address(_, _, _, _, typ) => typ.clone(),
+            _ => Type::Long, // default fallback
+        }
+    }
 }
 
 impl fmt::Display for X86Operand {
@@ -53,9 +68,9 @@ impl fmt::Display for X86Operand {
             X86Operand::Reg(reg) => write!(f, "{}", reg),
             X86Operand::Constant(val) => write!(f, "${}", val),
             X86Operand::Global(name) => write!(f, "{}", name),
-            X86Operand::RegInt(reg, offset) => write!(f, "{}({})", offset, reg),
+            X86Operand::RegInt(reg, offset, typ) => write!(f, "{}({})", offset, reg),
             X86Operand::RegLabel(reg, label) => write!(f, "{}({})", label, reg),
-            X86Operand::Address(label, reg1, reg2, scale) => {
+            X86Operand::Address(label, reg1, reg2, scale, typ) => {
                 write!(
                     f,
                     "{}({}, {}, {})",
@@ -92,6 +107,19 @@ pub enum Register {
     Rax,
     Al,
     Rip,
+
+    Ebx,
+    Edi,
+    Esi,
+    Edx,
+    Ecx,
+    R8d,
+    R9d,
+    R10d,
+    R11d,
+    Ebp,
+    Esp,
+    Eax,
     Rbx
 }
 
@@ -112,19 +140,41 @@ impl fmt::Display for Register {
             Register::Al => write!(f, "%al"),
             Register::Rip => write!(f, "%rip"),
             Register::Rbx => write!(f, "%rbx"),
+
+            Register::Ebx => write!(f, "%ebx"),
+            Register::Edi => write!(f, "%edi"),
+            Register::Esi => write!(f, "%esi"),
+            Register::Edx => write!(f, "%edx"),
+            Register::Ecx => write!(f, "%ecx"),
+            Register::R8d => write!(f, "%r8d"),
+            Register::R9d => write!(f, "%r9d"),
+            Register::R10d => write!(f, "%r10d"),
+            Register::R11d => write!(f, "%r11d"),
+            Register::Ebp => write!(f, "%ebp"),
+            Register::Esp => write!(f, "%esp"),
+            Register::Eax => write!(f, "%eax"),
         }
     }
 }
 
 impl fmt::Display for X86Insn {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let suffix = |typ: &Type| match typ {
+            Type::Int => "l",
+            Type::Long => "q",
+            Type::Bool => "l",
+            _ => "q", // default to 64-bit
+        };
+
         match self {
-            X86Insn::Mov(src, dst) => write!(f, "    movq {}, {}", src, dst),
-            X86Insn::Movzbq(src, dst) => write!(f, "    movzbq {}, {}", src, dst),
-            X86Insn::Add(src, dst) => write!(f, "    addq {}, {}", src, dst),
-            X86Insn::Sub(src, dst) => write!(f, "    subq {}, {}", src, dst),
-            X86Insn::Mul(src, dst) => write!(f, "    imul {}, {}", src, dst),
-            X86Insn::Div(divisor) => write!(f, "    idiv {}", divisor),
+            X86Insn::Mov(src, dst, typ) => {write!(f, "    mov{} {}, {}", suffix(typ), src, dst)}
+            X86Insn::Movzbq(src, dst) => {write!(f, "    movzbq {}, {}", src, dst) }
+            X86Insn::Movsxd(src, dst) => write!(f, "    movsxd {}, {}", src, dst),
+            X86Insn::Add(src, dst, typ) => {write!(f, "    add{} {}, {}", suffix(typ), src, dst) }
+            X86Insn::Sub(src, dst, typ) => {write!(f, "    sub{} {}, {}", suffix(typ), src, dst) }
+            X86Insn::Mul(src, dst, ..) => {write!(f, "    imul {}, {}", src, dst) } // `imul` has same mnemonic for int/long 
+            X86Insn::Div(divisor, typ) => {write!(f, "    idiv {}", divisor)}
+            X86Insn::Cdq => write!(f, "    cdq"),
             X86Insn::Cqto => write!(f, "    cqto"),
             X86Insn::Xor(src, dst) => write!(f, "    xor {}, {}", src, dst),
             X86Insn::Call(label) => write!(f, "    call {}", label),
@@ -134,7 +184,7 @@ impl fmt::Display for X86Insn {
             X86Insn::Pop(op) => write!(f, "    popq {}", op),
             X86Insn::Ret => write!(f, "    ret"),
             X86Insn::Lea(src, dst) => write!(f, "    leaq {}, {}", src, dst),
-            X86Insn::Cmp(left, right) => write!(f, "    cmpq {}, {}", left, right),
+            X86Insn::Cmp(left, right) => write!(f, "    cmpl {}, {}", left, right),
             X86Insn::Jne(label) => writeln!(f, "    jne {}", label),
             X86Insn::Sete(dst) => write!(f, "    sete {}", dst),
             X86Insn::Setg(dst) => write!(f, "    setg {}", dst),
@@ -148,7 +198,6 @@ impl fmt::Display for X86Insn {
             X86Insn::Global(val) => write!(f, ".globl {val}"),
             X86Insn::Or(src, dst) => write!(f, "    orq {src}, {dst}"),
             X86Insn::Shl(src, dst) => write!(f, "    shlq {src}, {dst}"),
-            
         }
     }
 }

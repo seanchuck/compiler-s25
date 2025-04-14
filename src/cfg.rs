@@ -1,21 +1,28 @@
-use crate::tac::*;
+use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*};
+use std::{cell::RefCell, collections::{BTreeMap, HashMap}, rc::Rc};
 /**
 Control flow graph (CFG) representation.
 
 Consists of basic blocks and directed edges
 between those basic blocks.
 **/
-use std::collections::{BTreeMap, HashMap};
 
 // #################################################
 // CONSTANTS
 // #################################################
 
-pub const ELEMENT_SIZE: i64 = 8; // for now, allocate 8 bytes for everything no matter the type
+pub const INT_SIZE: i64 = 4; // 32 bits
+pub const LONG_SIZE: i64 = 8; // 64 bits
 
 // #################################################
 // STRUCT DEFINITIONS
 // #################################################
+
+#[derive(Debug, Clone)]
+pub struct Temp {
+    pub name: String,
+    pub typ: Type
+}
 
 #[derive(Debug, Clone)]
 pub struct CFG {
@@ -25,9 +32,10 @@ pub struct CFG {
     pub blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
     // no need to store edges because basic blocks end with a jump/branch instruction
 
-    // TODO: also increase stack size for function call with ore than 6 args
+    // TODO: 
     pub stack_size: i64, // total space to allocate on the stack for this method
-    pub locals: BTreeMap<String, Local>,
+    pub locals: BTreeMap<String, Local>, // maps local variable names to their metadata
+    pub param_to_temp: BTreeMap<i32, Temp>, // maps param number to local temp var
     pub exit: i32, // index of the last basic block
 }
 
@@ -38,6 +46,7 @@ impl CFG {
             blocks: BTreeMap::new(),
             stack_size: 0,
             locals: BTreeMap::new(),
+            param_to_temp: BTreeMap::new(),
             exit: 0, // index of the last basic block
         }
     }
@@ -71,22 +80,42 @@ impl CFG {
         }
     }
 
+    pub fn get_element_size(&self, typ: Type) -> i64 {
+        match typ {
+            Type::Int
+            | Type::Bool => INT_SIZE,
+
+            Type::Long
+            | Type::String
+            | _=> LONG_SIZE // default to 64-bit
+        }
+    }
+
     /// Allocate space on the stack for a new temp var
-    pub fn add_temp_var(&mut self, temp: String, length: Option<i64>) {
+    pub fn add_temp_var(&mut self, temp: String, typ: Type, length: Option<i64>) {
+        println!("looking at temp {} of type {:#?}", temp, typ);
+        let element_size = self.get_element_size(typ.clone());
+        // let element_size = LONG_SIZE;
         let size: i64;
+
         if length.is_some() {
-            // add one to store the array length
-            size = (length.unwrap() + 1) * ELEMENT_SIZE;
+            // add extra slot for arrays to store array length
+            size = (length.unwrap() + 1) * element_size;
         } else {
-            size = ELEMENT_SIZE;
+            size = element_size;
         }
 
+        println!("going to allocate {size} bytes for {temp}");
+
         self.stack_size += size;
+
+        println!("Offset for temp: {} is at - {}. It uses {} bytes", temp, self.stack_size, size);
         self.locals.insert(
             temp,
             Local {
                 stack_offset: -self.stack_size,
                 length,
+                typ
             },
         );
     }
@@ -94,6 +123,15 @@ impl CFG {
     /// Get the stack offset of a temp var
     pub fn get_stack_offset(&self, temp: &String) -> i64 {
         self.locals.get(temp).unwrap().stack_offset
+    }
+
+    // Get type of a parameter
+    pub fn get_param_type(&self, idx: i32) -> Type {
+        println!("Method: {} , trying to find the argument {}", self.name, idx);
+        println!("Param to temp {:?}", self.param_to_temp);
+        let param_temp = self.param_to_temp.get(&idx).expect("couldnt find param temp");
+        let param_typ = param_temp.typ.clone();
+        param_typ
     }
 }
 
@@ -105,26 +143,30 @@ pub struct CFGScope {
 
 impl CFGScope {
     /// Returns this global variable, or the temp variable associated to this local variable
-    pub fn lookup_var(&self, var: String) -> Operand {
+    pub fn lookup_var(&self, var: String, typ: Type) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&var) {
-            Operand::LocalVar(temp.to_string())
+            Operand::LocalVar(temp.to_string(), typ.clone())
         } else if let Some(parent) = &self.parent {
-            parent.lookup_var(var)
+            parent.lookup_var(var ,typ.clone())
         } else {
             // assume it is in the global CFGScope
-            Operand::GlobalVar(var)
+            Operand::GlobalVar(var, typ.clone())
         }
     }
 
     /// Returns this global array element, or the temp array element associated to this local array element
-    pub fn lookup_arr(&self, arr: String, idx: Operand) -> Operand {
+    pub fn lookup_arr(&self, arr: String, idx: Operand, sym_scope: &Rc<RefCell<Scope>>, typ: Type) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&arr) {
-            Operand::LocalArrElement(temp.to_string(), Box::new(idx))
+            Operand::LocalArrElement(temp.to_string(), Box::new(idx), typ.clone())
         } else if let Some(parent) = &self.parent {
-            parent.lookup_arr(arr, idx)
+            parent.lookup_arr(arr, idx, sym_scope, typ.clone())
         } else {
             // assume it is in the global CFGScope
-            Operand::GlobalArrElement(arr, Box::new(idx))
+            let table_entry = sym_scope.borrow().lookup(&arr).expect("Array not defined in this scope");
+            let TableEntry::Variable {  typ, .. } = table_entry else {
+                panic!("Expected a variable, found something else!");
+            };
+            Operand::GlobalArrElement(arr, Box::new(idx), typ.clone())
         }
     }
 
@@ -165,12 +207,14 @@ impl BasicBlock {
 pub struct Global {
     pub name: String,
     pub length: Option<i32>, // if array
+    pub typ: Type
 }
 
 #[derive(Debug, Clone)]
 pub struct Local {
-    stack_offset: i64,
-    length: Option<i64>, // if array
+    pub stack_offset: i64,
+    pub length: Option<i64>, // if array
+    pub typ: Type
 }
 
 pub struct Loop {
