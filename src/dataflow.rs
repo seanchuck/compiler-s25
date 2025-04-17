@@ -195,8 +195,8 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
             match instr {
                 Instruction::Assign { src, dest } => {
                     // Apply the copy prop if operands are copies of another block
-                    // substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
-                    // substitute_operand(dest, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(dest, &copy_to_src, &mut update_occurred, debug);
 
                     // Kill copies that use dest, since this assignment updates its values
                     if let Operand::LocalVar(dest_name) = dest {
@@ -222,8 +222,8 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                 | Instruction::GreaterEqual { left, right, dest }
                 | Instruction::Equal { left, right, dest }
                 | Instruction::NotEqual { left, right, dest }=> {
-                    // substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
-                    // substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
 
                     // Invalidate the destination since its value is updated
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
@@ -231,22 +231,22 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
 
                 // Unary operations
                 Instruction::Not { expr, dest } => {
-                    // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                 }
                 Instruction::Cast { expr, dest, .. } => {
-                    // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                 }
                 Instruction::Len { expr, dest } => {
-                    // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                 }
 
                 Instruction::MethodCall {args, dest , ..} => {
                     // Try to copy prop on each of the arguments
                     for arg in args {
-                        // substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
+                        substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
                     }
                     
                     // Invalidate the destination since its value is updated
