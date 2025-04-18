@@ -195,8 +195,10 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
             match instr {
                 Instruction::Assign { src, dest } => {
                     // Apply the copy prop if operands are copies of another block
-                    // substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
-                    // substitute_operand(dest, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
+
+                    // Why was the below considered for substitution? Only sub srcs?
+                    //substitute_operand(dest, &copy_to_src, &mut update_occurred, debug);
 
                     // Kill copies that use dest, since this assignment updates its values
                     if let Operand::LocalVar(dest_name) = dest {
