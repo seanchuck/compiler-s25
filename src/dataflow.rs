@@ -157,7 +157,8 @@ fn get_dest(instr: &Instruction) -> Option<String> {
 // Worklist equations for copy propagation:
 //      IN[B]  = ⋂ OUT[P] for all predecessors P of B
 //      OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
-fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
+// Returns a tuple (in_map, out_map)
+fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, CopyMap>, HashMap<i32, CopyMap> ) {
     // Compute predecessor and successor graphs
     let cfg_preds = compute_predecessors(&method_cfg);
     let cfg_succs = compute_successors(&method_cfg);
@@ -172,13 +173,11 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
 
     // Worklist of basic block ids
     let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect::<VecDeque<i32>>();
-    let mut update_occurred = false;
 
 
     // Iterate until a fixed point
     while let Some(block_id) = worklist.pop_front() {
-        // let block = method_cfg.blocks.get(&block_id).unwrap();
-    
+
         // IN[B] = ⋂ OUT[P] for all predecessors P of B, where IN is the hash table containing valid copy mappigns
         let in_copies = if let Some(preds) = cfg_preds.get(&block_id) {
             preds.iter()
@@ -197,9 +196,6 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
         for instr in method_cfg.blocks.get_mut(&block_id).unwrap().instructions.iter_mut() {
             match instr {
                 Instruction::Assign { src, dest } => {
-                    // Apply the copy prop if operands are copies of another block
-                    substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
-
                     // Kill copies that use dest, since this assignment updates its values
                     if let Operand::LocalVar(dest_name) = dest {
                         invalidate(dest_name, &mut copy_to_src, &mut src_to_copies, debug);
@@ -224,8 +220,6 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                 | Instruction::GreaterEqual { left, right, dest }
                 | Instruction::Equal { left, right, dest }
                 | Instruction::NotEqual { left, right, dest }=> {
-                    //substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
-                    //substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
 
                     // Invalidate the destination since its value is updated
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
@@ -233,31 +227,22 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
 
                 // Unary operations
                 Instruction::Not { expr, dest } => {
-                    //substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                 }
                 Instruction::Cast { expr, dest, .. } => {
-                    // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                 }
                 Instruction::Len { expr, dest } => {
-                    // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                 }
 
                 Instruction::MethodCall {args, dest , ..} => {
-                    // Try to copy prop on each of the arguments
-                    for arg in args {
-                        // substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
-                    }
-                    
                     // Invalidate the destination since its value is updated
                     if dest.is_some() {
                         invalidate(&dest.clone().unwrap().to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                     }
                 }
 
-                // Can't really do copy prop on either of these
                 Instruction::LoadString { dest, .. } => {
                     // Invalidate the destination since its value is updated
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
@@ -266,7 +251,6 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                     // Invalidate the destination since its value is updated
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                 }
-
                 _ => { 
                     // UJmp, CJmp, Ret, and Exit have no effect
                     // Conservatively attempt to invalidate any destinations that are written, but shouldn't
@@ -296,8 +280,213 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
         }
     }
 
-    update_occurred
+    (in_map, out_map)
 }
+
+
+
+
+// Update to call compute_maps and then do a match on all the statements
+// and perform the associated substitutions
+
+// // Worklist equations for copy propagation:
+// //      IN[B]  = ⋂ OUT[P] for all predecessors P of B
+// //      OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
+// fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
+//     // Compute predecessor and successor graphs
+//     let cfg_preds = compute_predecessors(&method_cfg);
+//     let cfg_succs = compute_successors(&method_cfg);
+
+//     println!("****** CFG PREDS ********\n {:?} \n\n", cfg_preds);
+//     println!("****** CFG SUCCS ********\n {:?} \n\n", cfg_succs);
+
+//     // // Copies that are valid going in to this block; hashmap keyed by block_id
+//     // let mut in_map: HashMap<i32, CopyMap> = HashMap::new();
+//     // Copies that are valid going out of this block; hashmap keyed by block_id
+//     // let mut out_map: HashMap<i32, CopyMap> = HashMap::new();
+
+//     let mut in_map: HashMap<i32, CopyMap> = compute_inmap(method_cfg, debug);
+//     let mut out_map: HashMap<i32, CopyMap> = compute_outmap(method_cfg, debug);
+
+//     // Worklist of basic block ids
+//     let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect::<VecDeque<i32>>();
+//     let mut update_occurred = false;
+
+
+//     // Iterate until a fixed point
+//     while let Some(block_id) = worklist.pop_front() {
+//         // let block = method_cfg.blocks.get(&block_id).unwrap();
+    
+//         // IN[B] = ⋂ OUT[P] for all predecessors P of B, where IN is the hash table containing valid copy mappigns
+//         let in_copies = if let Some(preds) = cfg_preds.get(&block_id) {
+//             preds.iter()
+//                 .filter_map(|p| out_map.get(p).cloned())
+//                 .reduce(|a, b| intersect_maps(&a, &b))
+//                 .unwrap_or_default()
+//         } else {
+//             // If there are no predecessors, IN is empty
+//             HashMap::new()
+//         };
+    
+//         // Copy state we'll update during this block
+//         let mut copy_to_src = in_copies.clone();
+//         let mut src_to_copies: HashMap<String, HashSet<String>> = reverse_map(&copy_to_src);
+    
+//         for instr in method_cfg.blocks.get_mut(&block_id).unwrap().instructions.iter_mut() {
+//             match instr {
+//                 Instruction::Assign { src, dest } => {
+//                     // Apply the copy prop if operands are copies of another block
+//                     substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
+
+//                     // Kill copies that use dest, since this assignment updates its values
+//                     if let Operand::LocalVar(dest_name) = dest {
+//                         invalidate(dest_name, &mut copy_to_src, &mut src_to_copies, debug);
+
+//                         // Gen[B]: this is a direct assignment (a = b), add to tables
+//                         if let Operand::LocalVar(src_name) = src {
+//                             copy_to_src.insert(dest_name.clone(), src_name.clone());
+//                             src_to_copies.entry(src_name.clone()).or_default().insert(dest_name.clone());
+//                         }
+//                     }
+//                 }
+
+//                 // Binary operations: arithmetic and relational 
+//                 Instruction::Add { left, right, dest } 
+//                 | Instruction::Subtract { left, right, dest }
+//                 | Instruction::Multiply { left, right, dest }
+//                 | Instruction::Divide { left, right, dest }
+//                 | Instruction::Modulo { left, right, dest } 
+//                 | Instruction::Greater { left, right, dest }
+//                 | Instruction::Less { left, right, dest }
+//                 | Instruction::LessEqual { left, right, dest }
+//                 | Instruction::GreaterEqual { left, right, dest }
+//                 | Instruction::Equal { left, right, dest }
+//                 | Instruction::NotEqual { left, right, dest }=> {
+//                     //substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
+//                     //substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
+
+//                     // Invalidate the destination since its value is updated
+//                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+//                 }
+
+//                 // Unary operations
+//                 Instruction::Not { expr, dest } => {
+//                     //substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+//                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+//                 }
+//                 Instruction::Cast { expr, dest, .. } => {
+//                     // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+//                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+//                 }
+//                 Instruction::Len { expr, dest } => {
+//                     // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+//                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+//                 }
+
+//                 Instruction::MethodCall {args, dest , ..} => {
+//                     // Try to copy prop on each of the arguments
+//                     for arg in args {
+//                         // substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
+//                     }
+                    
+//                     // Invalidate the destination since its value is updated
+//                     if dest.is_some() {
+//                         invalidate(&dest.clone().unwrap().to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+//                     }
+//                 }
+
+//                 // Can't really do copy prop on either of these
+//                 Instruction::LoadString { dest, .. } => {
+//                     // Invalidate the destination since its value is updated
+//                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+//                 }
+//                 Instruction::LoadConst {dest, .. } => {
+//                     // Invalidate the destination since its value is updated
+//                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+//                 }
+
+//                 _ => { 
+//                     // UJmp, CJmp, Ret, and Exit have no effect
+//                     // Conservatively attempt to invalidate any destinations that are written, but shouldn't
+//                     // be any for any of these
+//                     let dest = get_dest(instr);
+//                     if let Some(dest) = dest {
+//                         invalidate(&dest, &mut copy_to_src, &mut src_to_copies, debug);
+//                     }
+//                 }
+//             }
+//         }
+    
+//         // OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
+//         let out_copies: HashMap<String, String> = copy_to_src.clone();
+    
+//         // Update maps if either IN or OUT changed
+//         if in_map.get(&block_id) != Some(&in_copies) || out_map.get(&block_id) != Some(&out_copies) {
+//             in_map.insert(block_id, in_copies);
+//             out_map.insert(block_id, out_copies);
+    
+//             // Queue all successors of block, since IN or OUT changed
+//             if let Some(succs) = cfg_succs.get(&block_id) {
+//                 for succ in succs {
+//                     worklist.push_back(*succ);
+//                 }
+//             }
+//         }
+//     }
+
+//     update_occurred
+// }
+
+
+
+
+// //      IN[B]  = ⋂ OUT[P] for all predecessors P of B
+// fn compute_inmap(method_cfg: &CFG, out_map: &HashMap<i32, CopyMap>, debug: bool,) -> HashMap<i32, CopyMap> {
+//     let mut in_map: HashMap<i32, CopyMap> = HashMap::new();
+//     let predecessors = compute_predecessors(method_cfg);
+
+//     for (block_id, _block) in method_cfg.get_blocks() {
+
+//         let in_copies = match predecessors.get(&block_id) {
+//             Some(preds) if !preds.is_empty() => {
+//                 preds.iter()
+//                     .filter_map(|p| out_map.get(p).cloned())
+//                     .reduce(|a, b| intersect_maps(&a, &b))
+//                     .unwrap_or_default()
+//             }
+//             // No preds, create empty map
+//             _ => HashMap::new(),
+//         };
+
+//         in_map.insert(*block_id, in_copies);
+//     }
+
+//     in_map
+// }
+
+
+// // //      OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
+// // fn compute_outmap(method_cfg: &mut CFG, debug: bool) -> HashMap<i32, CopyMap> {
+// //     let mut in_map: HashMap<i32, CopyMap> = HashMap::new();
+
+
+// //     // Run through each of the instructions, 
+
+
+
+// //     todo!()
+// //     in_map
+// // }
+
+
+
+
+
+
+
+
+
+
 
 
 fn dead_code_elimination(cfg: &mut CFG) -> bool {
