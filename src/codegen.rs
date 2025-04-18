@@ -467,7 +467,7 @@ pub fn generate_assembly(
     let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
 
     // Perform dataflow optimizations
-    //optimize_dataflow(&mut method_cfgs, &optimizations, debug);
+    optimize_dataflow(&mut method_cfgs, &optimizations, debug);
 
     if debug {
         // print_cfg(&method_cfgs);
