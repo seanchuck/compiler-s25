@@ -227,8 +227,8 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                 | Instruction::GreaterEqual { left, right, dest }
                 | Instruction::Equal { left, right, dest }
                 | Instruction::NotEqual { left, right, dest }=> {
-                    // substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
-                    // substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
 
                     // Invalidate the destination since its value is updated
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
@@ -236,22 +236,22 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
 
                 // Unary operations
                 Instruction::Not { expr, dest } => {
-                    // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                 }
                 Instruction::Cast { expr, dest, .. } => {
-                    // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                 }
                 Instruction::Len { expr, dest } => {
-                    // substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
                 }
 
                 Instruction::MethodCall {args, dest , ..} => {
                     // Try to copy prop on each of the arguments
                     for arg in args {
-                        // substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
+                        substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
                     }
                     
                     // Invalidate the destination since its value is updated
