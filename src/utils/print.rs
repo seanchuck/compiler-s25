@@ -5,6 +5,8 @@ use crate::tac::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::fs::{File, rename};
+use std::io::Write;
 
 /// Pretty-print the CFG
 pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
@@ -228,3 +230,33 @@ fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
 
     println!("{}}}", indent_str); // Closing scope
 }
+
+
+pub fn html_cfgs(method_cfgs: &HashMap<String, CFG>) {
+    let mut html = File::create("all_cfgs.html").expect("Failed to create HTML file");
+    writeln!(html, "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>CFG Viewer</title></head><body><h1>CFG Visualizations</h1>")
+        .unwrap();
+
+    for (method_name, cfg) in method_cfgs {
+        let dot_filename = format!("{}.dot", method_name);
+        let png_filename = format!("{}.png", method_name);
+
+        // Export the CFG to .dot and .png
+        cfg.export_dot(&dot_filename, true);
+
+        // Rename output png file from generic cfg.png to method-specific name
+        rename("cfg.png", &png_filename).expect("Failed to rename cfg.png");
+
+        // Add section to HTML
+        writeln!(
+            html,
+            "<h2>{}</h2><img src=\"{}\" style=\"border:1px solid #ccc; max-width:100%;\"><br><br>",
+            method_name, png_filename
+        )
+        .unwrap();
+    }
+
+    writeln!(html, "</body></html>").unwrap();
+    println!("Generated all_cfgs.html with CFG diagrams.");
+}
+

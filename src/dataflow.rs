@@ -162,6 +162,9 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
     let cfg_preds = compute_predecessors(&method_cfg);
     let cfg_succs = compute_successors(&method_cfg);
 
+    println!("****** CFG PREDS ********\n {:?} \n\n", cfg_preds);
+    println!("****** CFG SUCCS ********\n {:?} \n\n", cfg_succs);
+
     // Copies that are valid going in to this block; hashmap keyed by block_id
     let mut in_map: HashMap<i32, CopyMap> = HashMap::new();
     // Copies that are valid going out of this block; hashmap keyed by block_id

@@ -6,7 +6,7 @@ use crate::cfg::ELEMENT_SIZE;
 use crate::dataflow::optimize_dataflow;
 use crate::tac::*;
 use crate::utils::cli::Optimization;
-use crate::utils::print::print_cfg;
+use crate::utils::print::{print_cfg, html_cfgs};
 use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use std::collections::HashMap;
@@ -467,10 +467,11 @@ pub fn generate_assembly(
     let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
 
     // Perform dataflow optimizations
-    optimize_dataflow(&mut method_cfgs, &optimizations, debug);
+    //optimize_dataflow(&mut method_cfgs, &optimizations, debug);
 
     if debug {
-        print_cfg(&method_cfgs);
+        // print_cfg(&method_cfgs);
+        html_cfgs(&method_cfgs);
         println!("\n========== X86 Code ==========\n");
     }
 

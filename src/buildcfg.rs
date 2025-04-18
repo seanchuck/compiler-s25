@@ -263,6 +263,9 @@ fn destruct_expr(
                         strings,
                     );
 
+                    cfg.add_edge(next_true_block.get_id(), next_block.get_id(), EdgeType::Unconditional);
+                    cfg.add_edge(next_false_block.get_id(), next_block.get_id(), EdgeType::Unconditional);
+
                     return (next_block.get_id(), dest);
                 }
                 _ => {
@@ -486,12 +489,23 @@ fn build_cond(
                             id: next_true_block_id,
                         },
                     );
+                    cfg.add_edge(
+                        cur_block_id,
+                        next_true_block_id,
+                        EdgeType::True,
+                    );
+
                     cfg.add_instruction_to_block(
                         cur_block_id,
                         Instruction::UJmp {
                             name: cfg.name.clone(),
                             id: next_false_block_id,
                         },
+                    );
+                    cfg.add_edge(
+                        cur_block_id,
+                        next_false_block_id,
+                        EdgeType::False,
                     );
                 }
             }
@@ -524,6 +538,8 @@ fn build_cond(
                             id: next_true_block_id,
                         },
                     );
+                    cfg.add_edge(cur_block_id, next_true_block_id, EdgeType::True);
+
                     cfg.add_instruction_to_block(
                         cur_block_id,
                         Instruction::UJmp {
@@ -531,6 +547,7 @@ fn build_cond(
                             id: next_false_block_id,
                         },
                     );
+                    cfg.add_edge(cur_block_id, next_false_block_id, EdgeType::False);
                 }
             }
         }
@@ -547,6 +564,8 @@ fn build_cond(
                     id: next_true_block_id,
                 },
             );
+            cfg.add_edge(cur_block_id, next_true_block_id, EdgeType::True);  
+
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::UJmp {
@@ -554,6 +573,7 @@ fn build_cond(
                     id: next_false_block_id,
                 },
             );
+            cfg.add_edge(cur_block_id, next_false_block_id, EdgeType::False);
         }
     }
 }
@@ -921,6 +941,9 @@ fn destruct_statement(
                         id: next_block.get_id(),
                     },
                 );
+
+                cfg.add_edge(body_block_id, next_block.get_id(), EdgeType::Unconditional);
+                cfg.add_edge(else_body_block_id, next_block.get_id(), EdgeType::Unconditional);
             } else {
                 next_block = BasicBlock::new(next_bblock_id());
 
@@ -953,6 +976,7 @@ fn destruct_statement(
                         id: next_block.get_id(),
                     },
                 );
+                cfg.add_edge(body_block_id, next_block.get_id(), EdgeType::Unconditional);
             }
 
             cfg.add_block(&next_block);
@@ -969,6 +993,7 @@ fn destruct_statement(
             cfg.add_block(&header_block);
             cfg.add_block(&body_block);
             cfg.add_block(&next_block);
+            // Two edges from header to body and next are handled by buildconditional
 
             cfg.add_instruction_to_block(
                 cur_block_id,
@@ -977,6 +1002,7 @@ fn destruct_statement(
                     id: header_block.get_id(),
                 },
             );
+            cfg.add_edge(cur_block_id, header_id, EdgeType::Unconditional);
 
             build_cond(
                 cfg,
@@ -1017,6 +1043,7 @@ fn destruct_statement(
                     id: header_id,
                 },
             );
+            cfg.add_edge(body_id, header_id, EdgeType::Unconditional);
 
             next_block.get_id()
         }
@@ -1061,6 +1088,7 @@ fn destruct_statement(
                     id: header_id,
                 },
             );
+            cfg.add_edge(cur_block_id, header_id, EdgeType::Unconditional);
         
             // build condition check
             build_cond(
@@ -1105,6 +1133,7 @@ fn destruct_statement(
                     id: update_block_id,
                 },
             );
+            cfg.add_edge(body_id, update_block_id, EdgeType::Unconditional);
         
             // update block executes update expression
             let mut update_id = update_block_id;
@@ -1118,6 +1147,7 @@ fn destruct_statement(
                     id: header_id,
                 },
             );
+            cfg.add_edge(update_id, header_id, EdgeType::Unconditional);
         
             next_block.get_id()
         }
@@ -1130,6 +1160,7 @@ fn destruct_statement(
                     id: cur_loop.unwrap().break_to,
                 },
             );
+            cfg.add_edge(cur_block_id, cur_loop.unwrap().break_to, EdgeType::Unconditional);
 
             // code after the break within this statement is unreachable
             UNREACHABLE_BLOCK
@@ -1142,6 +1173,7 @@ fn destruct_statement(
                     id: cur_loop.clone().unwrap().continue_to,
                 },
             );
+            cfg.add_edge(cur_block_id, cur_loop.unwrap().continue_to, EdgeType::Unconditional);
 
             // code after the continue within this statement is unreachable
             UNREACHABLE_BLOCK
