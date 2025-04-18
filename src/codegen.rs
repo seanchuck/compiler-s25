@@ -465,26 +465,28 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let mut swapped = false;
 
-            // All relational operation expressions are only for comparing integer expressions (from spec)
+            let left_typ = left_op.get_type();
+            let left_reg = reg_for_type(Register::Rax, &left_typ);
+
             // handle illegal cmp: (mem, mem)
             if is_memory_operand(&left_op) && is_memory_operand(&right_op) {
                 // move value into a register
                 x86_instructions.push(X86Insn::Mov(
                     left_op.clone(),
-                    X86Operand::Reg(Register::Eax),
-                    Type::Int
+                    X86Operand::Reg(left_reg.clone()),
+                    left_typ.clone()
                 ));
-                left_op = X86Operand::Reg(Register::Eax);
+                left_op = X86Operand::Reg(left_reg.clone());
             }
 
             // handle illegal cmp: (imm, imm),
             if is_immediate_operand(&left_op) && is_immediate_operand(&right_op) {
                 x86_instructions.push(X86Insn::Mov(
                     left_op.clone(),
-                    X86Operand::Reg(Register::Eax),
-                    Type::Int
+                    X86Operand::Reg(left_reg.clone()),
+                    left_typ.clone()
                 ));
-                left_op = X86Operand::Reg(Register::Eax);
+                left_op = X86Operand::Reg(left_reg);
             }
 
             // handle illegal cmp: (mem, imm), (reg, imm) --> imm must come first
@@ -495,7 +497,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             }
 
             // x86 swaps right and left for cmp
-            x86_instructions.push(X86Insn::Cmp(right_op, left_op));
+            x86_instructions.push(X86Insn::Cmp(right_op, left_op, left_typ));
 
             let set_instr = match insn {
                 Instruction::Greater { .. } => {
@@ -555,6 +557,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             x86_instructions.push(X86Insn::Cmp(
                 X86Operand::Constant(0),
                 X86Operand::Reg(Register::Eax),
+                Type::Bool
             ));
             x86_instructions.push(X86Insn::Jne(label)); // jump if condition != 0
         }
@@ -657,18 +660,25 @@ pub fn generate_assembly(file: &str, filename: &str, writer: &mut dyn std::io::W
 
     // global variables
     for global in globals.values() {
+        let type_length = match global.typ {
+            Type::Int => INT_SIZE,
+            Type::Long => LONG_SIZE,
+            Type::Bool => INT_SIZE,
+            _ => panic!("Should not have had this type global")
+        };
+
         if global.length.is_some() {
             // allocate an extra element's worth of space to store the length of the array
             global_code.push(X86Insn::Comm(
                 global.name.clone(),
-                LONG_SIZE * i64::from(global.length.unwrap() + 1),
-                LONG_SIZE,
+                type_length * i64::from(global.length.unwrap() + 1),
+                type_length,
             ));
         } else {
             global_code.push(X86Insn::Comm(
                 global.name.clone(),
-                LONG_SIZE,
-                LONG_SIZE,
+                type_length,
+                type_length,
             ));
         }
     }
