@@ -302,58 +302,61 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
         {
             match instr {
                 Instruction::Assign { src, dest } => {
-                    substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
+                                substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
 
-                    if let Operand::LocalVar(dest_name) = dest {
-                        invalidate(dest_name, &mut copy_to_src, &mut src_to_copies, debug);
+                                if let Operand::LocalVar(dest_name) = dest {
+                                    invalidate(dest_name, &mut copy_to_src, &mut src_to_copies, debug);
 
-                        if let Operand::LocalVar(src_name) = src {
-                            copy_to_src.insert(dest_name.clone(), src_name.clone());
-                            src_to_copies
-                                .entry(src_name.clone())
-                                .or_default()
-                                .insert(dest_name.clone());
-                        }
-                    }
-                }
-
+                                    if let Operand::LocalVar(src_name) = src {
+                                        copy_to_src.insert(dest_name.clone(), src_name.clone());
+                                        src_to_copies
+                                            .entry(src_name.clone())
+                                            .or_default()
+                                            .insert(dest_name.clone());
+                                    }
+                                }
+                            }
                 Instruction::Add { left, right, dest }
-                | Instruction::Subtract { left, right, dest }
-                | Instruction::Multiply { left, right, dest }
-                | Instruction::Divide { left, right, dest }
-                | Instruction::Modulo { left, right, dest }
-                | Instruction::Greater { left, right, dest }
-                | Instruction::Less { left, right, dest }
-                | Instruction::LessEqual { left, right, dest }
-                | Instruction::GreaterEqual { left, right, dest }
-                | Instruction::Equal { left, right, dest }
-                | Instruction::NotEqual { left, right, dest } => {
-                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
-                }
+                            | Instruction::Subtract { left, right, dest }
+                            | Instruction::Multiply { left, right, dest }
+                            | Instruction::Divide { left, right, dest }
+                            | Instruction::Modulo { left, right, dest }
+                            | Instruction::Greater { left, right, dest }
+                            | Instruction::Less { left, right, dest }
+                            | Instruction::LessEqual { left, right, dest }
+                            | Instruction::GreaterEqual { left, right, dest }
+                            | Instruction::Equal { left, right, dest }
+                            | Instruction::NotEqual { left, right, dest } => {
+                                substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
+                                substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
 
-                Instruction::Not { expr: _, dest }
-                | Instruction::Cast { expr: _, dest, .. }
-                | Instruction::Len { expr: _, dest } => {
-                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
-                }
-
+                                invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                            }
+                Instruction::Not { expr, dest }
+                            | Instruction::Cast { expr, dest, .. }
+                            | Instruction::Len { expr, dest } => {
+                                substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+                    
+                                invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                            }
                 Instruction::MethodCall { args, dest, .. } => {
-                    for arg in args {
-                        // You may uncomment this if you want to try propagating into args
-                        // substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
-                    }
+                                for arg in args {
+                                    // You may uncomment this if you want to try propagating into args
+                                    substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
+                                }
 
-                    if let Some(dest_op) = dest {
-                        invalidate(&dest_op.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
-                    }
-                }
-
+                                if let Some(dest_op) = dest {
+                                    invalidate(&dest_op.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                                }
+                            }
                 Instruction::LoadString { dest, .. }
-                | Instruction::LoadConst { dest, .. } => {
-                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
-                }
-
-                _ => {
+                            | Instruction::LoadConst { dest, .. } => {
+                                invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                            }
+                Instruction::UJmp { .. }
+                | Instruction::CJmp { .. }
+                | Instruction::Ret { .. }
+                | Instruction::Exit { .. } => {
                     if let Some(dest_name) = get_dest(instr) {
                         invalidate(&dest_name, &mut copy_to_src, &mut src_to_copies, debug);
                     }

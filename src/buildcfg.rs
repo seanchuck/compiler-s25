@@ -18,6 +18,7 @@ const UNREACHABLE_BLOCK: i32 = -1; // id for an unreachable block
 thread_local! {
     static TEMP_COUNTER: RefCell<usize> = RefCell::new(0);
     static BBLOCK_COUNTER: RefCell<usize> = RefCell::new(0);
+    static VAR_COUNTERS: RefCell<HashMap<String, usize>> = RefCell::new(HashMap::new());
 }
 
 /// Create a new temporary variable named "_t{counter}"
@@ -28,6 +29,22 @@ fn fresh_temp() -> String {
         let temp_name = format!("_t{}", *count);
         *count += 1;
         temp_name
+    })
+}
+
+/// Create a new unique version of a named variable like "b" -> "_b1"
+fn fresh_var(base: &str) -> String {
+    VAR_COUNTERS.with(|map| {
+        let mut counters = map.borrow_mut();
+        let count = counters.entry(base.to_string()).or_insert(0);
+        let var_name: String;
+        if *count as i32 > 0 {
+            var_name = format!("_{}{}", base, count);
+        } else {
+            var_name = format!("{}", base);
+        }
+        *count += 1;
+        var_name
     })
 }
 
@@ -1203,7 +1220,7 @@ fn destruct_statement(
             ..
         } => {
             // create new temp variable for this local variable, and add it to the scope
-            let temp = fresh_temp();
+            let temp = fresh_var(name);
             scope.add_local(name.to_string(), temp.to_string());
 
             if length.is_some() {

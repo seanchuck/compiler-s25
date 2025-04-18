@@ -8,6 +8,8 @@ between those basic blocks.
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
+use std::cell::RefCell;
+
 
 // #################################################
 // CONSTANTS
@@ -42,6 +44,7 @@ pub struct CFG {
     // no need to store edges because basic blocks end with a jump/branch instruction
 
     pub edges: BTreeMap<i32, HashSet<BlockEdge>>,
+    pub scopes: BTreeMap<i32, RefCell<CFGScope>>,
 
     // TODO: also increase stack size for function call with ore than 6 args
     pub stack_size: i64, // total space to allocate on the stack for this method
@@ -55,6 +58,7 @@ impl CFG {
             name,
             blocks: BTreeMap::new(),
             edges: BTreeMap::new(),
+            scopes: BTreeMap::new(),
             stack_size: 0,
             locals: BTreeMap::new(),
             exit: 0, // index of the last basic block
@@ -127,6 +131,17 @@ impl CFG {
     /// Get the stack offset of a temp var
     pub fn get_stack_offset(&self, temp: &String) -> i64 {
         self.locals.get(temp).unwrap().stack_offset
+    }
+
+    pub fn add_scope(&mut self, id: i32, scope: CFGScope) {
+        self.scopes.insert(id, RefCell::new(scope));
+    }
+    
+    pub fn get_scope(&self, id: i32) -> std::cell::RefMut<'_, CFGScope> {
+        self.scopes
+            .get(&id)
+            .expect("missing scope")
+            .borrow_mut()
     }
 
     // Used to get nice visualization of CFG
@@ -242,6 +257,9 @@ pub struct CFGScope {
 }
 
 impl CFGScope {
+    pub fn new(parent: Option<Box<CFGScope>>) -> CFGScope {
+        CFGScope { parent, local_to_temp: HashMap::new() }
+    }
     /// Returns this global variable, or the temp variable associated to this local variable
     pub fn lookup_var(&self, var: String) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&var) {
