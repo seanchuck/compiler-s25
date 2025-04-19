@@ -1,0 +1,16 @@
+void main() {
+    int temp1;
+    int temp2;
+
+    int a;
+    int b;
+
+    a = 2;
+    b = 3;
+
+    temp1 = a * b;
+    a = 5;
+    temp2 = a * b;
+
+    return;
+}

@@ -3,9 +3,33 @@ Data structures for dataflow analysis.
 */
 use std::collections::{HashMap, HashSet};
 use crate::cfg::*;
+use std::fmt;
 
 // Map between variable and its source
 pub type CopyMap = HashMap<String, String>;
+
+pub type AvailableExpressions = HashMap<Expression, String>; // maps expression to variable
+
+#[derive(Hash, PartialEq, Eq, Clone)]
+pub enum Expression {
+    Add(String, String),
+    Subtract(String, String),
+    Multiply(String, String),
+    Divide(String, String),
+    Modulo(String, String)
+}
+
+impl fmt::Display for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Expression::Add(left, right) => write!(f, "{} + {}", left, right),
+            Expression::Subtract(left, right) => write!(f, "{} - {}", left, right),
+            Expression::Multiply(left, right) => write!(f, "{} * {}", left, right),
+            Expression::Divide(left, right) => write!(f, "{} / {}", left, right),
+            Expression::Modulo(left, right) => write!(f, "{} % {}", left, right),
+        }
+    }
+}
 
 /// Compute the successors graph for a given CFG.
 /// Maps each block_id to a set of successor block IDs.

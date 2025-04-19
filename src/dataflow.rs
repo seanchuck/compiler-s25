@@ -369,8 +369,268 @@ fn dead_code_elimination(cfg: &mut CFG) -> bool {
     false
 }
 
-fn common_subexpression_elimination(cfg: &mut CFG) -> bool {
-    false
+/// CSE: Map intersection for IN
+fn intersect_expressions(
+    mapa: &AvailableExpressions,
+    mapb: &AvailableExpressions
+) -> AvailableExpressions {
+    let mut result = HashMap::new();
+    for (k, val1) in mapa {
+        if let Some(val2) = mapb.get(k) {
+            if val1 == val2 {
+                result.insert(k.clone(), val1.clone());
+            }
+        }
+    }
+    result
+}
+
+// Worklist equations for CSE:
+//      IN[B]  = ⋂ OUT[P] for all predecessors P of B
+//      OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
+// Returns a tuple (in_map, out_map)
+fn compute_expression_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, AvailableExpressions>, HashMap<i32, AvailableExpressions> ) {
+    // Compute predecessor and successor graphs
+    let cfg_preds = compute_predecessors(&method_cfg);
+    let cfg_succs = compute_successors(&method_cfg);
+
+    // Expressions that are valid going in to this block; hashmap keyed by block_id
+    let mut in_map: HashMap<i32, AvailableExpressions> = HashMap::new();
+    // Expressions that are valid going out of this block; hashmap keyed by block_id
+    let mut out_map: HashMap<i32, AvailableExpressions> = HashMap::new();
+
+    // Worklist of basic block ids
+    let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect::<VecDeque<i32>>();
+
+    // Iterate until a fixed point
+    while let Some(block_id) = worklist.pop_front() {
+
+        // IN[B] = ⋂ OUT[P] for all predecessors P of B, where IN is the hash table containing available expressions
+        let in_expressions = if let Some(preds) = cfg_preds.get(&block_id) {
+            preds.iter()
+                .filter_map(|p| out_map.get(p).cloned())
+                .reduce(|a, b| intersect_expressions(&a, &b))
+                .unwrap_or_default()
+        } else {
+            // If there are no predecessors, IN is empty
+            HashMap::new()
+        };
+    
+        let mut out_expressions = in_expressions.clone();  // maps expression to variable
+
+        for instr in method_cfg.blocks.get_mut(&block_id).unwrap().instructions.iter_mut() {
+            match instr {
+                Instruction::Add { left, right, ref dest, ref typ }
+                | Instruction::Subtract { left, right, ref dest, ref typ }
+                | Instruction::Multiply { left, right, ref dest, ref typ }
+                | Instruction::Divide { left, right, ref dest, ref typ }
+                | Instruction::Modulo { left, right, ref dest, ref typ } => {
+                    let left_var = match left {
+                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        _ => None,  // only do CSE on local variables
+                    };
+            
+                    let right_var = match right {
+                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        _ => None,  // only do CSE on local variables
+                    };
+        
+                    let dest_var = match dest {
+                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        _ => None  // only do CSE on local variables
+                    };
+
+                    if let (Some(lv), Some(rv)) = (left_var, right_var) {
+                        let expr = match instr {
+                            Instruction::Add { .. } => Expression::Add(lv.clone(), rv.clone()),
+                            Instruction::Subtract { .. } => Expression::Subtract(lv.clone(), rv.clone()),
+                            Instruction::Multiply { .. } => Expression::Multiply(lv.clone(), rv.clone()),
+                            Instruction::Divide { .. } => Expression::Divide(lv.clone(), rv.clone()),
+                            Instruction::Modulo { .. } => Expression::Modulo(lv.clone(), rv.clone()),
+                            _ => unreachable!(),
+                        };
+
+                        // kill expressions that involve dest
+                        if dest_var.is_some() {
+                            kill_expressions(&mut out_expressions, dest_var.as_ref().unwrap(), debug);
+                        }
+
+                        // generate the expression if dest is local and different from the operands
+                        if dest_var.is_some() && dest_var.as_ref().unwrap() != &lv && dest_var.as_ref().unwrap() != &rv {
+                            out_expressions.insert(expr, dest_var.as_ref().unwrap().to_string());
+                        }
+                    }
+                }
+                Instruction::Assign { dest, .. }
+                | Instruction::Cast { dest, .. }
+                | Instruction::Equal { dest, .. }
+                | Instruction::Greater { dest, .. }
+                | Instruction::GreaterEqual { dest, .. }
+                | Instruction::Len { dest, .. }
+                | Instruction::Less { dest, .. }
+                | Instruction::LessEqual { dest, .. }
+                | Instruction::LoadConst { dest, .. }
+                | Instruction::LoadString { dest, .. }
+                | Instruction::MethodCall { dest: Some(dest), .. }
+                | Instruction::Not { dest, .. }
+                | Instruction::NotEqual { dest, .. } => {
+                    // kill expressions that involve dest
+                    match dest {
+                        Operand::LocalVar(name, _) => kill_expressions(&mut out_expressions, name, debug),
+                        _ => continue  // only do CSE on local variables
+                    };
+                }
+                _ => continue  // skip other types of instructions
+            }
+        }
+    
+        // Update maps if either IN or OUT changed
+        if in_map.get(&block_id) != Some(&in_expressions) || out_map.get(&block_id) != Some(&out_expressions) {
+            in_map.insert(block_id, in_expressions);
+            out_map.insert(block_id, out_expressions);
+    
+            // Queue all successors of block, since IN or OUT changed
+            if let Some(succs) = cfg_succs.get(&block_id) {
+                for succ in succs {
+                    worklist.push_back(*succ);
+                }
+            }
+        }
+    }
+
+    (in_map, out_map)
+}
+
+// kill all expressions involving var
+fn kill_expressions(expressions: &mut AvailableExpressions, var: &String, debug: bool) {
+    expressions.retain(|expr, _| {
+        match expr {
+            Expression::Add(left, right)
+            | Expression::Subtract(left, right)
+            | Expression::Multiply(left, right)
+            | Expression::Divide(left, right)
+            | Expression::Modulo(left, right) => {
+                if var == left || var == right {
+                    if debug {
+                        println!("killed expression {} containing variable {}", expr, var);
+                    }
+                    false
+                } else {
+                    true // only keep expr if its left and right are different from var
+                }
+            }
+        }
+    });
+}
+
+// Worklist equations for CSE:
+//      IN[B]  = ⋂ OUT[P] for all predecessors P of B
+//      OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
+fn common_subexpression_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
+    let (in_maps, _) = compute_expression_maps(method_cfg, debug);
+    let mut update_occurred = false;
+
+    for (block_id, _) in method_cfg.blocks.clone() {
+        let mut expressions = in_maps
+            .get(&block_id)
+            .cloned()
+            .expect("couldn't find block id");
+
+        for instr in method_cfg
+            .blocks
+            .get_mut(&block_id)
+            .unwrap()
+            .instructions
+            .iter_mut()
+        {
+            match instr {
+                Instruction::Add { left, right, ref dest, ref typ }
+                | Instruction::Subtract { left, right, ref dest, ref typ }
+                | Instruction::Multiply { left, right, ref dest, ref typ }
+                | Instruction::Divide { left, right, ref dest, ref typ }
+                | Instruction::Modulo { left, right, ref dest, ref typ } => {
+                    let left_var = match left {
+                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        _ => None,  // only do CSE on local variables
+                    };
+            
+                    let right_var = match right {
+                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        _ => None,  // only do CSE on local variables
+                    };
+        
+                    let dest_var = match dest {
+                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        _ => None  // only do CSE on local variables
+                    };
+
+                    let mut insert = None;
+
+                    if let (Some(lv), Some(rv)) = (left_var, right_var) {
+                        let expr = match instr {
+                            Instruction::Add { .. } => Expression::Add(lv.clone(), rv.clone()),
+                            Instruction::Subtract { .. } => Expression::Subtract(lv.clone(), rv.clone()),
+                            Instruction::Multiply { .. } => Expression::Multiply(lv.clone(), rv.clone()),
+                            Instruction::Divide { .. } => Expression::Divide(lv.clone(), rv.clone()),
+                            Instruction::Modulo { .. } => Expression::Modulo(lv.clone(), rv.clone()),
+                            _ => unreachable!(),
+                        };
+
+                        // check if this expression is already available
+                        if let Some(expression_var) = expressions.get(&expr) {
+
+                            // replace this instruction with an assignment
+                            *instr = Instruction::Assign {
+                                dest: dest.clone(),
+                                src: Operand::LocalVar(expression_var.clone(), typ.clone()),
+                                typ: typ.clone()
+                            };
+                            update_occurred = true;
+                            if debug {
+                                println!("replace expression {} with variable {}", expr, expression_var.clone());
+                            }
+                        } else {
+                            // generate the expression if dest is local and different from the operands
+                            if dest_var.is_some() && dest_var.as_ref().unwrap() != &lv && dest_var.as_ref().unwrap() != &rv {
+                                insert = Some(expr);
+                            }
+                        }
+                    }
+
+                    // kill expressions that involve dest
+                    if dest_var.is_some() {
+                        kill_expressions(&mut expressions, dest_var.as_ref().unwrap(), debug);
+                    }
+                    
+                    if insert.is_some() {
+                        expressions.insert(insert.unwrap(), dest_var.as_ref().unwrap().to_string());
+                    }
+                }
+                Instruction::Assign { dest, .. }
+                | Instruction::Cast { dest, .. }
+                | Instruction::Equal { dest, .. }
+                | Instruction::Greater { dest, .. }
+                | Instruction::GreaterEqual { dest, .. }
+                | Instruction::Len { dest, .. }
+                | Instruction::Less { dest, .. }
+                | Instruction::LessEqual { dest, .. }
+                | Instruction::LoadConst { dest, .. }
+                | Instruction::LoadString { dest, .. }
+                | Instruction::MethodCall { dest: Some(dest), .. }
+                | Instruction::Not { dest, .. }
+                | Instruction::NotEqual { dest, .. } => {
+                    // kill expressions that involve dest
+                    match dest {
+                        Operand::LocalVar(name, _) => kill_expressions(&mut expressions, name, debug),
+                        _ => continue  // only do CSE on local variables
+                    };
+                }
+                _ => continue  // skip other types of instructions
+            }
+        }
+    }
+
+    update_occurred
 }
 
 /// Perform multiple passes over the CFG to apply the given optimizations
@@ -415,7 +675,7 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
 
         if optimizations.contains(&Optimization::Cse) {
             for (method, cfg) in method_cfgs.iter_mut() {
-                if common_subexpression_elimination(cfg) {
+                if common_subexpression_elimination(cfg, debug) {
                     fixed_point = false;
                     if debug {
                         println!("Common subexpression elimination elimination changed {}", method);
