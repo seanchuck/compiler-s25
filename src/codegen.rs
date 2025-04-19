@@ -6,7 +6,7 @@ use crate::cfg::ELEMENT_SIZE;
 use crate::dataflow::optimize_dataflow;
 use crate::tac::*;
 use crate::utils::cli::Optimization;
-use crate::utils::print::{print_cfg, html_cfgs};
+use crate::utils::print::html_cfgs;
 use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use std::collections::HashMap;
@@ -231,7 +231,8 @@ fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut 
             x86_instructions.push(X86Insn::Cqto); // Sign extend rax into Rdx
             x86_instructions.push(X86Insn::Mov(right_op, X86Operand::Reg(Register::Rcx))); // Division cannot work on immediate, move to scratch reg
             x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::Rcx))); // Signed divide RDX:RAX by right_op
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op)); // remainder in %rdx
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op));
+            // remainder in %rdx
         }
         Instruction::Not { expr, dest } => {
             let expr_op = map_operand(method_cfg, expr, x86_instructions);
@@ -452,9 +453,6 @@ fn generate_method_x86(
 
     x86_instructions
 }
-
-
-
 
 /// Generate x86 assembly code from the CFG/
 pub fn generate_assembly(

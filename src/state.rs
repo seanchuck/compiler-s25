@@ -3,8 +3,8 @@ Data structures for dataflow analysis.
 */
 use std::collections::{HashMap, HashSet};
 use crate::cfg::*;
-use crate::tac::*;
 
+// Map between variable and its source
 pub type CopyMap = HashMap<String, String>;
 
 /// Compute the successors graph for a given CFG.
