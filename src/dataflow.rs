@@ -17,7 +17,6 @@ fn invalidate(
     dest_name: &str,
     copy_to_src: &mut HashMap<String, String>,
     src_to_copies: &mut HashMap<String, HashSet<String>>,
-    debug: bool
 ) {
     // Remove dest from its source's copy set
     if let Some(src) = copy_to_src.remove(dest_name) {
@@ -32,11 +31,6 @@ fn invalidate(
             copy_to_src.remove(&dependent);
         }
     }
-
-    // if debug {
-    //     println!("Invalidated mutated variable: {}", dest_name);
-    // }
-
 }
 
 /// Recursively get the root source that a copy refers to.
@@ -124,32 +118,33 @@ fn reverse_map(map: &HashMap<String, String>) -> HashMap<String, HashSet<String>
 fn get_dest(instr: &Instruction) -> Option<String> {
     match instr {
         Instruction::Assign { dest, .. }
-            | Instruction::Add { dest, .. }
-            | Instruction::Subtract { dest, .. }
-            | Instruction::Multiply { dest, .. }
-            | Instruction::Divide { dest, .. }
-            | Instruction::Modulo { dest, .. }
-            | Instruction::Cast { dest, .. }
-            | Instruction::Not { dest, .. }
-            | Instruction::Len { dest, .. }
-            | Instruction::Equal { dest, .. }
-            | Instruction::Less { dest, .. }
-            | Instruction::Greater { dest, .. }
-            | Instruction::LessEqual { dest, .. }
-            | Instruction::GreaterEqual { dest, .. }
-            | Instruction::NotEqual {dest, .. }
-            | Instruction::LoadString {dest, .. }
-            | Instruction::LoadConst {dest, .. } => {
+        | Instruction::Add { dest, .. }
+        | Instruction::Subtract { dest, .. }
+        | Instruction::Multiply { dest, .. }
+        | Instruction::Divide { dest, .. }
+        | Instruction::Modulo { dest, .. }
+        | Instruction::Cast { dest, .. }
+        | Instruction::Not { dest, .. }
+        | Instruction::Len { dest, .. }
+        | Instruction::Equal { dest, .. }
+        | Instruction::Less { dest, .. }
+        | Instruction::Greater { dest, .. }
+        | Instruction::LessEqual { dest, .. }
+        | Instruction::GreaterEqual { dest, .. }
+        | Instruction::NotEqual {dest, .. }
+        | Instruction::LoadString {dest, .. }
+        | Instruction::LoadConst {dest, .. } => {
+            Some(dest.to_string())
+        }
+
+        Instruction::MethodCall { dest, .. } =>{
+            if let Some(dest) = dest {
                 Some(dest.to_string())
+            } else {
+                None
             }
-            Instruction::MethodCall { dest, .. } =>{
-                if let Some(dest) = dest {
-                    Some(dest.to_string())
-                } else {
-                    None
-                }
-            }
-            _=> None
+        }
+        _=> None
     }
 }
 
@@ -195,7 +190,7 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, CopyMap>, Ha
                 Instruction::Assign { src, dest } => {
                     // Kill copies that use dest, since this assignment updates its values
                     if let Operand::LocalVar(dest_name) = dest {
-                        invalidate(dest_name, &mut copy_to_src, &mut src_to_copies, debug);
+                        invalidate(dest_name, &mut copy_to_src, &mut src_to_copies);
 
                         // Gen[B]: this is a direct assignment (a = b), add to tables
                         if let Operand::LocalVar(src_name) = src {
@@ -206,47 +201,46 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, CopyMap>, Ha
                 }
 
                 // Binary operations: arithmetic and relational 
-                Instruction::Add { left, right, dest } 
-                | Instruction::Subtract { left, right, dest }
-                | Instruction::Multiply { left, right, dest }
-                | Instruction::Divide { left, right, dest }
-                | Instruction::Modulo { left, right, dest } 
-                | Instruction::Greater { left, right, dest }
-                | Instruction::Less { left, right, dest }
-                | Instruction::LessEqual { left, right, dest }
-                | Instruction::GreaterEqual { left, right, dest }
-                | Instruction::Equal { left, right, dest }
-                | Instruction::NotEqual { left, right, dest }=> {
-
+                Instruction::Add {dest, .. } 
+                | Instruction::Subtract {dest, .. }
+                | Instruction::Multiply {dest, .. }
+                | Instruction::Divide {dest, .. }
+                | Instruction::Modulo {dest, .. } 
+                | Instruction::Greater {dest, .. }
+                | Instruction::Less {dest, .. }
+                | Instruction::LessEqual {dest, .. }
+                | Instruction::GreaterEqual {dest, .. }
+                | Instruction::Equal {dest, .. }
+                | Instruction::NotEqual {dest, .. }=> {
                     // Invalidate the destination since its value is updated
-                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
                 }
 
                 // Unary operations
-                Instruction::Not { expr, dest } => {
-                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                Instruction::Not {dest, .. } => {
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
                 }
-                Instruction::Cast { expr, dest, .. } => {
-                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                Instruction::Cast {dest, ..} => {
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
                 }
-                Instruction::Len { expr, dest } => {
-                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                Instruction::Len {dest, .. } => {
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
                 }
 
                 Instruction::MethodCall {args, dest , ..} => {
                     // Invalidate the destination since its value is updated
                     if dest.is_some() {
-                        invalidate(&dest.clone().unwrap().to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                        invalidate(&dest.clone().unwrap().to_string(), &mut copy_to_src, &mut src_to_copies);
                     }
                 }
 
                 Instruction::LoadString { dest, .. } => {
                     // Invalidate the destination since its value is updated
-                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
                 }
                 Instruction::LoadConst {dest, .. } => {
                     // Invalidate the destination since its value is updated
-                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
                 }
                 _ => { 
                     // UJmp, CJmp, Ret, and Exit have no effect
@@ -254,7 +248,7 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, CopyMap>, Ha
                     // be any for any of these
                     let dest = get_dest(instr);
                     if let Some(dest) = dest {
-                        invalidate(&dest, &mut copy_to_src, &mut src_to_copies, debug);
+                        invalidate(&dest, &mut copy_to_src, &mut src_to_copies);
                     }
                 }
             }
@@ -302,63 +296,63 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
         {
             match instr {
                 Instruction::Assign { src, dest } => {
-                                substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
 
-                                if let Operand::LocalVar(dest_name) = dest {
-                                    invalidate(dest_name, &mut copy_to_src, &mut src_to_copies, debug);
+                    if let Operand::LocalVar(dest_name) = dest {
+                        invalidate(dest_name, &mut copy_to_src, &mut src_to_copies);
 
-                                    if let Operand::LocalVar(src_name) = src {
-                                        copy_to_src.insert(dest_name.clone(), src_name.clone());
-                                        src_to_copies
-                                            .entry(src_name.clone())
-                                            .or_default()
-                                            .insert(dest_name.clone());
-                                    }
-                                }
-                            }
+                        if let Operand::LocalVar(src_name) = src {
+                            copy_to_src.insert(dest_name.clone(), src_name.clone());
+                            src_to_copies
+                                .entry(src_name.clone())
+                                .or_default()
+                                .insert(dest_name.clone());
+                        }
+                    }
+                }
                 Instruction::Add { left, right, dest }
-                            | Instruction::Subtract { left, right, dest }
-                            | Instruction::Multiply { left, right, dest }
-                            | Instruction::Divide { left, right, dest }
-                            | Instruction::Modulo { left, right, dest }
-                            | Instruction::Greater { left, right, dest }
-                            | Instruction::Less { left, right, dest }
-                            | Instruction::LessEqual { left, right, dest }
-                            | Instruction::GreaterEqual { left, right, dest }
-                            | Instruction::Equal { left, right, dest }
-                            | Instruction::NotEqual { left, right, dest } => {
-                                substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
-                                substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
+                | Instruction::Subtract { left, right, dest }
+                | Instruction::Multiply { left, right, dest }
+                | Instruction::Divide { left, right, dest }
+                | Instruction::Modulo { left, right, dest }
+                | Instruction::Greater { left, right, dest }
+                | Instruction::Less { left, right, dest }
+                | Instruction::LessEqual { left, right, dest }
+                | Instruction::GreaterEqual { left, right, dest }
+                | Instruction::Equal { left, right, dest }
+                | Instruction::NotEqual { left, right, dest } => {
+                    substitute_operand(left, &copy_to_src, &mut update_occurred, debug);
+                    substitute_operand(right, &copy_to_src, &mut update_occurred, debug);
 
-                                invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
-                            }
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
+                }
                 Instruction::Not { expr, dest }
-                            | Instruction::Cast { expr, dest, .. }
-                            | Instruction::Len { expr, dest } => {
-                                substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
-                    
-                                invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
-                            }
+                | Instruction::Cast { expr, dest, .. }
+                | Instruction::Len { expr, dest } => {
+                    substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
+        
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
+                }
                 Instruction::MethodCall { args, dest, .. } => {
-                                for arg in args {
-                                    // You may uncomment this if you want to try propagating into args
-                                    substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
-                                }
+                    for arg in args {
+                        // You may uncomment this if you want to try propagating into args
+                        substitute_operand(arg, &copy_to_src, &mut update_occurred, debug);
+                    }
 
-                                if let Some(dest_op) = dest {
-                                    invalidate(&dest_op.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
-                                }
-                            }
+                    if let Some(dest_op) = dest {
+                        invalidate(&dest_op.to_string(), &mut copy_to_src, &mut src_to_copies);
+                    }
+                }
                 Instruction::LoadString { dest, .. }
-                            | Instruction::LoadConst { dest, .. } => {
-                                invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies, debug);
-                            }
+                | Instruction::LoadConst { dest, .. } => {
+                    invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
+                }
                 Instruction::UJmp { .. }
                 | Instruction::CJmp { .. }
                 | Instruction::Ret { .. }
                 | Instruction::Exit { .. } => {
                     if let Some(dest_name) = get_dest(instr) {
-                        invalidate(&dest_name, &mut copy_to_src, &mut src_to_copies, debug);
+                        invalidate(&dest_name, &mut copy_to_src, &mut src_to_copies);
                     }
                 }
             }
@@ -367,7 +361,6 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
 
     update_occurred
 }
-
 
 
 
