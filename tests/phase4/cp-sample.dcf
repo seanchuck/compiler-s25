@@ -1,0 +1,48 @@
+// Sample test cases
+
+int increment(int x) {
+    int y;
+    y = x + 1;
+    return y;
+}
+
+void main() {
+    int a;
+    int b;
+    int c;
+    int d;
+    int e;
+    int f;
+
+    int z;
+    int k;
+    bool cond;
+    bool notcond;
+
+
+
+    int result;
+
+    a = 5;
+    k = 999;
+    b = a;          // copy: b = a
+    c = b + 2;      // propagation: b -> a
+    d = c % 3;      // propagation: c -> a + 2
+    cond = true;
+    
+    if (cond) {
+        e = d;      // copy across branch
+        z = k;
+        
+    } else {
+        e = 0;
+        z = k;
+    }
+
+    a = z + 3; // propagation: z -> k
+
+    notcond = !cond;      // unary operation
+    result = increment(e); // result propagates return
+
+    return;
+}

@@ -26,7 +26,7 @@ fn invalidate(
         }
     }
 
-    // If dest was a source, remove all dependent copies
+    // If dest was a source,b remove all dependent copies
     if let Some(dependents) = src_to_copies.remove(dest_name) {
         for dependent in dependents {
             copy_to_src.remove(&dependent);
