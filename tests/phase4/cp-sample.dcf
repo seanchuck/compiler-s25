@@ -1,10 +1,6 @@
-// Sample test cases
+// Our sample test case to demonstrate copy propagation
 
-int increment(int x) {
-    int y;
-    y = x + 1;
-    return y;
-}
+import printf;
 
 void main() {
     int a;
@@ -13,24 +9,24 @@ void main() {
     int d;
     int e;
     int f;
-
     int z;
     int k;
-    bool cond;
+    bool cond1;
+    bool cond2;
     bool notcond;
 
-
-
-    int result;
 
     a = 5;
     k = 999;
     b = a;          // copy: b = a
     c = b + 2;      // propagation: b -> a
     d = c % 3;      // propagation: c -> a + 2
-    cond = true;
+
+    cond1 = true;
+    cond2 = cond1;
     
-    if (cond) {
+    if (cond1) {
+        // should be e = (7 % 3 = 1)
         e = d;      // copy across branch
         z = k;
         
@@ -41,8 +37,7 @@ void main() {
 
     a = z + 3; // propagation: z -> k
 
-    notcond = !cond;      // unary operation
-    result = increment(e); // result propagates return
+    notcond = !cond2;      // propagation: cond2 -> cond1
+    printf("%d\n", e); // no propagation: should be 1
 
-    return;
 }

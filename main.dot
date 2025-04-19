@@ -1,11 +1,11 @@
 digraph CFG {
   node [shape=box fontname="monospace"];
-  0 [label="Block 0\l_t0 <- 5\la <- _t0\l_t1 <- 999\lk <- _t1\lb <- _t0\l_t2 <- 2\l_t3 <- _t0 + _t2\lc <- _t3\l_t4 <- 3\l_t5 <- _t3 % _t4\ld <- _t5\lcond <- 1\lcjmp cond, main1\lujmp main2\l"];
+  0 [label="Block 0\l_t0 <- 5\la <- _t0\l_t1 <- 999\lk <- _t1\lb <- _t0\l_t2 <- 2\l_t3 <- _t0 + _t2\lc <- _t3\l_t4 <- 3\l_t5 <- _t3 % _t4\ld <- _t5\lcond1 <- 1\lcond2 <- cond1\lcjmp cond1, main1\lujmp main2\l"];
   1 [label="Block 1\le <- _t5\lz <- _t1\lujmp main3\l"];
   2 [label="Block 2\l_t6 <- 0\le <- _t6\lz <- _t1\lujmp main3\l"];
-  3 [label="Block 3\l_t7 <- 3\l_t8 <- _t1 + _t7\la <- _t8\l_t9 <- !cond\lnotcond <- _t9\l_t10 <- increment(e)\lresult <- _t10\lret\l"];
-  0 -> 2 [label="False"];
+  3 [label="Block 3\l_t7 <- 3\l_t8 <- _t1 + _t7\la <- _t8\l_t9 <- !cond1\lnotcond <- _t9\l_t10 <- String(0)\lprintf(_t10, e)\l_t11 <- 0\lret _t11\l"];
   0 -> 1 [label="True"];
+  0 -> 2 [label="False"];
   1 -> 3 [label=""];
   2 -> 3 [label=""];
 }
