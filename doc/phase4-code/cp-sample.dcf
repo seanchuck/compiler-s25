@@ -20,7 +20,7 @@ void main() {
     k = 999;
     b = a;          // copy: b = a
     c = b + 2;      // propagation: b -> a
-    d = c % 3;      // propagation: c -> a + 2
+    d = c % 3;
 
     cond1 = true;
     cond2 = cond1;
@@ -39,5 +39,4 @@ void main() {
 
     notcond = !cond2;      // propagation: cond2 -> cond1
     printf("%d\n", e); // no propagation: should be 1
-
 }
