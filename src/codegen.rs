@@ -465,7 +465,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let mut swapped = false;
 
-            let left_typ = left_op.get_type();
+            let left_typ = left.get_type();
             let left_reg = reg_for_type(Register::Rax, &left_typ);
 
             // handle illegal cmp: (mem, mem)
