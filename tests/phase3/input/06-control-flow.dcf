@@ -3,14 +3,28 @@ void main ( ) {
   int i, sum;
   int j;
   sum = 0;
+
   for ( j = 0; j < 10; j ++ ) {
+    printf("j is %d\n",j);
     sum += j;
+    printf("sum is %d\n", sum);
   }
+
+
+
+
+
+
+
+
+
+
   if ( sum != 45 ) {
     printf ( "ERROR: for loop is bad (1)\n" );
   }
   i = 11;
   for ( j = 10; j < 0; j += 1 ) {
+    printf("hi\n");
     i += 1;
   }
   if ( i != 11 ) {

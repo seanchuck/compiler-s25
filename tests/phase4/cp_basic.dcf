@@ -1,0 +1,12 @@
+void main() {
+    int a, b, c, d;
+    int arr[5];
+    arr[0] = 3;
+
+
+    a = arr[0];
+    b = a;     // Copy propagation: b can be replaced with a
+
+    c = b + 1;
+    return;
+}

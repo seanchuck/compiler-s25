@@ -1,0 +1,12 @@
+void main() {
+    int a,b,c,s,t;
+    long l;
+
+    a = 5;
+    b = 3;
+    c = a;
+    s = b;
+    t = c + s;
+    l = long(s);
+
+}

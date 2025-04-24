@@ -21,6 +21,7 @@ const UNREACHABLE_BLOCK: i32 = -1; // id for an unreachable block
 thread_local! {
     static TEMP_COUNTER: RefCell<usize> = RefCell::new(0);
     static BBLOCK_COUNTER: RefCell<usize> = RefCell::new(0);
+    static VAR_COUNTERS: RefCell<HashMap<String, usize>> = RefCell::new(HashMap::new());
 }
 
 /// Create a new temporary variable named "_t{counter}"
@@ -31,6 +32,22 @@ fn fresh_temp() -> String {
         let temp_name = format!("_t{}", *count);
         *count += 1;
         temp_name
+    })
+}
+
+/// Create a new unique version of a named variable like "b" -> "_b1"
+fn fresh_var(base: &str) -> String {
+    VAR_COUNTERS.with(|map| {
+        let mut counters = map.borrow_mut();
+        let count = counters.entry(base.to_string()).or_insert(0);
+        let var_name: String;
+        if *count as i32 > 0 {
+            var_name = format!("_{}{}", base, count);
+        } else {
+            var_name = format!("{}", base);
+        }
+        *count += 1;
+        var_name
     })
 }
 
@@ -301,6 +318,9 @@ fn destruct_expr(
                         sym_scope,
                         strings,
                     );
+
+                    cfg.add_edge(next_true_block.get_id(), next_block.get_id(), EdgeType::Unconditional);
+                    cfg.add_edge(next_false_block.get_id(), next_block.get_id(), EdgeType::Unconditional);
 
                     return (next_block.get_id(), dest);
                 }
@@ -590,12 +610,23 @@ fn build_cond(
                             id: next_true_block_id,
                         },
                     );
+                    cfg.add_edge(
+                        cur_block_id,
+                        next_true_block_id,
+                        EdgeType::True,
+                    );
+
                     cfg.add_instruction_to_block(
                         cur_block_id,
                         Instruction::UJmp {
                             name: cfg.name.clone(),
                             id: next_false_block_id,
                         },
+                    );
+                    cfg.add_edge(
+                        cur_block_id,
+                        next_false_block_id,
+                        EdgeType::False,
                     );
                 }
             }
@@ -630,6 +661,8 @@ fn build_cond(
                             id: next_true_block_id,
                         },
                     );
+                    cfg.add_edge(cur_block_id, next_true_block_id, EdgeType::True);
+
                     cfg.add_instruction_to_block(
                         cur_block_id,
                         Instruction::UJmp {
@@ -637,6 +670,7 @@ fn build_cond(
                             id: next_false_block_id,
                         },
                     );
+                    cfg.add_edge(cur_block_id, next_false_block_id, EdgeType::False);
                 }
             }
         }
@@ -654,6 +688,8 @@ fn build_cond(
                     id: next_true_block_id,
                 },
             );
+            cfg.add_edge(cur_block_id, next_true_block_id, EdgeType::True);  
+
             cfg.add_instruction_to_block(
                 cur_block_id,
                 Instruction::UJmp {
@@ -661,6 +697,7 @@ fn build_cond(
                     id: next_false_block_id,
                 },
             );
+            cfg.add_edge(cur_block_id, next_false_block_id, EdgeType::False);
         }
     }
 }
@@ -1130,6 +1167,9 @@ fn destruct_statement(
                         id: next_block.get_id(),
                     },
                 );
+
+                cfg.add_edge(body_block_id, next_block.get_id(), EdgeType::Unconditional);
+                cfg.add_edge(else_body_block_id, next_block.get_id(), EdgeType::Unconditional);
             } else {
                 next_block = BasicBlock::new(next_bblock_id());
 
@@ -1164,6 +1204,7 @@ fn destruct_statement(
                         id: next_block.get_id(),
                     },
                 );
+                cfg.add_edge(body_block_id, next_block.get_id(), EdgeType::Unconditional);
             }
 
             cfg.add_block(&next_block);
@@ -1180,6 +1221,7 @@ fn destruct_statement(
             cfg.add_block(&header_block);
             cfg.add_block(&body_block);
             cfg.add_block(&next_block);
+            // Two edges from header to body and next are handled by buildconditional
 
             cfg.add_instruction_to_block(
                 cur_block_id,
@@ -1188,6 +1230,7 @@ fn destruct_statement(
                     id: header_block.get_id(),
                 },
             );
+            cfg.add_edge(cur_block_id, header_id, EdgeType::Unconditional);
 
             build_cond(
                 cfg,
@@ -1230,6 +1273,7 @@ fn destruct_statement(
                     id: header_id,
                 },
             );
+            cfg.add_edge(body_id, header_id, EdgeType::Unconditional);
 
             next_block.get_id()
         }
@@ -1253,22 +1297,6 @@ fn destruct_statement(
             cfg.add_block(&body_block);
             cfg.add_block(&update_block);
             cfg.add_block(&next_block);
-
-            // for-loop initialization
-            // println!("Looking for for loop variable {}", var);
-            // println!("Looking in scope {:?}", sym_scope);
-            // let var_typ = if let TableEntry::Variable { typ, .. } = sym_scope.borrow().lookup(var).expect("couldn't find for loop variable") {
-            //     typ.clone()
-            // } else {
-            //     panic!("Expected a variable, found something else!");
-            // };
-
-            // let mut dummy_context: SemanticContext = SemanticContext {
-            //     filename: "dummy".to_string(),
-            //     error_found: false,
-            // };
-            // let mut dummy_writer = io::sink();
-            // let var_typ = infer_expr_type(init, &sym_scope.borrow(), &mut dummy_writer, &mut dummy_context).expect("couldnt get expr type");
 
             let var_entry = sym_scope.borrow().lookup(&var).expect(format!("Did not find for loop variable {}", var).as_str());
             let var_typ = if let TableEntry::Variable { typ, .. } = var_entry {
@@ -1302,7 +1330,8 @@ fn destruct_statement(
                     id: header_id,
                 },
             );
-
+            cfg.add_edge(cur_block_id, header_id, EdgeType::Unconditional);
+        
             // build condition check
             build_cond(
                 cfg,
@@ -1348,7 +1377,8 @@ fn destruct_statement(
                     id: update_block_id,
                 },
             );
-
+            cfg.add_edge(body_id, update_block_id, EdgeType::Unconditional);
+        
             // update block executes update expression
             let mut update_id = update_block_id;
             update_id = destruct_statement(
@@ -1369,7 +1399,8 @@ fn destruct_statement(
                     id: header_id,
                 },
             );
-
+            cfg.add_edge(update_id, header_id, EdgeType::Unconditional);
+        
             next_block.get_id()
         }
 
@@ -1381,6 +1412,7 @@ fn destruct_statement(
                     id: cur_loop.unwrap().break_to,
                 },
             );
+            cfg.add_edge(cur_block_id, cur_loop.unwrap().break_to, EdgeType::Unconditional);
 
             // code after the break within this statement is unreachable
             UNREACHABLE_BLOCK
@@ -1393,6 +1425,7 @@ fn destruct_statement(
                     id: cur_loop.clone().unwrap().continue_to,
                 },
             );
+            cfg.add_edge(cur_block_id, cur_loop.unwrap().continue_to, EdgeType::Unconditional);
 
             // code after the continue within this statement is unreachable
             UNREACHABLE_BLOCK
@@ -1446,7 +1479,7 @@ fn destruct_statement(
             name, typ, length, ..
         } => {
             // create new temp variable for this local variable, and add it to the scope
-            let temp = fresh_temp();
+            let temp = fresh_var(name);
             cfg_scope.add_local(name.to_string(), temp.to_string());
 
             if length.is_some() {
@@ -1506,7 +1539,6 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
     for (pos, (typ, param_name, ..)) in method.params.iter().enumerate() {
         let temp = fresh_temp();
         method_cfg.add_temp_var(temp.clone(), typ.clone(), None);
-        println!("adding arg {param_name} at {temp}");
     
         // Add param name → temp to local scope
         scope.add_local(param_name.to_string(), temp.clone());

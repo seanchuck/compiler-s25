@@ -1,8 +1,21 @@
+int foo(int x) {
+  int y;
+  y = 0;
+
+  if (x < 5) {
+    y = 1;
+  } else {
+    y = 2;
+  }
+
+  while (y < 10) {
+    y = y + 1;
+  }
+
+  return y;
+}
+
 void main() {
-    int i;
-    for (i = 0 ; i < 3; i++) {
-        int a;
-        for ( a = 0 ; a < 3; a++) {
-        }
-    }
+  int z;
+  z = foo(3);
 }

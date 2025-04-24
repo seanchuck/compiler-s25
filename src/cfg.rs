@@ -1,11 +1,14 @@
 use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*};
-use std::{cell::RefCell, collections::{BTreeMap, HashMap}, rc::Rc};
+use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet}, rc::Rc};
 /**
 Control flow graph (CFG) representation.
 
 Consists of basic blocks and directed edges
 between those basic blocks.
 **/
+use std::fs::File;
+use std::io::Write;
+
 
 // #################################################
 // CONSTANTS
@@ -24,6 +27,20 @@ pub struct Temp {
     pub typ: Type
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum EdgeType {
+    True,
+    False,
+    Unconditional,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct BlockEdge {
+    pub u: i32,
+    pub v: i32,
+    pub truth: EdgeType,
+}
+
 #[derive(Debug, Clone)]
 pub struct CFG {
     // BTreeMap is hash map that allows constant iteration order
@@ -31,6 +48,9 @@ pub struct CFG {
     pub name: String,                      // Name of the method for the CFG
     pub blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
     // no need to store edges because basic blocks end with a jump/branch instruction
+
+    pub edges: BTreeMap<i32, HashSet<BlockEdge>>,
+    pub scopes: BTreeMap<i32, RefCell<CFGScope>>,
 
     // TODO: 
     pub stack_size: i64, // total space to allocate on the stack for this method
@@ -44,6 +64,8 @@ impl CFG {
         CFG {
             name,
             blocks: BTreeMap::new(),
+            edges: BTreeMap::new(),
+            scopes: BTreeMap::new(),
             stack_size: 0,
             locals: BTreeMap::new(),
             param_to_temp: BTreeMap::new(),
@@ -55,6 +77,10 @@ impl CFG {
     pub fn get_blocks(&self) -> &BTreeMap<i32, BasicBlock> {
         &self.blocks
     }
+
+    pub fn get_blocks_mut(&mut self) -> &mut BTreeMap<i32, BasicBlock> {
+        &mut self.blocks
+    }    
 
     /// Get basic block with ID
     fn get_block_with_id(&mut self, id: i32) -> &mut BasicBlock {
@@ -69,6 +95,16 @@ impl CFG {
     pub fn add_block(&mut self, block: &BasicBlock) {
         self.blocks.insert(block.get_id(), block.clone());
     }
+
+    // Adds an edge to the CFG
+    pub fn add_edge(&mut self, u: i32, v: i32, edge_type: EdgeType) {
+        let edge = BlockEdge {
+            u,
+            v,
+            truth: edge_type,
+        };
+        self.edges.entry(u).or_default().insert(edge);
+    }    
 
     /// Add instruction to block with ID
     pub fn add_instruction_to_block(&mut self, id: i32, instruction: Instruction) {
@@ -93,7 +129,6 @@ impl CFG {
 
     /// Allocate space on the stack for a new temp var
     pub fn add_temp_var(&mut self, temp: String, typ: Type, length: Option<i64>) {
-        println!("looking at temp {} of type {:#?}", temp, typ);
         let element_size = self.get_element_size(typ.clone());
         // let element_size = LONG_SIZE;
         let size: i64;
@@ -105,11 +140,7 @@ impl CFG {
             size = element_size;
         }
 
-        println!("going to allocate {size} bytes for {temp}");
-
         self.stack_size += size;
-
-        println!("Offset for temp: {} is at - {}. It uses {} bytes", temp, self.stack_size, size);
         self.locals.insert(
             temp,
             Local {
@@ -125,13 +156,120 @@ impl CFG {
         self.locals.get(temp).unwrap().stack_offset
     }
 
-    // Get type of a parameter
-    pub fn get_param_type(&self, idx: i32) -> Type {
-        println!("Method: {} , trying to find the argument {}", self.name, idx);
-        println!("Param to temp {:?}", self.param_to_temp);
-        let param_temp = self.param_to_temp.get(&idx).expect("couldnt find param temp");
-        let param_typ = param_temp.typ.clone();
-        param_typ
+    pub fn add_scope(&mut self, id: i32, scope: CFGScope) {
+        self.scopes.insert(id, RefCell::new(scope));
+    }
+    
+    pub fn get_scope(&self, id: i32) -> std::cell::RefMut<'_, CFGScope> {
+        self.scopes
+            .get(&id)
+            .expect("missing scope")
+            .borrow_mut()
+    }
+
+    // Used to get nice visualization of CFG
+    pub fn to_dot(&self) -> String {
+        let mut dot = String::new();
+        dot.push_str("digraph CFG {\n");
+        dot.push_str("  node [shape=box fontname=\"monospace\"];\n");
+
+        for (id, block) in &self.blocks {
+            let label = block
+                .get_instructions()
+                .iter()
+                .map(|insn| {
+                    let s = match insn {
+                        Instruction::Add { left, right, dest, .. } => format!("{dest} <- {left} + {right}"),
+                        Instruction::Assign { src, dest, .. } => format!("{dest} <- {src}"),
+                        Instruction::CJmp { name, condition, id } => format!("cjmp {condition}, {name}{id}"),
+                        Instruction::Cast { expr, dest, target_type } => {
+                            format!("{dest} <- {target_type}({expr})")
+                        }
+                        Instruction::Divide {left, right, dest, .. } => format!("{dest} <- {left} / {right}"),
+                        Instruction::Equal { left, right, dest } => format!("{dest} <- {left} == {right}"),
+                        Instruction::Greater { left, right, dest } => format!("{dest} <- {left} > {right}"),
+                        Instruction::GreaterEqual { left, right, dest } => format!("{dest} <- {left} >= {right}"),
+                        Instruction::Len {expr, dest, .. } => format!("{dest} <- len({expr})"),
+                        Instruction::Less { left, right, dest } => format!("{dest} <- {left} < {right}"),
+                        Instruction::LessEqual { left, right, dest } => format!("{dest} <- {left} <= {right}"),
+                        Instruction::MethodCall { name, args, dest, .. }=> {
+                            let args_str = args
+                                .iter()
+                                .map(|op| op.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", ");
+                            if let Some(d) = dest {
+                                format!("{d} <- {name}({args_str})")
+                            } else {
+                                format!("{name}({args_str})")
+                            }
+                        }
+                        Instruction::Modulo {left, right, dest , ..}=> format!("{dest} <- {left} % {right}"),
+                        Instruction::Multiply {left, right, dest , ..} => format!("{dest} <- {left} * {right}"),
+                        Instruction::Not { expr, dest } => format!("{dest} <- !{expr}"),
+                        Instruction::NotEqual { left, right, dest } => format!("{dest} <- {left} != {right}"),
+                        Instruction::Ret {value, .. }=> {
+                            if let Some(v) = value {
+                                format!("ret {v}")
+                            } else {
+                                "ret".to_string()
+                            }
+                        }
+                        Instruction::Subtract { typ, left, right, dest }=> format!("{dest} <- {left} - {right}"),
+                        Instruction::UJmp { name, id } => format!("ujmp {name}{id}"),
+                        Instruction::LoadString { src, dest } => format!("{dest} <- {src:?}"),
+                        Instruction::Exit { exit_code } => format!("exit({})", exit_code),
+                        Instruction::LoadConst { src, dest, typ } => format!("{dest} <- {src}"),
+                    };
+                    s.replace('\\', "\\\\").replace('"', "\\\"") // escape for DOT
+                })                           
+                .collect::<Vec<_>>()
+                .join("\\l"); // Graphviz line break
+            dot.push_str(&format!("  {} [label=\"Block {}\\l{}\\l\"];\n", id, id, label));
+        }
+
+        for (_from, edges) in &self.edges {
+            for edge in edges {
+                let label = match edge.truth {
+                    EdgeType::True => "True",
+                    EdgeType::False => "False",
+                    EdgeType::Unconditional => "",
+                };
+                dot.push_str(&format!(
+                    "  {} -> {} [label=\"{}\"];\n",
+                    edge.u, edge.v, label
+                ));
+            }
+        }
+
+        dot.push_str("}\n");
+        dot
+    }
+
+    /// Dump dot to file and optionally render PNG
+    pub fn export_dot(&self, path: &str, render_png: bool) {
+        let dot_code = self.to_dot();
+        let mut file = File::create(path).expect("Could not create .dot file");
+        file.write_all(dot_code.as_bytes())
+            .expect("Failed to write DOT");
+
+        println!("DOT file written to: {}", path);
+
+        if render_png {
+            let output = std::process::Command::new("dot")
+                .arg("-Tpng")
+                .arg(path)
+                .arg("-o")
+                .arg("cfg.png")
+                .output()
+                .expect("Failed to run Graphviz 'dot' command");
+            if output.status.success() {
+                println!("Rendered image: cfg.png");
+            } else {
+                eprintln!("⚠️ Failed to render PNG. Do you have Graphviz installed?");
+                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+            }
+        }
     }
 }
 
@@ -142,6 +280,9 @@ pub struct CFGScope {
 }
 
 impl CFGScope {
+    pub fn new(parent: Option<Box<CFGScope>>) -> CFGScope {
+        CFGScope { parent, local_to_temp: HashMap::new() }
+    }
     /// Returns this global variable, or the temp variable associated to this local variable
     pub fn lookup_var(&self, var: String, typ: Type) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&var) {
@@ -199,6 +340,10 @@ impl BasicBlock {
         &self.instructions
     }
 
+    pub fn get_instructions_mut(&mut self) -> &mut Vec<Instruction> {
+        &mut self.instructions
+    }
+    
     fn add_instruction(&mut self, instruction: Instruction) {
         self.instructions.push(instruction);
     }

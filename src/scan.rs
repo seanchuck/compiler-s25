@@ -808,9 +808,5 @@ pub fn scan(
         process::exit(1);
     }
 
-    // if debug {
-    //     println!("Successfully scanned! Tokens are:\n {:#?}", tokens);
-    // }
-
     tokens
 }
