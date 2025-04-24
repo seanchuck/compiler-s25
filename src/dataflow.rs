@@ -251,8 +251,13 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<
     let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect::<VecDeque<i32>>();
 
 
+    // Run fixed point algorithm to get steady-state liveness maps
     while let Some(block_id) = worklist.pop_front() {
-        let block = method_cfg.blocks.get(&block_id).unwrap();
+        // let block = method_cfg.blocks.get(&block_id);
+        // println!("want block: {}", block_id);
+        // println!("current blocks {:#?}", method_cfg.blocks);
+        // println!("")
+        
 
         // OUT[B] = ∪ IN[S] for successors S
         let out_set: HashSet<String> = successors
@@ -271,7 +276,7 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<
         let mut def_set = HashSet::new();
 
         // iterate in reverse within the basic block
-        for instr in block.instructions.iter().rev() {
+        for instr in method_cfg.blocks.get(&block_id).unwrap().instructions.iter().rev() {
             let used_vars = get_source_vars(instr);
             let dest = get_dest_var(instr);
 
@@ -315,6 +320,8 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
     let (_, out_maps) = compute_liveness(method_cfg, debug);
     let mut update_occurred = false;
 
+    println!("whoooop");
+
     for (block_id, block) in method_cfg.blocks.iter_mut() {
         let out_set = out_maps.get(&block_id).unwrap_or(&HashSet::new()).clone();
 
@@ -326,22 +333,30 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
             let dest = get_dest_var(instr);
             let used = get_source_vars(instr);
 
-            // avoid moving any instructions with a side-effect
-            let has_side_effect = matches!(
-                instr,
+            // TODO: avoid moving any instructions with a side-effect
+            let has_side_effect = match instr {
                 Instruction::MethodCall { .. }
-                    | Instruction::Ret { .. }
-                    | Instruction::CJmp { .. }
-                    | Instruction::UJmp { .. }
-                    | Instruction::Exit { .. }
-            );
+                | Instruction::Ret { .. }
+                | Instruction::CJmp { .. }
+                | Instruction::UJmp { .. }
+                | Instruction::Exit { .. } => true,
+            
+                // check for assigning to globals
+                instr => {
+                    if let Some(dest) = get_dest_var(instr) {
+                        method_cfg.locals.get(dest.as_str()).is_none() // global var iff not in locals
+                    } else {
+                        false
+                    }
+                }
+            };
 
-            let keep = match &dest {
+            let keep_instr = match &dest {
                 Some(var) => live.contains(var) || has_side_effect,
                 None => true,
             };
 
-            if keep {
+            if keep_instr {
                 // Update live set
                 for var in &used {
                     live.insert(var.clone());

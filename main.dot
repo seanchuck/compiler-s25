@@ -1,4 +1,4 @@
 digraph CFG {
   node [shape=box fontname="monospace"];
-  0 [label="Block 0\l_t0 <- 2\l_t1 <- get_int(_t0)\la <- _t1\l_t2 <- 3\l_t3 <- get_int(_t2)\lb <- _t3\l_t5 <- a * b\ld <- _t5\l_t6 <- 4\l_t7 <- d + _t6\le <- _t7\l_t8 <- String(0)\lprintf(_t8, d)\l_t9 <- String(1)\lprintf(_t9, e)\l_t10 <- 0\lret _t10\l"];
+  0 [label="Block 0\ld <- 3\l_t0 <- 1\la <- _t0\l_t1 <- 2\lb[_t2] <- _t1\l_t3 <- 3\lb[_t4] <- _t3\l_t5 <- 4\l_t6 <- 5\ld[_t7] <- _t6\l_t8 <- 6\ld[_t9] <- _t8\l_t10 <- 7\ld[_t11] <- _t10\l_t12 <- String(0)\l_t13 <- len(b)\l_t14 <- b[_t15]\l_t16 <- b[_t17]\l_t18 <- len(d)\l_t19 <- d[_t20]\l_t21 <- d[_t22]\l_t23 <- d[_t24]\lprintf(_t12, a, _t13, _t14, _t16, _t5, _t18, _t19, _t21, _t23)\l_t25 <- 0\lret _t25\l"];
 }
