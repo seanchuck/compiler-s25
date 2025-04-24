@@ -38,13 +38,13 @@ impl Operand {
 impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Operand::Const(val, typ) => write!(f, "({}){}", typ, val),
+            Operand::Const(val, _) => write!(f, "{}", val),
             Operand::String(id, _) => write!(f, "str{}", id),
-            Operand::GlobalVar(name, typ) => write!(f, "({}){}", typ, name),
-            Operand::GlobalArrElement(name, idx, typ) => write!(f, "({}){}[{}]", typ, name, idx),
-            Operand::LocalVar(name, typ) => write!(f, "({}){}", typ, name),
-            Operand::LocalArrElement(name, idx, typ) => write!(f, "({}){}[{}]", typ, name, idx),
-            Operand::Argument(pos, typ) => write!(f, "({})arg{}", typ, pos),
+            Operand::GlobalVar(name, _) => write!(f, "{}", name),
+            Operand::GlobalArrElement(name, idx, _) => write!(f, "{}[{}]", name, idx),
+            Operand::LocalVar(name, _) => write!(f, "{}", name),
+            Operand::LocalArrElement(name, idx, _) => write!(f, "{}[{}]", name, idx),
+            Operand::Argument(pos, _) => write!(f, "arg{}", pos),
         }
     }
 }

@@ -18,6 +18,7 @@ fn invalidate(
     copy_to_src: &mut HashMap<String, String>,
     src_to_copies: &mut HashMap<String, HashSet<String>>,
 ) {
+    println!("trying to invalidate: {}", dest_name);
     // Remove dest from its source's copy set
     if let Some(src) = copy_to_src.remove(dest_name) {
         if let Some(set) = src_to_copies.get_mut(&src) {
@@ -57,9 +58,9 @@ fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, u
             let root_src = get_root_source(name, copy_to_src);
             // Check whether an udpate occurred
             if *name != root_src {
-                // if debug {
+                if debug {
                     println!("Replacing {} with {}", name, root_src);
-                // }
+                }
 
                 *op = Operand::LocalVar(root_src.clone(), typ.clone());
                 *update_occurred = true;
@@ -69,16 +70,16 @@ fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, u
         Operand::GlobalVar(name, typ) => {
             let root_src = get_root_source(name, copy_to_src);
             if *name != root_src {
-                // if debug {
+                if debug {
                     println!("Replacing {} with {}", name, root_src);
-                // }
+                }
 
                 *op = Operand::GlobalVar(root_src, typ.clone());
                 *update_occurred = true;
             }
         }
 
-        Operand::LocalArrElement(_, index,_) | Operand::GlobalArrElement(_, index, _) => {
+        Operand::LocalArrElement(_, index, _) => {
             substitute_operand(index, copy_to_src, update_occurred, debug);
         }
 
@@ -187,10 +188,10 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, CopyMap>, Ha
     
         for instr in method_cfg.blocks.get_mut(&block_id).unwrap().instructions.iter_mut() {
             match instr {
-                Instruction::Assign { typ, src, dest }=> {
+                Instruction::Assign { typ: _, src, dest } => {
                     // Kill copies that use dest, since this assignment updates its values
-                    if let Operand::LocalVar(dest_name, _) = dest {
-                        invalidate(dest_name, &mut copy_to_src, &mut src_to_copies);
+                    if let Operand::LocalVar(dest_name, _) = dest.clone() {
+                        invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
 
                         // Gen[B]: this is a direct assignment (a = b), add to tables
                         if let Operand::LocalVar(src_name, _) = src {
@@ -295,11 +296,11 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
             .iter_mut()
         {
             match instr {
-                Instruction::Assign { src, dest, .. }=> {
+                Instruction::Assign { typ: _, src, dest } => {
                     substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
 
-                    if let Operand::LocalVar(dest_name, _) = dest {
-                        invalidate(dest_name, &mut copy_to_src, &mut src_to_copies);
+                    if let Operand::LocalVar(dest_name, _) = dest.clone() {
+                        invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
 
                         if let Operand::LocalVar(src_name, _) = src {
                             copy_to_src.insert(dest_name.clone(), src_name.clone());
@@ -310,11 +311,11 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                         }
                     }
                 }
-                Instruction::Add { left, right, dest, .. }
-                | Instruction::Subtract { left, right, dest, .. }
-                | Instruction::Multiply { left, right, dest, .. }
-                | Instruction::Divide { left, right, dest, .. }
-                | Instruction::Modulo { left, right, dest, .. }
+                Instruction::Add { typ: _, left, right, dest }
+                | Instruction::Subtract { typ: _, left, right, dest }
+                | Instruction::Multiply { typ: _, left, right, dest }
+                | Instruction::Divide { typ: _, left, right, dest }
+                | Instruction::Modulo { typ: _, left, right, dest }
                 | Instruction::Greater { left, right, dest }
                 | Instruction::Less { left, right, dest }
                 | Instruction::LessEqual { left, right, dest }
@@ -328,7 +329,7 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                 }
                 Instruction::Not { expr, dest }
                 | Instruction::Cast { expr, dest, .. }
-                | Instruction::Len { expr, dest, .. } => {
+                | Instruction::Len { typ: _, expr, dest } => {
                     substitute_operand(expr, &copy_to_src, &mut update_occurred, debug);
         
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
