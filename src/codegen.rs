@@ -7,7 +7,7 @@ use crate::ast::Type;
 use crate::dataflow::optimize_dataflow;
 use crate::tac::*;
 use crate::utils::cli::Optimization;
-use crate::utils::print::html_cfgs;
+use crate::utils::print::{html_cfgs, print_cfg};
 use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use core::panic;
@@ -643,13 +643,23 @@ fn generate_method_x86(
 pub fn generate_assembly(file: &str, filename: &str, optimizations: HashSet<Optimization>, writer: &mut dyn std::io::Write, debug: bool) {
     // Generate the method CFGS
     let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
+    
+    // if debug {
+    print_cfg(&method_cfgs);
+    //     html_cfgs(&method_cfgs, "cfg_no-opt.html".to_string());
+    //     println!("\n========== X86 Code ==========\n");
+    // }
+
+    optimize_dataflow(&mut method_cfgs, &optimizations, debug);
+
+    print_cfg(&method_cfgs);
+
     if debug {
-        // print_cfg(&method_cfgs);
-        html_cfgs(&method_cfgs);
+    // print_cfg(&method_cfgs);
+        html_cfgs(&method_cfgs, "cfg_opt.html".to_string());
         println!("\n========== X86 Code ==========\n");
     }
 
-    optimize_dataflow(&mut method_cfgs, &optimizations, debug);
 
     let mut global_code: Vec<X86Insn> = Vec::new();
 

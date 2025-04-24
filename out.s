@@ -1,3 +1,15 @@
+Replacing j with _t1
+Replacing j with _t1
+Replacing sum with _t0
+Replacing j with _t1
+Replacing sum with _t0
+Replacing j with _t1
+Replacing sum with _t0
+Replacing j with _t11
+Replacing i with _t10
+Replacing j with _t11
+Replacing i with _t10
+Replacing i with _t10
 
 str0:
     .string "j is %d\n"

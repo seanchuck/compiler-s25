@@ -57,9 +57,9 @@ fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, u
             let root_src = get_root_source(name, copy_to_src);
             // Check whether an udpate occurred
             if *name != root_src {
-                if debug {
+                // if debug {
                     println!("Replacing {} with {}", name, root_src);
-                }
+                // }
 
                 *op = Operand::LocalVar(root_src.clone(), typ.clone());
                 *update_occurred = true;
@@ -69,9 +69,9 @@ fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, u
         Operand::GlobalVar(name, typ) => {
             let root_src = get_root_source(name, copy_to_src);
             if *name != root_src {
-                if debug {
+                // if debug {
                     println!("Replacing {} with {}", name, root_src);
-                }
+                // }
 
                 *op = Operand::GlobalVar(root_src, typ.clone());
                 *update_occurred = true;
