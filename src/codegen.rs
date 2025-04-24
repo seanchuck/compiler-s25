@@ -425,14 +425,21 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             let expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
 
+            let expr_typ = expr.get_type();
+            let expr_reg = reg_for_type(Register::Rax, &expr_typ);
+
             match target_type {
                 crate::ast::Type::Int => {
                     x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Eax), Type::Int));
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
                 }
                 crate::ast::Type::Long => {
-                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Eax), Type::Int));
-                    x86_instructions.push(X86Insn::Movsxd(X86Operand::Reg(Register::Eax), X86Operand::Reg(Register::Rax)));
+                    x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(expr_reg.clone()), expr_typ.clone()));
+                    if expr_typ == Type::Int {  // only sign extend if its an int
+                        x86_instructions.push(X86Insn::Movsxd(X86Operand::Reg(expr_reg.clone()), X86Operand::Reg(Register::Rax)));
+                    } else {                    // Otherwise do basic move
+                        x86_instructions.push(X86Insn::Mov(X86Operand::Reg(expr_reg.clone()), X86Operand::Reg(Register::Rax), expr_typ.clone()));
+                    }
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
                 }
                 _ => panic!("Shouldnt get here, cannot cast non int or long value"),
