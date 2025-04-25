@@ -1,4 +1,0 @@
-digraph CFG {
-  node [shape=box fontname="monospace"];
-  0 [label="Block 0\l_t0 <- arg0\l_t1 <- arg1\l_t2 <- a[_t0]\l_t3 <- a[_t1]\la[_t0] <- _t3\la[_t1] <- _t2\l"];
-}

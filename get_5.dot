@@ -1,4 +1,0 @@
-digraph CFG {
-  node [shape=box fontname="monospace"];
-  0 [label="Block 0\l_t0 <- 5\lret _t0\l"];
-}

@@ -1,9 +1,0 @@
-digraph CFG {
-  node [shape=box fontname="monospace"];
-  0 [label="Block 0\l_t0 <- arg0\l_t1 <- 1\l_t2 <- _t0 <= _t1\lcjmp _t2, fib1\lujmp fib2\l"];
-  1 [label="Block 1\lret _t0\l"];
-  2 [label="Block 2\l_t3 <- 1\l_t4 <- _t0 - _t3\l_t5 <- fib(_t4)\l_t6 <- 2\l_t7 <- _t0 - _t6\l_t8 <- fib(_t7)\l_t9 <- _t5 + _t8\lret _t9\l"];
-  -1 -> 2 [label=""];
-  0 -> 1 [label="True"];
-  0 -> 2 [label="False"];
-}
