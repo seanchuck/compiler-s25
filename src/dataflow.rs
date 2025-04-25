@@ -367,12 +367,11 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
 
             let keep_instr = match &dest {
                 Some(var) => live.contains(var)
-                    || used.iter().any(|u| live.contains(u)) // RHS vars are live (i.e. `a` used in expr)
+                    || used.iter().any(|u| live.contains(u)) // TODO: is this overly-conservative?
                     || has_side_effect,
                 None => true,
             };
 
-            
 
             if keep_instr {
                 // Update live set
