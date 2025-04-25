@@ -1,4 +1,26 @@
 digraph CFG {
   node [shape=box fontname="monospace"];
-  0 [label="Block 0\l_t0 <- 1\l_t1 <- foo()\la[_t1] <- _t0\l_t2 <- 2\l_t4 <- foo()\l_t3 <- a[_t4]\la[_t3] <- _t2\l_t5 <- 17\l_t8 <- 1\l_t7 <- a[_t8]\l_t10 <- foo()\l_t9 <- a[_t10]\l_t11 <- _t7 - _t9\l_t6 <- a[_t11]\la[_t6] <- _t5\l_t12 <- String(0)\l_t14 <- 2\l_t13 <- a[_t14]\lprintf(_t12, _t13)\l_t15 <- 0\lret _t15\l"];
+  0 [label="Block 0\ly <- 1\lcjmp y, main1\lujmp main2\l"];
+  1 [label="Block 1\l_t1 <- 0\l_t2 <- String(0)\lprintf(_t2, _t1)\lujmp main2\l"];
+  2 [label="Block 2\lcjmp y, main3\lujmp main4\l"];
+  3 [label="Block 3\l_t3 <- 3\l_t4 <- String(1)\l_t5 <- x + _t3\lprintf(_t4, _t5)\lujmp main4\l"];
+  4 [label="Block 4\lcjmp y, main5\lujmp main6\l"];
+  5 [label="Block 5\l_y2 <- 0\lcjmp _y2, main7\lujmp main8\l"];
+  6 [label="Block 6\l_t8 <- 0\lret _t8\l"];
+  7 [label="Block 7\l_t6 <- String(2)\lprintf(_t6)\lujmp main9\l"];
+  8 [label="Block 8\l_t7 <- String(3)\lprintf(_t7)\lujmp main9\l"];
+  9 [label="Block 9\lujmp main6\l"];
+  0 -> 1 [label="True"];
+  0 -> 2 [label="False"];
+  1 -> 2 [label=""];
+  2 -> 4 [label="False"];
+  2 -> 3 [label="True"];
+  3 -> 4 [label=""];
+  4 -> 5 [label="True"];
+  4 -> 6 [label="False"];
+  5 -> 7 [label="True"];
+  5 -> 8 [label="False"];
+  7 -> 9 [label=""];
+  8 -> 9 [label=""];
+  9 -> 6 [label=""];
 }

@@ -13,6 +13,7 @@ void main() {
   if (y) {
     int y;
     y = 3;
+    // printf("x is %d, y is %d\n", x, y);
     printf("Sum should be 10; x + y = %d\n", x + y);
   }
   if (y) {

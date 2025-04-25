@@ -161,7 +161,7 @@ fn collect_vars_in_operand(op: &Operand) -> Vec<String> {
         | Operand::GlobalArrElement(name, idx) => {
             let mut vars = vec![name.clone()];
 
-            // Recurse on recursive operands
+            // Recurse on recursive operand idx
             vars.extend(collect_vars_in_operand(idx));
             vars
         }
@@ -231,12 +231,10 @@ fn get_source_vars(instr: &Instruction) -> Vec<String> {
         | Instruction::Equal { left, right, .. }
         | Instruction::NotEqual { left, right, .. } => {
             let mut vars = Vec::new();
-            if let Operand::LocalVar(v) = left {
-                vars.push(v.clone());
-            }
-            if let Operand::LocalVar(v) = right {
-                vars.push(v.clone());
-            }
+
+            vars.extend(collect_vars_in_operand(left));
+            vars.extend(collect_vars_in_operand(right));
+            
             vars
         }
 
@@ -336,9 +334,16 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<
                 }
             }
 
+            // if let Some(var) = dest {
+            //     def_set.insert(var);
+            // }
             if let Some(var) = dest {
-                def_set.insert(var);
+                // Only remove if def occurs before use, so old value unused
+                if !use_set.contains(&var) {
+                    def_set.insert(var);
+                }
             }
+            
         }
 
         // IN[B] = USE[B] ∪ (OUT[B] - DEF[B])
