@@ -52,25 +52,15 @@ pub enum X86Operand {
     Address(Option<String>, Option<Register>, Register, i64, Type), // reg1 + reg2 * scale, offset by label
 }
 
-impl X86Operand {
-    pub fn get_type(&self) -> Type {
-        match self {
-            X86Operand::RegInt(_, _, typ) => typ.clone(),
-            X86Operand::Address(_, _, _, _, typ) => typ.clone(),
-            _ => Type::Long, // default fallback
-        }
-    }
-}
-
 impl fmt::Display for X86Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             X86Operand::Reg(reg) => write!(f, "{}", reg),
             X86Operand::Constant(val) => write!(f, "${}", val),
             X86Operand::Global(name) => write!(f, "{}", name),
-            X86Operand::RegInt(reg, offset, typ) => write!(f, "{}({})", offset, reg),
+            X86Operand::RegInt(reg, offset, _typ) => write!(f, "{}({})", offset, reg),
             X86Operand::RegLabel(reg, label) => write!(f, "{}({})", label, reg),
-            X86Operand::Address(label, reg1, reg2, scale, typ) => {
+            X86Operand::Address(label, reg1, reg2, scale, _typ) => {
                 write!(
                     f,
                     "{}({}, {}, {})",
@@ -173,7 +163,7 @@ impl fmt::Display for X86Insn {
             X86Insn::Add(src, dst, typ) => {write!(f, "    add{} {}, {}", suffix(typ), src, dst) }
             X86Insn::Sub(src, dst, typ) => {write!(f, "    sub{} {}, {}", suffix(typ), src, dst) }
             X86Insn::Mul(src, dst, ..) => {write!(f, "    imul {}, {}", src, dst) } // `imul` has same mnemonic for int/long 
-            X86Insn::Div(divisor, typ) => {write!(f, "    idiv {}", divisor)}
+            X86Insn::Div(divisor, _typ) => {write!(f, "    idiv {}", divisor)}
             X86Insn::Cdq => write!(f, "    cdq"),
             X86Insn::Cqto => write!(f, "    cqto"),
             X86Insn::Xor(src, dst) => write!(f, "    xor {}, {}", src, dst),

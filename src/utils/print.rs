@@ -5,7 +5,7 @@ use crate::tac::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::fs::{File, rename};
+use std::fs::File;
 use std::io::Write;
 
 /// Pretty-print the CFG

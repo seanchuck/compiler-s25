@@ -484,7 +484,7 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, CopyMap>, Ha
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
                 }
 
-                Instruction::MethodCall {args, dest , ..} => {
+                Instruction::MethodCall {args: _, dest , ..} => {
                     // Invalidate the destination since its value is updated
                     if dest.is_some() {
                         invalidate(&dest.clone().unwrap().to_string(), &mut copy_to_src, &mut src_to_copies);
@@ -676,11 +676,11 @@ fn compute_expression_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, A
 
         for instr in method_cfg.blocks.get_mut(&block_id).unwrap().instructions.iter_mut() {
             match instr {
-                Instruction::Add { left, right, ref dest, ref typ }
-                | Instruction::Subtract { left, right, ref dest, ref typ }
-                | Instruction::Multiply { left, right, ref dest, ref typ }
-                | Instruction::Divide { left, right, ref dest, ref typ }
-                | Instruction::Modulo { left, right, ref dest, ref typ } => {
+                Instruction::Add { left, right, ref dest, typ: _ }
+                | Instruction::Subtract { left, right, ref dest, typ: _ }
+                | Instruction::Multiply { left, right, ref dest, typ: _ }
+                | Instruction::Divide { left, right, ref dest, typ: _ }
+                | Instruction::Modulo { left, right, ref dest, typ: _ } => {
                     let left_var = match left {
                         Operand::LocalVar(name, _) => Some(name.clone()),
                         _ => None,  // only do CSE on local variables
