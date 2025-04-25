@@ -152,30 +152,70 @@ fn get_dest_var(instr: &Instruction) -> Option<String> {
     }
 }
 
+// Recursively collects vars in an oeperand 
+fn collect_vars_in_operand(op: &Operand) -> Vec<String> {
+    match op {
+        Operand::LocalVar(v) | Operand::GlobalVar(v) => vec![v.clone()],
+
+        Operand::LocalArrElement(name, idx)
+        | Operand::GlobalArrElement(name, idx) => {
+            let mut vars = vec![name.clone()];
+
+            // Recurse on recursive operands
+            vars.extend(collect_vars_in_operand(idx));
+            vars
+        }
+
+        // These don’t reference any variable
+        Operand::Const(_) | Operand::String(_) | Operand::Argument(_) => vec![],
+    }
+}
+
+
 
 /// Returns a vector of source vars involved in an instruction.
 fn get_source_vars(instr: &Instruction) -> Vec<String> {
     match instr {
         // t <- X
-        Instruction::Assign { src, .. } => match src {
-            Operand::LocalVar(v) => vec![v.clone()],
+        // In a[_t1], _t1 should be considered a source/used var!!!
+        // Instruction::Assign { src, .. } => match src {
+        //     Operand::LocalVar(v) => vec![v.clone()],
         
-            Operand::GlobalVar(v) => vec![v.clone()],
+        //     Operand::GlobalVar(v) => vec![v.clone()],
         
-            Operand::GlobalArrElement(_, index) | Operand::LocalArrElement(_, index) => {
-                // Recurse into the index to find variables used
-                match index.as_ref() {
-                    Operand::LocalVar(v) => vec![v.clone()],
-                    _ => vec![], // Could expand this if you support nested indexing
-                }
+        //     Operand::GlobalArrElement(_, index) | Operand::LocalArrElement(_, index) => {
+        //         println!("we considering this instr {:#?}", instr);
+
+        //         // Recurse into the index to find variables used
+        //         match index.as_ref() {
+        //             Operand::LocalVar(v) => vec![v.clone()],
+        //             _ => vec![], // Could expand this if you support nested indexing
+        //         }
+        //     }
+        
+        //     // Operand::String(_) => vec![], // No variable involved
+        //     // Operand::Const(_) => vec![], // No variable involved
+        //     _=> vec![]
+        
+        //     // Operand::Argument(v) => vec![v.clone()],
+        // },
+
+        Instruction::Assign { src, dest } => {
+            let mut vars = Vec::new();
+
+            // collect from src
+            vars.extend(collect_vars_in_operand(src));
+
+            // collect from dest (if it's array access with an index)
+            match dest {
+                Operand::LocalArrElement(_, idx) | Operand::GlobalArrElement(_, idx) => {
+                    vars.extend(collect_vars_in_operand(idx));
+                },
+                _ => {}
             }
-        
-            // Operand::String(_) => vec![], // No variable involved
-            // Operand::Const(_) => vec![], // No variable involved
-            _=> vec![]
-        
-            // Operand::Argument(v) => vec![v.clone()],
-        },
+
+            vars
+        }
         
 
         // t <- X op Y
@@ -348,8 +388,13 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
                 | Instruction::CJmp { .. }
                 | Instruction::UJmp { .. }
                 | Instruction::Exit { .. } => true,
-            
-                // check for assigning to globals
+
+                // Instruction::Assign { dest, .. }
+                // | Instruction::LoadString { dest, .. }
+                // | Instruction::LoadConst { dest, .. } => {
+                //     // Any assignment to global var is a side effect
+                //     matches!(dest, Operand::GlobalVar(_) | Operand::GlobalArrElement(_, _))
+                // }
                 instr => {
                     if let Some(dest) = get_dest_var(instr) {
                         method_cfg.locals.get(dest.as_str()).is_none() // global var iff not in locals
@@ -360,6 +405,7 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
             };
 
             let keep_instr = match &dest {
+                // Keep any instructions where destination is live or instr has side effect
                 Some(var) => live.contains(var) || has_side_effect,
                 None => true,
             };
@@ -647,17 +693,6 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
             }
         }
 
-        if optimizations.contains(&Optimization::Dce) {
-            for (method, cfg) in method_cfgs.iter_mut() {
-                if dead_code_elimination(cfg, debug) {
-                    fixed_point = false;
-                    if debug {
-                        println!("Dead code elimination changed {}", method);
-                    }
-                }
-            }
-        }
-
         if optimizations.contains(&Optimization::Cse) {
             for (method, cfg) in method_cfgs.iter_mut() {
                 if common_subexpression_elimination(cfg) {
@@ -668,7 +703,18 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
                 }
             }
         }
-    }
 
+        if optimizations.contains(&Optimization::Dce) {
+            for (method, cfg) in method_cfgs.iter_mut() {
+                if dead_code_elimination(cfg, debug) {
+                    fixed_point = false;
+                    if debug {
+                        println!("Dead code elimination changed {}", method);
+                    }
+                }
+            }
+        }
+    }
+    
     method_cfgs.clone()
 }

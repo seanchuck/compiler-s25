@@ -19,21 +19,21 @@ pub enum Operand {
     Const(i64),
     Argument(i32), // position of the argument
 }
-
-impl fmt::Display for Operand {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Operand::Const(val) => write!(f, "{}", val),
-            Operand::String(id) => write!(f, "str{}", id),
-            Operand::GlobalVar(name) => write!(f, "{}", name),
-            Operand::GlobalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
-            Operand::LocalVar(name) => write!(f, "{}", name),
-            Operand::LocalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
-            Operand::Argument(pos) => write!(f, "arg{}", pos),
+    
+    impl fmt::Display for Operand {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                Operand::Const(val) => write!(f, "{}", val),
+                Operand::String(id) => write!(f, "str{}", id),
+                Operand::GlobalVar(name) => write!(f, "{}", name),
+                Operand::LocalVar(name) => write!(f, "{}", name),
+                Operand::GlobalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
+                Operand::LocalArrElement(name, idx) => write!(f, "{}[{}]", name, idx),
+                Operand::Argument(pos) => write!(f, "arg{}", pos),
+            }
         }
     }
-}
-
+    
 impl Operand {
     pub fn get_name(&self) -> Option<&str> {
         match self {

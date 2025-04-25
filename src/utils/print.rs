@@ -232,8 +232,8 @@ fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
 }
 
 
-pub fn html_cfgs(method_cfgs: &HashMap<String, CFG>) {
-    let mut html = File::create("all_cfgs.html").expect("Failed to create HTML file");
+pub fn html_cfgs(method_cfgs: &HashMap<String, CFG>, filename: String) {
+    let mut html = File::create(filename).expect("Failed to create HTML file");
     writeln!(html, "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>CFG Viewer</title></head><body><h1>CFG Visualizations</h1>")
         .unwrap();
 
