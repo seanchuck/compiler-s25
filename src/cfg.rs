@@ -1,5 +1,5 @@
 use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*};
-use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet}, rc::Rc};
+use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet}, rc::Rc, process::Command};
 /**
 Control flow graph (CFG) representation.
 
@@ -246,31 +246,38 @@ impl CFG {
         dot
     }
 
-    /// Dump dot to file and optionally render PNG
-    pub fn export_dot(&self, path: &str, render_png: bool) {
-        let dot_code = self.to_dot();
-        let mut file = File::create(path).expect("Could not create .dot file");
-        file.write_all(dot_code.as_bytes())
-            .expect("Failed to write DOT");
-
-        println!("DOT file written to: {}", path);
-
-        if render_png {
-            let output = std::process::Command::new("dot")
-                .arg("-Tpng")
-                .arg(path)
-                .arg("-o")
-                .arg("cfg.png")
-                .output()
-                .expect("Failed to run Graphviz 'dot' command");
+        /// Generate SVG (or PNG) directly from the DOT representation
+        pub fn render_dot(&self, output_format: &str) -> Vec<u8> {
+            let dot_code = self.to_dot();
+    
+            let mut child = std::process::Command::new("dot")
+                .arg(format!("-T{}", output_format)) // example: -Tsvg or -Tpng
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .expect("Failed to spawn dot command");
+    
+            {
+                let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+                use std::io::Write;
+                stdin
+                    .write_all(dot_code.as_bytes())
+                    .expect("Failed to write DOT code to dot process");
+            }
+    
+            let output = child
+                .wait_with_output()
+                .expect("Failed to read dot output");
+    
             if output.status.success() {
-                println!("Rendered image: cfg.png");
+                output.stdout
             } else {
-                eprintln!("⚠️ Failed to render PNG. Do you have Graphviz installed?");
-                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+                panic!(
+                    "Graphviz 'dot' command failed:\n{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
             }
         }
-    }
 }
 
 #[derive(Debug, Clone)]
