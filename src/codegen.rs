@@ -7,6 +7,7 @@ use crate::dataflow::optimize_dataflow;
 use crate::tac::*;
 use crate::utils::cli::Optimization;
 use crate::utils::print::html_cfgs;
+use crate::utils::print::print_cfg;
 use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use std::collections::HashMap;
@@ -465,18 +466,19 @@ pub fn generate_assembly(
     // Generate the method CFGS
     let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
 
-    if debug {
-        html_cfgs(&method_cfgs, "no-opt.html".to_string());
-        println!("\n========== X86 Code ==========\n");
-    }
+    // if debug {
+    //     html_cfgs(&method_cfgs, "no-opt.html".to_string());
+    //     println!("\n========== X86 Code ==========\n");
+    // }
 
     // Perform dataflow optimizations
     optimize_dataflow(&mut method_cfgs, &optimizations, debug);
 
-    // if debug {
-    //     html_cfgs(&method_cfgs, "opt.html".to_string());
-    //     println!("\n========== X86 Code ==========\n");
-    // }
+    if debug {
+        print_cfg(&method_cfgs);
+        html_cfgs(&method_cfgs, "opt.html".to_string());
+        println!("\n========== X86 Code ==========\n");
+    }
 
 
     let mut global_code: Vec<X86Insn> = Vec::new();

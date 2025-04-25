@@ -264,9 +264,6 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<
     let predecessors = compute_predecessors(&method_cfg);
     let successors = compute_successors(&method_cfg);
 
-    println!("preds are {:#?}", predecessors);
-    println!("succs are {:#?}", successors);
-
     // Variables that are live going into this block; hashmap keyed by block_id
     let mut in_map: HashMap<i32, HashSet<String>> = HashMap::new();
     // Variables that are live going out of this block; hashmap keyed by block_id
@@ -311,7 +308,7 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<
         // IN[B] = USE[B] ∪ (OUT[B] - DEF[B])
         let mut in_set = use_set.clone();
         in_set.extend(out_set.difference(&def_set).cloned());
-        
+
 
         // Check if IN or OUT changed → if so, propagate
         if in_map.get(&block_id) != Some(&in_set) || out_map.get(&block_id) != Some(&out_set) {
@@ -326,7 +323,6 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<
         }
     }
 
-    println!("in_map: {:#?}, out map {:#?}", in_map, out_map);
     (in_map, out_map)
 }
 
@@ -345,6 +341,7 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
         // We will add any non-dead code to this vector
         let mut new_instrs = Vec::new();
         let mut live = out_set.clone();
+
         
         for instr in block.instructions.iter().rev() {
             let dest = get_dest_var(instr);
@@ -358,15 +355,10 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
                 | Instruction::UJmp { .. }
                 | Instruction::Exit { .. } => true,
 
-                // Instruction::Assign { dest, .. }
-                // | Instruction::LoadString { dest, .. }
-                // | Instruction::LoadConst { dest, .. } => {
-                //     // Any assignment to global var is a side effect
-                //     matches!(dest, Operand::GlobalVar(_) | Operand::GlobalArrElement(_, _))
-                // }
-                instr => {
+                // Any write to global var is a side effect
+                 _=> {
                     if let Some(dest) = get_dest_var(instr) {
-                        method_cfg.locals.get(dest.as_str()).is_none() // global var iff not in locals
+                        method_cfg.locals.get(dest.as_str()).is_none()
                     } else {
                         false
                     }
@@ -374,10 +366,13 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
             };
 
             let keep_instr = match &dest {
-                // Keep any instructions where destination is live or instr has side effect
-                Some(var) => live.contains(var) || has_side_effect,
+                Some(var) => live.contains(var)
+                    || used.iter().any(|u| live.contains(u)) // RHS vars are live (i.e. `a` used in expr)
+                    || has_side_effect,
                 None => true,
             };
+
+            
 
             if keep_instr {
                 // Update live set
@@ -647,8 +642,8 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
     // Run the optimizations until the CFG stops changing
     let mut fixed_point = false;
 
-    // while !fixed_point {
-    //     fixed_point = true;
+    while !fixed_point {
+        fixed_point = true;
 
         // TODO: ordering?
         if optimizations.contains(&Optimization::Cp) {
@@ -675,7 +670,6 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
 
         if optimizations.contains(&Optimization::Dce) {
             for (method, cfg) in method_cfgs.iter_mut() {
-                println!("method: {method}");
                 if dead_code_elimination(cfg, debug) {
                     fixed_point = false;
                     if debug {
@@ -684,7 +678,7 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
                 }
             }
         }
-    // }
+    }
     
     method_cfgs.clone()
 }

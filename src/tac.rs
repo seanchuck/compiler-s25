@@ -9,7 +9,7 @@ instructions that are simplified, and TAC.
 use crate::ast::Type;
 use std::fmt;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub enum Operand {
     GlobalVar(String),
     GlobalArrElement(String, Box<Operand>), // name and index
