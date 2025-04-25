@@ -159,8 +159,24 @@ fn get_source_vars(instr: &Instruction) -> Vec<String> {
         // t <- X
         Instruction::Assign { src, .. } => match src {
             Operand::LocalVar(v) => vec![v.clone()],
-            _ => vec![],
+        
+            Operand::GlobalVar(v) => vec![v.clone()],
+        
+            Operand::GlobalArrElement(_, index) | Operand::LocalArrElement(_, index) => {
+                // Recurse into the index to find variables used
+                match index.as_ref() {
+                    Operand::LocalVar(v) => vec![v.clone()],
+                    _ => vec![], // Could expand this if you support nested indexing
+                }
+            }
+        
+            // Operand::String(_) => vec![], // No variable involved
+            // Operand::Const(_) => vec![], // No variable involved
+            _=> vec![]
+        
+            // Operand::Argument(v) => vec![v.clone()],
         },
+        
 
         // t <- X op Y
         Instruction::Add { left, right, .. }
@@ -253,12 +269,6 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<
 
     // Run fixed point algorithm to get steady-state liveness maps
     while let Some(block_id) = worklist.pop_front() {
-        // let block = method_cfg.blocks.get(&block_id);
-        // println!("want block: {}", block_id);
-        // println!("current blocks {:#?}", method_cfg.blocks);
-        // println!("")
-        
-
         // OUT[B] = ∪ IN[S] for successors S
         let out_set: HashSet<String> = successors
             .get(&block_id)
@@ -319,8 +329,6 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
     // basic-block level maps; we generate the instruction-level maps during iteration below
     let (_, out_maps) = compute_liveness(method_cfg, debug);
     let mut update_occurred = false;
-
-    println!("whoooop");
 
     for (block_id, block) in method_cfg.blocks.iter_mut() {
         let out_set = out_maps.get(&block_id).unwrap_or(&HashSet::new()).clone();
