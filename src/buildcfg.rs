@@ -176,7 +176,7 @@ fn destruct_expr(
         },
 
         SymExpr::Identifier { entry, .. } => match entry {
-            TableEntry::Variable { name, typ, length, span } => {
+            TableEntry::Variable { name, typ, length: _, span: _ } => {
                 (cur_block_id, cfg_scope.lookup_var(name.to_string(), typ.clone()))
             }
             _ => unreachable!(),
@@ -1542,7 +1542,7 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
     
         // Add param name → temp to local scope
         scope.add_local(param_name.to_string(), temp.clone());
-        method_cfg.param_to_temp.insert(pos as i32, Temp { name: temp.clone(), typ: typ.clone() });
+        method_cfg.param_to_temp.insert(pos as i32, Temp { name: temp.clone() });
     
         // Load argument from caller into local temp
         method_cfg.add_instruction_to_block(
@@ -1679,6 +1679,6 @@ pub fn build_cfg(
     let mut strings: Vec<String> = Vec::new();
 
     // Generate a CFG for each method
-    let mut method_cfgs: HashMap<String, CFG> = destruct_program(&sym_tree, &mut strings);
+    let method_cfgs: HashMap<String, CFG> = destruct_program(&sym_tree, &mut strings);
     (method_cfgs, globals, strings)
 }

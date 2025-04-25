@@ -526,7 +526,7 @@ pub fn build_statement(
         }) => {
             match location.as_ref() {
                 // Plain variable assignment (x = 3;)
-                AST::Identifier { id, span: id_span } => {
+                AST::Identifier { id, span: _id_span } => {
                     check_used_before_decl(id, scope.clone(), span, writer, context);
 
                     // Fix the increment/decrement by promoting the long as needed
@@ -550,7 +550,6 @@ pub fn build_statement(
                     SymStatement::Assignment {
                         target: SymExpr::Identifier {
                             entry: entry.clone(),
-                            span: id_span.clone(),
                         },
                         expr: build_expr(expr_ref, Rc::clone(&scope), writer, context),
                         span: span.clone(),
@@ -853,14 +852,13 @@ pub fn build_expr(
                 if let AST::Identifier { id, .. } = id.as_ref() {
                     SymExpr::Len {
                         id: id.clone(),
-                        span: span.clone(),
                     }
                 } else {
-                    SymExpr::Error { span: span.clone() }
+                    SymExpr::Error { }
                 }
             } else {
                 // If invalid, return an error node
-                SymExpr::Error { span: span.clone() }
+                SymExpr::Error { }
             }
         }
 
@@ -889,7 +887,6 @@ pub fn build_expr(
             let entry = scope_clone.borrow().lookup(id).unwrap();
             SymExpr::Identifier {
                 entry: entry.clone(),
-                span: span.clone(),
             }
         }
 

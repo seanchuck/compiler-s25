@@ -417,7 +417,6 @@ fn check_for(
         let init_statement = SymStatement::Assignment {
             target: (SymExpr::Identifier {
                 entry: (var_entry),
-                span: (span.clone()),
             }),
             expr: (init.clone()),
             span: (span.clone()),

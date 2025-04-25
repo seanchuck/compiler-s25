@@ -165,7 +165,7 @@ fn map_operand(
 
 
 // Adds the x86 instructions corresponding to insn to x86_instructions
-fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut Vec<X86Insn>, globals: &HashMap<String, Global>, method_cfgs: &HashMap<String, CFG>) {
+fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut Vec<X86Insn>, globals: &HashMap<String, Global>) {
     match insn {
         Instruction::LoadConst { src, dest, typ } => {
             match typ {
@@ -569,8 +569,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
 fn generate_method_x86(
     method_name: &String,
     method_cfg: &mut CFG,
-    globals: &HashMap<String, Global>,
-    method_cfgs: &HashMap<String, CFG>
+    globals: &HashMap<String, Global>
 ) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
@@ -621,7 +620,7 @@ fn generate_method_x86(
         x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
 
         for insn in block.get_instructions() {
-            add_instruction(method_cfg, &insn, &mut x86_instructions, globals, method_cfgs);
+            add_instruction(method_cfg, &insn, &mut x86_instructions, globals);
         }
 
         if *id == method_cfg.exit {
@@ -698,7 +697,7 @@ pub fn generate_assembly(file: &str, filename: &str, optimizations: HashSet<Opti
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, method_cfg) in &method_cfgs {
         let mut method_cfg = method_cfg.clone();
-        let method_code = generate_method_x86(method_name, &mut method_cfg, &globals, &method_cfgs);
+        let method_code = generate_method_x86(method_name, &mut method_cfg, &globals);
         code.insert(method_name.clone(), method_code);
     }
 

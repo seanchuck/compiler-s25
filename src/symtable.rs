@@ -114,7 +114,6 @@ pub enum SymExpr {
     },
     Identifier {
         entry: TableEntry,
-        span: Span,
     },
     ArrAccess {
         id: String,
@@ -144,9 +143,7 @@ pub enum SymExpr {
     },
     Len {
         id: String,
-        span: Span,
     },
     Error {
-        span: Span,
     },
 }

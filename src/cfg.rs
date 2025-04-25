@@ -1,14 +1,12 @@
-use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*};
-use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet}, rc::Rc};
 /**
 Control flow graph (CFG) representation.
 
 Consists of basic blocks and directed edges
 between those basic blocks.
 **/
-use std::fs::File;
-use std::io::Write;
 
+use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*};
+use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet}, rc::Rc};
 
 // #################################################
 // CONSTANTS
@@ -23,8 +21,7 @@ pub const LONG_SIZE: i64 = 8; // 64 bits
 
 #[derive(Debug, Clone)]
 pub struct Temp {
-    pub name: String,
-    pub typ: Type
+    pub name: String
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -50,7 +47,6 @@ pub struct CFG {
     // no need to store edges because basic blocks end with a jump/branch instruction
 
     pub edges: BTreeMap<i32, HashSet<BlockEdge>>,
-    pub scopes: BTreeMap<i32, RefCell<CFGScope>>,
 
     // TODO: 
     pub stack_size: i64, // total space to allocate on the stack for this method
@@ -65,7 +61,6 @@ impl CFG {
             name,
             blocks: BTreeMap::new(),
             edges: BTreeMap::new(),
-            scopes: BTreeMap::new(),
             stack_size: 0,
             locals: BTreeMap::new(),
             param_to_temp: BTreeMap::new(),
@@ -76,11 +71,7 @@ impl CFG {
     /// Get all basic blocks
     pub fn get_blocks(&self) -> &BTreeMap<i32, BasicBlock> {
         &self.blocks
-    }
-
-    pub fn get_blocks_mut(&mut self) -> &mut BTreeMap<i32, BasicBlock> {
-        &mut self.blocks
-    }    
+    }  
 
     /// Get basic block with ID
     fn get_block_with_id(&mut self, id: i32) -> &mut BasicBlock {
@@ -156,17 +147,6 @@ impl CFG {
         self.locals.get(temp).unwrap().stack_offset
     }
 
-    pub fn add_scope(&mut self, id: i32, scope: CFGScope) {
-        self.scopes.insert(id, RefCell::new(scope));
-    }
-    
-    pub fn get_scope(&self, id: i32) -> std::cell::RefMut<'_, CFGScope> {
-        self.scopes
-            .get(&id)
-            .expect("missing scope")
-            .borrow_mut()
-    }
-
     // Used to get nice visualization of CFG
     pub fn to_dot(&self) -> String {
         let mut dot = String::new();
@@ -215,11 +195,11 @@ impl CFG {
                                 "ret".to_string()
                             }
                         }
-                        Instruction::Subtract { typ, left, right, dest }=> format!("{dest} <- {left} - {right}"),
+                        Instruction::Subtract { typ: _, left, right, dest }=> format!("{dest} <- {left} - {right}"),
                         Instruction::UJmp { name, id } => format!("ujmp {name}{id}"),
                         Instruction::LoadString { src, dest } => format!("{dest} <- {src:?}"),
                         Instruction::Exit { exit_code } => format!("exit({})", exit_code),
-                        Instruction::LoadConst { src, dest, typ } => format!("{dest} <- {src}"),
+                        Instruction::LoadConst { src, dest, typ: _ } => format!("{dest} <- {src}"),
                     };
                     s.replace('\\', "\\\\").replace('"', "\\\"") // escape for DOT
                 })                           
@@ -246,31 +226,38 @@ impl CFG {
         dot
     }
 
-    /// Dump dot to file and optionally render PNG
-    pub fn export_dot(&self, path: &str, render_png: bool) {
-        let dot_code = self.to_dot();
-        let mut file = File::create(path).expect("Could not create .dot file");
-        file.write_all(dot_code.as_bytes())
-            .expect("Failed to write DOT");
-
-        println!("DOT file written to: {}", path);
-
-        if render_png {
-            let output = std::process::Command::new("dot")
-                .arg("-Tpng")
-                .arg(path)
-                .arg("-o")
-                .arg("cfg.png")
-                .output()
-                .expect("Failed to run Graphviz 'dot' command");
+        /// Generate SVG (or PNG) directly from the DOT representation
+        pub fn render_dot(&self, output_format: &str) -> Vec<u8> {
+            let dot_code = self.to_dot();
+    
+            let mut child = std::process::Command::new("dot")
+                .arg(format!("-T{}", output_format)) // example: -Tsvg or -Tpng
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .expect("Failed to spawn dot command");
+    
+            {
+                let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+                use std::io::Write;
+                stdin
+                    .write_all(dot_code.as_bytes())
+                    .expect("Failed to write DOT code to dot process");
+            }
+    
+            let output = child
+                .wait_with_output()
+                .expect("Failed to read dot output");
+    
             if output.status.success() {
-                println!("Rendered image: cfg.png");
+                output.stdout
             } else {
-                eprintln!("⚠️ Failed to render PNG. Do you have Graphviz installed?");
-                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+                panic!(
+                    "Graphviz 'dot' command failed:\n{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
             }
         }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -280,9 +267,6 @@ pub struct CFGScope {
 }
 
 impl CFGScope {
-    pub fn new(parent: Option<Box<CFGScope>>) -> CFGScope {
-        CFGScope { parent, local_to_temp: HashMap::new() }
-    }
     /// Returns this global variable, or the temp variable associated to this local variable
     pub fn lookup_var(&self, var: String, typ: Type) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&var) {
@@ -338,10 +322,6 @@ impl BasicBlock {
 
     pub fn get_instructions(&self) -> &Vec<Instruction> {
         &self.instructions
-    }
-
-    pub fn get_instructions_mut(&mut self) -> &mut Vec<Instruction> {
-        &mut self.instructions
     }
     
     fn add_instruction(&mut self, instruction: Instruction) {

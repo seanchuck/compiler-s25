@@ -1,0 +1,26 @@
+void main ( ) {
+  int c;
+  int i;
+  int b;
+  int x;
+
+
+  b = 0;
+  c = 0;
+
+  // works
+    for (i = 0; i < 10; i++) {
+    x = c + i;
+    c = x;
+   }
+
+  // doesn't work
+  //  for (i = 0; i < 10; i++) {
+   //    c = c + i;
+   // }
+
+  // works
+  // c = c + 2;
+  
+
+}
