@@ -643,20 +643,18 @@ fn generate_method_x86(
 pub fn generate_assembly(file: &str, filename: &str, optimizations: HashSet<Optimization>, writer: &mut dyn std::io::Write, debug: bool) {
     // Generate the method CFGS
     let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
-    
+
     // if debug {
-    print_cfg(&method_cfgs);
-    //     html_cfgs(&method_cfgs, "cfg_no-opt.html".to_string());
+    //     html_cfgs(&method_cfgs, "no-opt.html".to_string());
     //     println!("\n========== X86 Code ==========\n");
     // }
 
+    // Perform dataflow optimizations
     optimize_dataflow(&mut method_cfgs, &optimizations, debug);
 
-    print_cfg(&method_cfgs);
-
     if debug {
-    // print_cfg(&method_cfgs);
-        html_cfgs(&method_cfgs, "cfg_opt.html".to_string());
+        print_cfg(&method_cfgs);
+        html_cfgs(&method_cfgs, "opt.html".to_string());
         println!("\n========== X86 Code ==========\n");
     }
 

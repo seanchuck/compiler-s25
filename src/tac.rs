@@ -9,8 +9,7 @@ instructions that are simplified, and TAC.
 use crate::ast::Type;
 use std::fmt;
 
-// Types for operands can be looked up using their name in a
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub enum Operand {
     GlobalVar(String, Type),
     GlobalArrElement(String, Box<Operand>, Type), // name and index
@@ -48,7 +47,7 @@ impl fmt::Display for Operand {
         }
     }
 }
-
+    
 impl Operand {
     pub fn get_name(&self) -> Option<&str> {
         match self {

@@ -9,6 +9,10 @@ use crate::{
     state::*,
 };
 
+// #################################################
+// HELPERS
+// #################################################
+
 
 /// Invalidate the hash table entries for a variable whose
 /// value has been updated, so that we don't attempt to
@@ -18,7 +22,6 @@ fn invalidate(
     copy_to_src: &mut HashMap<String, String>,
     src_to_copies: &mut HashMap<String, HashSet<String>>,
 ) {
-    println!("trying to invalidate: {}", dest_name);
     // Remove dest from its source's copy set
     if let Some(src) = copy_to_src.remove(dest_name) {
         if let Some(set) = src_to_copies.get_mut(&src) {
@@ -116,7 +119,7 @@ fn reverse_map(map: &HashMap<String, String>) -> HashMap<String, HashSet<String>
 }
 
 /// Get the destination that an instruction writes to
-fn get_dest(instr: &Instruction) -> Option<String> {
+fn get_dest_var(instr: &Instruction) -> Option<String> {
     match instr {
         Instruction::Assign { dest, .. }
         | Instruction::Add { dest, .. }
@@ -149,6 +152,259 @@ fn get_dest(instr: &Instruction) -> Option<String> {
     }
 }
 
+// Recursively collects vars in an oeperand 
+fn collect_vars_in_operand(op: &Operand) -> Vec<String> {
+    match op {
+        Operand::LocalVar(v, _) | Operand::GlobalVar(v, _) => vec![v.clone()],
+
+        Operand::LocalArrElement(name, idx, _)
+        | Operand::GlobalArrElement(name, idx, _) => {
+            let mut vars = vec![name.clone()];
+
+            // Recurse on recursive operand idx
+            vars.extend(collect_vars_in_operand(idx));
+            vars
+        }
+
+        // These don’t reference any variable
+        Operand::Const(..) | Operand::String(..) | Operand::Argument(..) => vec![],
+    }
+}
+
+
+
+/// Returns a vector of source vars involved in an instruction.
+fn get_source_vars(instr: &Instruction) -> Vec<String> {
+    match instr {
+        // t <- X
+        Instruction::Assign { src, dest, .. } => {
+            let mut vars = Vec::new();
+
+            // collect from src
+            vars.extend(collect_vars_in_operand(src));
+
+            // collect from dest (if it's array access with an index)
+            match dest {
+                Operand::LocalArrElement(_, idx, _) | Operand::GlobalArrElement(_, idx, _) => {
+                    vars.extend(collect_vars_in_operand(idx));
+                },
+                _ => {}
+            }
+            vars
+        }
+
+        // t <- X op Y
+        Instruction::Add { left, right, .. }
+        | Instruction::Subtract { left, right, .. }
+        | Instruction::Multiply { left, right, .. }
+        | Instruction::Divide { left, right, .. }
+        | Instruction::Modulo { left, right, .. }
+        | Instruction::Greater { left, right, .. }
+        | Instruction::Less { left, right, .. }
+        | Instruction::LessEqual { left, right, .. }
+        | Instruction::GreaterEqual { left, right, .. }
+        | Instruction::Equal { left, right, .. }
+        | Instruction::NotEqual { left, right, .. } => {
+            let mut vars = Vec::new();
+            vars.extend(collect_vars_in_operand(left));
+            vars.extend(collect_vars_in_operand(right));
+            vars
+        }
+
+        // t <- !X / cast(X) / len(X)
+        Instruction::Not { expr, .. }
+        | Instruction::Cast { expr, ..}
+        | Instruction::Len { expr, .. } => {
+            collect_vars_in_operand(expr)
+        },
+
+        // Method call arguments
+        Instruction::MethodCall { args, .. } => {
+            args.iter()
+                .flat_map(|op| collect_vars_in_operand(op))
+                .collect()
+        }        
+
+        // Conditional jump depends on condition
+        Instruction::CJmp { condition, .. } =>  {
+            collect_vars_in_operand(condition)
+        },
+
+        // Return value
+        Instruction::Ret { value, .. } => match value {
+            Some(Operand::LocalVar(..)) => collect_vars_in_operand(&value.clone().unwrap()),
+            _ => vec![],
+        },
+
+        // LoadString reads from a source variable
+        Instruction::LoadString { src, .. } => {
+            collect_vars_in_operand(src)
+        },
+
+        // LoadConst and Exit do not use variables
+        Instruction::LoadConst { .. }
+        | Instruction::UJmp { .. }
+        | Instruction::Exit { .. } => vec![],
+    }
+}
+
+
+// #################################################
+// DEAD CODE ELIMINATION
+// #################################################
+
+/// Dataflow equations for DCE:
+///     - OUT[B] = ∪ IN[S] for successors S (live if may be used in any subsequent blocks)
+///     - IN[B] = USE[B] ∪ (OUT[B] - DEF[B])
+/// 
+/// USE[B] := vars used in B before any local assignment
+/// DEF[B] := vars defined in B before any use (any prev. def is not live)
+fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<String>>, HashMap<i32, HashSet<String>>) {
+    // Compute predecessor and successor graphs
+    let predecessors = compute_predecessors(&method_cfg);
+    let successors = compute_successors(&method_cfg);
+
+    // Variables that are live going into this block; hashmap keyed by block_id
+    let mut in_map: HashMap<i32, HashSet<String>> = HashMap::new();
+    // Variables that are live going out of this block; hashmap keyed by block_id
+    let mut out_map: HashMap<i32, HashSet<String>> = HashMap::new();
+
+    // Worklist of basic block ids (order doesn't matter since iterates until fixed point)
+    let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect::<VecDeque<i32>>();
+
+
+    // Run fixed point algorithm to get steady-state liveness maps
+    while let Some(block_id) = worklist.pop_front() {
+        // OUT[B] = ∪ IN[S] for successors S
+        let out_set: HashSet<String> = successors
+            .get(&block_id)
+            .map(|succs| {
+                succs.iter()
+                    .filter_map(|s| in_map.get(s))
+                    .fold(HashSet::new(), |mut acc, s| {
+                        acc.extend(s.clone());
+                        acc
+                    })
+            })
+            .unwrap_or_default();
+
+        let mut use_set = HashSet::new();
+        let mut def_set = HashSet::new();
+
+        // iterate in reverse within the basic block
+        for instr in method_cfg.blocks.get(&block_id).unwrap().instructions.iter().rev() {
+            let used_vars = get_source_vars(instr);
+            let dest = get_dest_var(instr);
+
+            // populate use and def sets
+            for var in used_vars {
+                use_set.insert(var);
+            }
+            if let Some(var) = dest {
+                def_set.insert(var);
+            }
+        }
+
+        // IN[B] = USE[B] ∪ (OUT[B] - DEF[B])
+        let mut in_set = use_set.clone();
+        in_set.extend(out_set.difference(&def_set).cloned());
+
+
+        // Check if IN or OUT changed → if so, propagate
+        if in_map.get(&block_id) != Some(&in_set) || out_map.get(&block_id) != Some(&out_set) {
+            in_map.insert(block_id, in_set);
+            out_map.insert(block_id, out_set);
+
+            if let Some(preds) = predecessors.get(&block_id) {
+                for pred in preds {
+                    worklist.push_back(*pred); // append predecessors to the queue
+                }
+            }
+        }
+    }
+
+    (in_map, out_map)
+}
+
+
+/// Dataflow equations for DCE (backwards analysis):
+///     - OUT[B] = ⋃ IN[S] for all successors S of B
+///     - IN[B] = USE[B] ∪ (OUT[B] - DEF[B])
+fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
+    // basic-block level maps; we generate the instruction-level maps during iteration below
+    let (_, out_maps) = compute_liveness(method_cfg, debug);
+    let mut update_occurred = false;
+
+
+    for (block_id, block) in method_cfg.blocks.iter_mut() {
+        let out_set = out_maps.get(&block_id).unwrap_or(&HashSet::new()).clone();
+
+        // We will add any non-dead code to this vector
+        let mut new_instrs = Vec::new();
+        let mut live = out_set.clone();
+
+        
+        for instr in block.instructions.iter().rev() {
+            let dest = get_dest_var(instr);
+            let used = get_source_vars(instr);
+            
+            // TODO: avoid moving any instructions with a side-effect
+            let has_side_effect = match instr {
+                Instruction::MethodCall { .. }
+                | Instruction::Ret { .. }
+                | Instruction::CJmp { .. }
+                | Instruction::UJmp { .. }
+                | Instruction::Exit { .. } => true,
+
+                // Any write to global var is a side effect
+                 _=> {
+                    if let Some(dest) = get_dest_var(instr) {
+                        method_cfg.locals.get(dest.as_str()).is_none()
+                    } else {
+                        false
+                    }
+                }
+            };
+
+            let keep_instr = match &dest {
+                Some(var) => live.contains(var) || has_side_effect,
+                None => true,
+            };
+
+
+            if keep_instr {
+                // Update live set
+                for var in &used {
+                    live.insert(var.clone());
+                }
+
+                if let Some(var) = &dest {
+                    // TODO: Don't (?) remove from liveness if is a def and a use
+                    if !&used.contains(var) {
+                        live.remove(var);
+                    }
+                }
+                new_instrs.push(instr.clone());
+            } else {
+                if debug {
+                    println!("Removed dead instruction: {:?}", instr);
+                }
+                update_occurred = true;
+            }
+        }
+
+        new_instrs.reverse();
+        block.instructions = new_instrs;
+    }
+
+    update_occurred
+}
+
+
+
+// #################################################
+// COPY PROPAGATION
+// #################################################
 
 // Worklist equations for copy propagation:
 //      IN[B]  = ⋂ OUT[P] for all predecessors P of B
@@ -247,7 +503,7 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, CopyMap>, Ha
                     // UJmp, CJmp, Ret, and Exit have no effect
                     // Conservatively attempt to invalidate any destinations that are written, but shouldn't
                     // be any for any of these
-                    let dest = get_dest(instr);
+                    let dest = get_dest_var(instr);
                     if let Some(dest) = dest {
                         invalidate(&dest, &mut copy_to_src, &mut src_to_copies);
                     }
@@ -352,7 +608,7 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                 | Instruction::CJmp { .. }
                 | Instruction::Ret { .. }
                 | Instruction::Exit { .. } => {
-                    if let Some(dest_name) = get_dest(instr) {
+                    if let Some(dest_name) = get_dest_var(instr) {
                         invalidate(&dest_name, &mut copy_to_src, &mut src_to_copies);
                     }
                 }
@@ -365,9 +621,9 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
 
 
 
-fn dead_code_elimination(cfg: &mut CFG) -> bool {
-    false
-}
+// #################################################
+// COMMON SUBEXPRESSION ELIMINATION
+// #################################################
 
 /// CSE: Map intersection for IN
 fn intersect_expressions(
@@ -633,6 +889,7 @@ fn common_subexpression_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
     update_occurred
 }
 
+
 /// Perform multiple passes over the CFG to apply the given optimizations
 /// Returns the optimized CFG
 pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: &HashSet<Optimization>, debug: bool
@@ -662,17 +919,6 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
             }
         }
 
-        if optimizations.contains(&Optimization::Dce) {
-            for (method, cfg) in method_cfgs.iter_mut() {
-                if dead_code_elimination(cfg) {
-                    fixed_point = false;
-                    if debug {
-                        println!("Dead code elimination changed {}", method);
-                    }
-                }
-            }
-        }
-
         if optimizations.contains(&Optimization::Cse) {
             for (method, cfg) in method_cfgs.iter_mut() {
                 if common_subexpression_elimination(cfg, debug) {
@@ -683,7 +929,18 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
                 }
             }
         }
-    }
 
+        if optimizations.contains(&Optimization::Dce) {
+            for (method, cfg) in method_cfgs.iter_mut() {
+                if dead_code_elimination(cfg, debug) {
+                    fixed_point = false;
+                    if debug {
+                        println!("Dead code elimination changed {}", method);
+                    }
+                }
+            }
+        }
+    }
+    
     method_cfgs.clone()
 }

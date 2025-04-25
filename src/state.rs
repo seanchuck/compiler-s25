@@ -37,7 +37,13 @@ pub fn compute_successors(cfg: &CFG) -> HashMap<i32, HashSet<i32>> {
     let mut successors: HashMap<i32, HashSet<i32>> = HashMap::new();
 
     for (&src, edges) in &cfg.edges {
+        // Unreachable block
+        if src == -1 {
+            continue;
+        }
+
         for edge in edges {
+
             successors
                 .entry(src)
                 .or_default()
@@ -54,6 +60,11 @@ pub fn compute_successors(cfg: &CFG) -> HashMap<i32, HashSet<i32>> {
 pub fn compute_predecessors(cfg: &CFG) -> HashMap<i32, HashSet<i32>> {
     let mut preds: HashMap<i32, HashSet<i32>> = HashMap::new();
     for (src, successors) in compute_successors(cfg) {
+        // Unreachable block
+        if src == -1 {
+            continue;
+        }
+
         for next_block in successors {
             preds.entry(next_block).or_default().insert(src);
         }
