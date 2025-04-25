@@ -10,6 +10,7 @@ mod tac;
 mod token;
 mod x86;
 mod state;
+mod regalloc;
 
 mod buildcfg;
 mod codegen;

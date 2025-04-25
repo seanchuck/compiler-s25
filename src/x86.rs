@@ -84,33 +84,47 @@ impl fmt::Display for X86Operand {
 
 #[derive(Debug, Clone)]
 pub enum Register {
-    Rdi,
-    Rsi,
-    Rdx,
+
+    // 64-bit GPRs (16)
+    Rax,
+    Rbx,
     Rcx,
+    Rdx,
+    Rsi,
+    Rdi,
+    Rbp,
+    Rsp,
     R8,
     R9,
     R10,
     R11,
-    Rbp,
-    Rsp,
-    Rax,
-    Al,
-    Rip,
+    R12,
+    R13,
+    R14,
+    R15,
 
+
+    // 32-bit GPRs
+    Eax,
     Ebx,
-    Edi,
-    Esi,
-    Edx,
     Ecx,
+    Edx,
+    Esi,
+    Edi,
+    Ebp,
+    Esp,
     R8d,
     R9d,
     R10d,
     R11d,
-    Ebp,
-    Esp,
-    Eax,
-    Rbx
+    R12d,
+    R13d,
+    R14d,
+    R15d,
+    
+    // Other
+    Rip,
+    Al,
 }
 
 impl fmt::Display for Register {
@@ -130,7 +144,6 @@ impl fmt::Display for Register {
             Register::Al => write!(f, "%al"),
             Register::Rip => write!(f, "%rip"),
             Register::Rbx => write!(f, "%rbx"),
-
             Register::Ebx => write!(f, "%ebx"),
             Register::Edi => write!(f, "%edi"),
             Register::Esi => write!(f, "%esi"),
@@ -143,9 +156,18 @@ impl fmt::Display for Register {
             Register::Ebp => write!(f, "%ebp"),
             Register::Esp => write!(f, "%esp"),
             Register::Eax => write!(f, "%eax"),
+            Register::R12 => write!(f, "%r12"),
+            Register::R13 => write!(f, "%r13"),
+            Register::R14 => write!(f, "%r14"),
+            Register::R15 => write!(f, "%r15"),
+            Register::R12d => write!(f, "%r12d"),
+            Register::R13d => write!(f, "%r13d"),
+            Register::R14d => write!(f, "%r14d"),
+            Register::R15d => write!(f, "%r15d"),
         }
     }
 }
+
 
 impl fmt::Display for X86Insn {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
