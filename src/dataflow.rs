@@ -335,6 +335,7 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
     let (_, out_maps) = compute_liveness(method_cfg, debug);
     let mut update_occurred = false;
 
+
     for (block_id, block) in method_cfg.blocks.iter_mut() {
         let out_set = out_maps.get(&block_id).unwrap_or(&HashSet::new()).clone();
 
@@ -366,9 +367,7 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
             };
 
             let keep_instr = match &dest {
-                Some(var) => live.contains(var)
-                    || used.iter().any(|u| live.contains(u)) // TODO: is this overly-conservative?
-                    || has_side_effect,
+                Some(var) => live.contains(var) || has_side_effect,
                 None => true,
             };
 
@@ -378,8 +377,12 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
                 for var in &used {
                     live.insert(var.clone());
                 }
+
                 if let Some(var) = &dest {
-                    live.remove(var);
+                    // TODO: Don't (?) remove from liveness if is a def and a use
+                    if !&used.contains(var) {
+                        live.remove(var);
+                    }
                 }
                 new_instrs.push(instr.clone());
             } else {

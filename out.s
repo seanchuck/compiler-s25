@@ -1,4 +1,5 @@
 
+
 str0:
     .string "%ld\n"
 str1:
@@ -11,6 +12,24 @@ get_int0:
     movq %rdi, %rax
     movq %rax, -8(%rbp)
     leaq str1(%rip), %rax
+    movq %rax, -16(%rbp)
+    movq -16(%rbp), %rdi
+    movq -8(%rbp), %rsi
+    movq $0, %rax
+    call printf
+    movq -8(%rbp), %rax
+    movq %rbp, %rsp
+    popq %rbp
+    ret
+
+get_long:
+    pushq %rbp
+    movq %rsp, %rbp
+    subq $16, %rsp
+get_long0:
+    movq %rdi, %rax
+    movq %rax, -8(%rbp)
+    leaq str0(%rip), %rax
     movq %rax, -16(%rbp)
     movq -16(%rbp), %rdi
     movq -8(%rbp), %rsi
@@ -420,24 +439,6 @@ main4:
     orq %rax, %rbx
     movq %rbx, -688(%rbp)
     movq -688(%rbp), %rax
-    movq %rbp, %rsp
-    popq %rbp
-    ret
-
-get_long:
-    pushq %rbp
-    movq %rsp, %rbp
-    subq $16, %rsp
-get_long0:
-    movq %rdi, %rax
-    movq %rax, -8(%rbp)
-    leaq str0(%rip), %rax
-    movq %rax, -16(%rbp)
-    movq -16(%rbp), %rdi
-    movq -8(%rbp), %rsi
-    movq $0, %rax
-    call printf
-    movq -8(%rbp), %rax
     movq %rbp, %rsp
     popq %rbp
     ret
