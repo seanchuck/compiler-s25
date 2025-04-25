@@ -1,0 +1,14 @@
+digraph CFG {
+  node [shape=box fontname="monospace"];
+  0 [label="Block 0\l_t0 <- arg0\l_t1 <- arg1\l_t2 <- _t0 + _t1\lsum <- _t2\l_t3 <- _t1 - _t0\l_t4 <- _t0 * _t1\l_t5 <- _t2 > _t4\lcjmp _t5, showOps1\lujmp showOps2\l"];
+  1 [label="Block 1\lret\l"];
+  2 [label="Block 2\l_t6 <- 5\l_t7 <- _t6 * _t0\lsum <- _t2 + _t7\l_t8 <- sum > _t4\lcjmp _t8, showOps3\lujmp showOps4\l"];
+  3 [label="Block 3\l_t9 <- String(0, String)\lprintf(_t9, _t3)\lujmp showOps4\l"];
+  4 [label="Block 4\l\l"];
+  -1 -> 2 [label=""];
+  0 -> 2 [label="False"];
+  0 -> 1 [label="True"];
+  2 -> 3 [label="True"];
+  2 -> 4 [label="False"];
+  3 -> 4 [label=""];
+}

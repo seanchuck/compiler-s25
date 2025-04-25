@@ -1,0 +1,36 @@
+digraph CFG {
+  node [shape=box fontname="monospace"];
+  0 [label="Block 0\lA <- 10\l_t0 <- 1\la <- a + _t0\l_t1 <- 0\lsum <- _t1\l_t2 <- 0\li <- _t2\lujmp func11\l"];
+  1 [label="Block 1\l_t3 <- 10\l_t4 <- i < _t3\lcjmp _t4, func12\lujmp func14\l"];
+  2 [label="Block 2\l_t5 <- 0\lA[i] <- _t5\lujmp func13\l"];
+  3 [label="Block 3\l_t6 <- 1\li <- i + _t6\lujmp func11\l"];
+  4 [label="Block 4\l_t7 <- 0\li <- _t7\lujmp func15\l"];
+  5 [label="Block 5\l_t8 <- 10\l_t9 <- i < _t8\lcjmp _t9, func16\lujmp func18\l"];
+  6 [label="Block 6\l_t10 <- A[i]\l_t11 <- 0\l_t12 <- _t10 != _t11\lcjmp _t12, func19\lujmp func110\l"];
+  7 [label="Block 7\l_t15 <- 1\li <- i + _t15\lujmp func15\l"];
+  8 [label="Block 8\l_t16 <- 0\li <- _t16\lujmp func111\l"];
+  9 [label="Block 9\l_t13 <- String(0, String)\lprintf(_t13)\lujmp func110\l"];
+  10 [label="Block 10\l_t14 <- a + i\lA[i] <- _t14\lujmp func17\l"];
+  11 [label="Block 11\l_t17 <- 10\l_t18 <- i < _t17\lcjmp _t18, func112\lujmp func114\l"];
+  12 [label="Block 12\l_t19 <- A[i]\lsum <- sum + _t19\lujmp func113\l"];
+  13 [label="Block 13\l_t20 <- 1\li <- i + _t20\lujmp func111\l"];
+  14 [label="Block 14\lc <- sum\l"];
+  0 -> 1 [label=""];
+  1 -> 2 [label="True"];
+  1 -> 4 [label="False"];
+  2 -> 3 [label=""];
+  3 -> 1 [label=""];
+  4 -> 5 [label=""];
+  5 -> 6 [label="True"];
+  5 -> 8 [label="False"];
+  6 -> 10 [label="False"];
+  6 -> 9 [label="True"];
+  7 -> 5 [label=""];
+  8 -> 11 [label=""];
+  9 -> 10 [label=""];
+  10 -> 7 [label=""];
+  11 -> 14 [label="False"];
+  11 -> 12 [label="True"];
+  12 -> 13 [label=""];
+  13 -> 11 [label=""];
+}

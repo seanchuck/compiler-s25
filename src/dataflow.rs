@@ -13,86 +13,6 @@ use crate::{
 // HELPERS
 // #################################################
 
-
-/// Invalidate the hash table entries for a variable whose
-/// value has been updated, so that we don't attempt to
-/// do copy propagation of stale values.
-fn invalidate(
-    dest_name: &str,
-    copy_to_src: &mut HashMap<String, String>,
-    src_to_copies: &mut HashMap<String, HashSet<String>>,
-) {
-    // Remove dest from its source's copy set
-    if let Some(src) = copy_to_src.remove(dest_name) {
-        if let Some(set) = src_to_copies.get_mut(&src) {
-            set.remove(dest_name);
-        }
-    }
-
-    // If dest was a source,b remove all dependent copies
-    if let Some(dependents) = src_to_copies.remove(dest_name) {
-        for dependent in dependents {
-            copy_to_src.remove(&dependent);
-        }
-    }
-}
-
-/// Recursively get the root source that a copy refers to.
-/// Returns the input variable if it is not a copy of anything.
-fn get_root_source(
-    var_name: &str,
-    copy_to_src: &HashMap<String, String>,
-) -> String {
-    let mut current: &str = var_name;
-    while let Some(next) = copy_to_src.get(current) {
-        current = next;
-    }
-    current.to_string()
-}
-
-
-/// If the given operand is a direct copy of another operand,
-/// replace it with the source operand. Otherwise, this has no effect.
-/// Returns true iff a mutation occurred.
-fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, update_occurred: &mut bool, debug: bool) {
-    match op {
-        Operand::LocalVar(name, typ) => {
-            // Substitute with the original source
-            let root_src = get_root_source(name, copy_to_src);
-            // Check whether an udpate occurred
-            if *name != root_src {
-                if debug {
-                    println!("Replacing {} with {}", name, root_src);
-                }
-
-                *op = Operand::LocalVar(root_src.clone(), typ.clone());
-                *update_occurred = true;
-            }
-        }
-
-        Operand::GlobalVar(name, typ) => {
-            let root_src = get_root_source(name, copy_to_src);
-            if *name != root_src {
-                if debug {
-                    println!("Replacing {} with {}", name, root_src);
-                }
-
-                *op = Operand::GlobalVar(root_src, typ.clone());
-                *update_occurred = true;
-            }
-        }
-
-        Operand::LocalArrElement(_, index, _) => {
-            substitute_operand(index, copy_to_src, update_occurred, debug);
-        }
-
-        _ => {
-            // Const, String, Argument – do nothing
-        }
-    }
-}
-
-
 /// Map intersection for IN
 fn intersect_maps(
     mapa: &HashMap<String, String>,
@@ -170,7 +90,6 @@ fn collect_vars_in_operand(op: &Operand) -> Vec<String> {
         Operand::Const(..) | Operand::String(..) | Operand::Argument(..) => vec![],
     }
 }
-
 
 
 /// Returns a vector of source vars involved in an instruction.
@@ -386,8 +305,9 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
                 }
                 new_instrs.push(instr.clone());
             } else {
+                // DO NOT REMOVE: needed for testopt debugging
                 if debug {
-                    println!("Removed dead instruction: {:?}", instr);
+                    println!("DCE: Removed dead instruction: {:?}", instr);
                 }
                 update_occurred = true;
             }
@@ -405,6 +325,86 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
 // #################################################
 // COPY PROPAGATION
 // #################################################
+
+/// Invalidate the hash table entries for a variable whose
+/// value has been updated, so that we don't attempt to
+/// do copy propagation of stale values.
+fn invalidate(
+    dest_name: &str,
+    copy_to_src: &mut HashMap<String, String>,
+    src_to_copies: &mut HashMap<String, HashSet<String>>,
+) {
+    // Remove dest from its source's copy set
+    if let Some(src) = copy_to_src.remove(dest_name) {
+        if let Some(set) = src_to_copies.get_mut(&src) {
+            set.remove(dest_name);
+        }
+    }
+
+    // If dest was a source,b remove all dependent copies
+    if let Some(dependents) = src_to_copies.remove(dest_name) {
+        for dependent in dependents {
+            copy_to_src.remove(&dependent);
+        }
+    }
+}
+
+/// Recursively get the root source that a copy refers to.
+/// Returns the input variable if it is not a copy of anything.
+fn get_root_source(
+    var_name: &str,
+    copy_to_src: &HashMap<String, String>,
+) -> String {
+    let mut current: &str = var_name;
+    while let Some(next) = copy_to_src.get(current) {
+        current = next;
+    }
+    current.to_string()
+}
+
+/// If the given operand is a direct copy of another operand,
+/// replace it with the source operand. Otherwise, this has no effect.
+/// Returns true iff a mutation occurred.
+fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, update_occurred: &mut bool, debug: bool) {
+    match op {
+        Operand::LocalVar(name, typ) => {
+            // Substitute with the original source
+            let root_src = get_root_source(name, copy_to_src);
+            // Check whether an udpate occurred
+            if *name != root_src {
+                // DO NOT REMOVE: needed for testopt debugging
+                if debug {
+                    println!("CP: Replacing {} with {}", name, root_src);
+                }
+
+                *op = Operand::LocalVar(root_src.clone(), typ.clone());
+                *update_occurred = true;
+            }
+        }
+
+        Operand::GlobalVar(name, typ) => {
+            let root_src = get_root_source(name, copy_to_src);
+            if *name != root_src {
+                // DO NOT REMOVE: needed for testopt debugging
+                if debug {
+                    println!("CP: Replacing {} with {}", name, root_src);
+                }
+
+                *op = Operand::GlobalVar(root_src, typ.clone());
+                *update_occurred = true;
+            }
+        }
+
+        Operand::LocalArrElement(_, index, _) => {
+            substitute_operand(index, copy_to_src, update_occurred, debug);
+        }
+
+        _ => {
+            // Const, String, Argument – do nothing
+        }
+    }
+}
+
 
 // Worklist equations for copy propagation:
 //      IN[B]  = ⋂ OUT[P] for all predecessors P of B
@@ -767,9 +767,6 @@ fn kill_expressions(expressions: &mut AvailableExpressions, var: &String, debug:
             | Expression::Divide(left, right)
             | Expression::Modulo(left, right) => {
                 if var == left || var == right {
-                    if debug {
-                        println!("killed expression {} containing variable {}", expr, var);
-                    }
                     false
                 } else {
                     true // only keep expr if its left and right are different from var
@@ -834,16 +831,18 @@ fn common_subexpression_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
 
                         // check if this expression is already available
                         if let Some(expression_var) = expressions.get(&expr) {
-
                             // replace this instruction with an assignment
                             *instr = Instruction::Assign {
                                 dest: dest.clone(),
                                 src: Operand::LocalVar(expression_var.clone(), typ.clone()),
                                 typ: typ.clone()
                             };
+
                             update_occurred = true;
+                            
+                            // DO NOT REMOVE: needed for testopt debugging
                             if debug {
-                                println!("replace expression {} with variable {}", expr, expression_var.clone());
+                                println!("CSE: Replacing expression {} with variable {}", expr, expression_var.clone());
                             }
                         } else {
                             // generate the expression if dest is local and different from the operands
@@ -913,7 +912,7 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
                 if copy_propagation(cfg, debug) {
                     fixed_point = false;
                     if debug {
-                        println!("Constant propagation changed {}", method);
+                        println!("Copy propagation changed {}", method);
                     }
                 }
             }

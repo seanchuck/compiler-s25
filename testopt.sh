@@ -22,6 +22,21 @@ compare_outputs() {
     return $?
 }
 
+# Function to count optimizations per test case
+count_optimizations() {
+    local debug_output="$1"
+    local cp_count dce_count cse_count
+
+    cp_count=$(grep -cE "^CP: Replacing" "$debug_output")
+    dce_count=$(grep -cE "^DCE: Removed" "$debug_output")
+    cse_count=$(grep -cE "^CSE: Replacing" "$debug_output")
+
+    echo "Optimization counts:" | tee -a "$OUTPUT_FILE"
+    echo "  --> CP: $cp_count" | tee -a "$OUTPUT_FILE"
+    echo "  --> DCE: $dce_count" | tee -a "$OUTPUT_FILE"
+    echo "  --> CSE: $cse_count" | tee -a "$OUTPUT_FILE"
+}
+
 # Loop through all files in 'input' directory
 for file in "$BASE_DIR/$INPUT_DIR"/*; do
     if [[ -f "$file" ]]; then
@@ -30,26 +45,29 @@ for file in "$BASE_DIR/$INPUT_DIR"/*; do
         assembly_file="$file.s"
         executable_file="$file.out"
         actual_output="$file.result"
+        debug_output="$file.debug"
 
-        # Preemptively clean up stale result file
-        rm -f "$actual_output"
+        # Preemptively clean up stale result files
+        rm -f "$actual_output" "$debug_output"
 
         echo -e "\n========================================" | tee -a "$OUTPUT_FILE"
-        echo "Running: ./run.sh -t assembly "$file" -O all" | tee -a "$OUTPUT_FILE"
+        echo "Running: ./run.sh -t assembly \"$file\" -O all --debug" | tee -a "$OUTPUT_FILE"
         echo "----------------------------------------" | tee -a "$OUTPUT_FILE"
-        
-        # Generate assembly
-        ./run.sh -t assembly "$file" -O all -o "$assembly_file"
+
+        # Generate assembly with --debug output
+        ./run.sh -t assembly "$file" -O all --debug -o "$assembly_file" > "$debug_output"
         exit_code=$?
-        
-        # Check if the compilation was successful
+
         if [[ $exit_code -ne 0 ]]; then
             echo "Compilation failed for $file" | tee -a "$OUTPUT_FILE"
             incorrect=$((incorrect + 1))
             rm -f "$assembly_file" "$actual_output"
             continue
         fi
-        
+
+        # Count optimization transformations
+        count_optimizations "$debug_output"
+
         # Assemble and link
         gcc -O0 -no-pie "$assembly_file" -o "$executable_file"
         if [[ $? -ne 0 ]]; then
@@ -58,11 +76,9 @@ for file in "$BASE_DIR/$INPUT_DIR"/*; do
             rm -f "$assembly_file" "$executable_file" "$actual_output"
             continue
         fi
-        
+
         # Run the executable and capture output
         "$executable_file" > "$actual_output"
-
-        # Check if it produced an error
         exit_code=$?
         if [[ $exit_code -ne 0 ]]; then
             echo "Execution for $file returned with an error" | tee -a "$OUTPUT_FILE"
@@ -70,7 +86,7 @@ for file in "$BASE_DIR/$INPUT_DIR"/*; do
             rm -f "$assembly_file" "$executable_file" "$actual_output"
             continue
         fi
-        
+
         # Compare output
         if compare_outputs "$actual_output" "$expected_output"; then
             echo "Test passed for $file" | tee -a "$OUTPUT_FILE"
@@ -83,7 +99,7 @@ for file in "$BASE_DIR/$INPUT_DIR"/*; do
         fi
 
         # Clean up temporary files
-        rm -f "$assembly_file" "$executable_file" "$actual_output"
+        rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
     fi
 done
 
@@ -94,25 +110,28 @@ for file in "$BASE_DIR/$ERROR_DIR"/*; do
         assembly_file="$file.s"
         executable_file="$file.out"
         actual_output="$file.result"
+        debug_output="$file.debug"
 
-        rm -f "$actual_output"
+        rm -f "$actual_output" "$debug_output"
 
         echo -e "\n========================================" | tee -a "$OUTPUT_FILE"
-        echo "Running: ./run.sh -t assembly "$file" -O all" | tee -a "$OUTPUT_FILE"
+        echo "Running: ./run.sh -t assembly \"$file\" -O all --debug" | tee -a "$OUTPUT_FILE"
         echo "----------------------------------------" | tee -a "$OUTPUT_FILE"
-        
-        # Generate assembly
-        ./run.sh -t assembly "$file" -O all -o "$assembly_file"
+
+        # Generate assembly with --debug output
+        ./run.sh -t assembly "$file" -O all --debug -o "$assembly_file" > "$debug_output"
         exit_code=$?
-        
-        # Check if the compilation was successful
+
         if [[ $exit_code -ne 0 ]]; then
             echo "Compilation failed for $file" | tee -a "$OUTPUT_FILE"
             incorrect=$((incorrect + 1))
             rm -f "$assembly_file" "$actual_output"
             continue
         fi
-        
+
+        # Count optimization transformations
+        count_optimizations "$debug_output"
+
         # Assemble and link
         gcc -O0 -no-pie "$assembly_file" -o "$executable_file"
         if [[ $? -ne 0 ]]; then
@@ -121,7 +140,7 @@ for file in "$BASE_DIR/$ERROR_DIR"/*; do
             rm -f "$assembly_file" "$executable_file" "$actual_output"
             continue
         fi
-        
+
         # Run the executable to ensure it fails
         "$executable_file"
         exit_code=$?
@@ -134,11 +153,13 @@ for file in "$BASE_DIR/$ERROR_DIR"/*; do
         fi
 
         # Clean up temporary files
-        rm -f "$assembly_file" "$executable_file" "$actual_output"
+        rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
     fi
 done
 
-# Print summary
+# ==========================
+# Print final summary
+# ==========================
 echo -e "\n========================================" | tee -a "$OUTPUT_FILE"
 echo "Execution completed. Results saved in $OUTPUT_FILE." | tee -a "$OUTPUT_FILE"
 echo "Total Passed: $correct" | tee -a "$OUTPUT_FILE"

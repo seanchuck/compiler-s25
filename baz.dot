@@ -1,4 +1,4 @@
 digraph CFG {
   node [shape=box fontname="monospace"];
-  0 [label="Block 0\l_t0 <- 1\le <- e + _t0\l_t1 <- String(3)\lprintf(_t1, e)\lret e\l"];
+  0 [label="Block 0\l_t0 <- 1\le <- e + _t0\l_t1 <- String(1, String)\lprintf(_t1, e)\lret e\l"];
 }

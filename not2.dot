@@ -1,0 +1,11 @@
+digraph CFG {
+  node [shape=box fontname="monospace"];
+  0 [label="Block 0\l_t0 <- arg0\lcjmp _t0, not21\lujmp not22\l"];
+  1 [label="Block 1\lb <- 0\lujmp not23\l"];
+  2 [label="Block 2\lb <- 1\lujmp not23\l"];
+  3 [label="Block 3\lret b\l"];
+  0 -> 1 [label="True"];
+  0 -> 2 [label="False"];
+  1 -> 3 [label=""];
+  2 -> 3 [label=""];
+}
