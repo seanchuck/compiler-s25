@@ -177,29 +177,6 @@ fn collect_vars_in_operand(op: &Operand) -> Vec<String> {
 fn get_source_vars(instr: &Instruction) -> Vec<String> {
     match instr {
         // t <- X
-        // In a[_t1], _t1 should be considered a source/used var!!!
-        // Instruction::Assign { src, .. } => match src {
-        //     Operand::LocalVar(v) => vec![v.clone()],
-        
-        //     Operand::GlobalVar(v) => vec![v.clone()],
-        
-        //     Operand::GlobalArrElement(_, index) | Operand::LocalArrElement(_, index) => {
-        //         println!("we considering this instr {:#?}", instr);
-
-        //         // Recurse into the index to find variables used
-        //         match index.as_ref() {
-        //             Operand::LocalVar(v) => vec![v.clone()],
-        //             _ => vec![], // Could expand this if you support nested indexing
-        //         }
-        //     }
-        
-        //     // Operand::String(_) => vec![], // No variable involved
-        //     // Operand::Const(_) => vec![], // No variable involved
-        //     _=> vec![]
-        
-        //     // Operand::Argument(v) => vec![v.clone()],
-        // },
-
         Instruction::Assign { src, dest } => {
             let mut vars = Vec::new();
 
@@ -213,10 +190,8 @@ fn get_source_vars(instr: &Instruction) -> Vec<String> {
                 },
                 _ => {}
             }
-
             vars
         }
-        
 
         // t <- X op Y
         Instruction::Add { left, right, .. }
@@ -231,46 +206,39 @@ fn get_source_vars(instr: &Instruction) -> Vec<String> {
         | Instruction::Equal { left, right, .. }
         | Instruction::NotEqual { left, right, .. } => {
             let mut vars = Vec::new();
-
             vars.extend(collect_vars_in_operand(left));
             vars.extend(collect_vars_in_operand(right));
-            
             vars
         }
 
         // t <- !X / cast(X) / len(X)
         Instruction::Not { expr, .. }
         | Instruction::Cast { expr, ..}
-        | Instruction::Len { expr, .. } => match expr {
-            Operand::LocalVar(v) => vec![v.clone()],
-            _ => vec![],
+        | Instruction::Len { expr, .. } => {
+            collect_vars_in_operand(expr)
         },
 
         // Method call arguments
-        Instruction::MethodCall { args, .. } => args
-            .iter()
-            .filter_map(|op| match op {
-                Operand::LocalVar(v) => Some(v.clone()),
-                _ => None,
-            })
-            .collect(),
+        Instruction::MethodCall { args, .. } => {
+            args.iter()
+                .flat_map(|op| collect_vars_in_operand(op))
+                .collect()
+        }        
 
         // Conditional jump depends on condition
-        Instruction::CJmp { condition, .. } => match condition {
-            Operand::LocalVar(v) => vec![v.clone()],
-            _ => vec![],
+        Instruction::CJmp { condition, .. } =>  {
+            collect_vars_in_operand(condition)
         },
 
         // Return value
         Instruction::Ret { value } => match value {
-            Some(Operand::LocalVar(v)) => vec![v.clone()],
+            Some(Operand::LocalVar(_)) => collect_vars_in_operand(&value.clone().unwrap()),
             _ => vec![],
         },
 
         // LoadString reads from a source variable
-        Instruction::LoadString { src, .. } => match src {
-            Operand::LocalVar(v) => vec![v.clone()],
-            _ => vec![],
+        Instruction::LoadString { src, .. } => {
+            collect_vars_in_operand(src)
         },
 
         // LoadConst and Exit do not use variables
@@ -295,6 +263,9 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<
     // Compute predecessor and successor graphs
     let predecessors = compute_predecessors(&method_cfg);
     let successors = compute_successors(&method_cfg);
+
+    println!("preds are {:#?}", predecessors);
+    println!("succs are {:#?}", successors);
 
     // Variables that are live going into this block; hashmap keyed by block_id
     let mut in_map: HashMap<i32, HashSet<String>> = HashMap::new();
@@ -328,27 +299,19 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<
             let used_vars = get_source_vars(instr);
             let dest = get_dest_var(instr);
 
+            // populate use and def sets
             for var in used_vars {
-                if !def_set.contains(&var) {
-                    use_set.insert(var);
-                }
+                use_set.insert(var);
             }
-
-            // if let Some(var) = dest {
-            //     def_set.insert(var);
-            // }
             if let Some(var) = dest {
-                // Only remove if def occurs before use, so old value unused
-                if !use_set.contains(&var) {
-                    def_set.insert(var);
-                }
+                def_set.insert(var);
             }
-            
         }
 
         // IN[B] = USE[B] ∪ (OUT[B] - DEF[B])
         let mut in_set = use_set.clone();
         in_set.extend(out_set.difference(&def_set).cloned());
+        
 
         // Check if IN or OUT changed → if so, propagate
         if in_map.get(&block_id) != Some(&in_set) || out_map.get(&block_id) != Some(&out_set) {
@@ -363,6 +326,7 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<
         }
     }
 
+    println!("in_map: {:#?}, out map {:#?}", in_map, out_map);
     (in_map, out_map)
 }
 
@@ -381,11 +345,11 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
         // We will add any non-dead code to this vector
         let mut new_instrs = Vec::new();
         let mut live = out_set.clone();
-
+        
         for instr in block.instructions.iter().rev() {
             let dest = get_dest_var(instr);
             let used = get_source_vars(instr);
-
+            
             // TODO: avoid moving any instructions with a side-effect
             let has_side_effect = match instr {
                 Instruction::MethodCall { .. }
@@ -683,8 +647,8 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
     // Run the optimizations until the CFG stops changing
     let mut fixed_point = false;
 
-    while !fixed_point {
-        fixed_point = true;
+    // while !fixed_point {
+    //     fixed_point = true;
 
         // TODO: ordering?
         if optimizations.contains(&Optimization::Cp) {
@@ -711,6 +675,7 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
 
         if optimizations.contains(&Optimization::Dce) {
             for (method, cfg) in method_cfgs.iter_mut() {
+                println!("method: {method}");
                 if dead_code_elimination(cfg, debug) {
                     fixed_point = false;
                     if debug {
@@ -719,7 +684,7 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
                 }
             }
         }
-    }
+    // }
     
     method_cfgs.clone()
 }

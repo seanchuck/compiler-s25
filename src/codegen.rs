@@ -465,18 +465,18 @@ pub fn generate_assembly(
     // Generate the method CFGS
     let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
 
-    // if debug {
-    //     html_cfgs(&method_cfgs, "no-opt.html".to_string());
-    //     println!("\n========== X86 Code ==========\n");
-    // }
+    if debug {
+        html_cfgs(&method_cfgs, "no-opt.html".to_string());
+        println!("\n========== X86 Code ==========\n");
+    }
 
     // Perform dataflow optimizations
     optimize_dataflow(&mut method_cfgs, &optimizations, debug);
 
-    if debug {
-        html_cfgs(&method_cfgs, "opt.html".to_string());
-        println!("\n========== X86 Code ==========\n");
-    }
+    // if debug {
+    //     html_cfgs(&method_cfgs, "opt.html".to_string());
+    //     println!("\n========== X86 Code ==========\n");
+    // }
 
 
     let mut global_code: Vec<X86Insn> = Vec::new();
