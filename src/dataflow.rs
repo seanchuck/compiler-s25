@@ -263,11 +263,12 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
         let mut live = out_set.clone();
 
         
+        // Work through basic block instructions from bottom up
         for instr in block.instructions.iter().rev() {
             let dest = get_dest_var(instr);
             let used = get_source_vars(instr);
             
-            // TODO: avoid moving any instructions with a side-effect
+            // Avoid moving any instructions with a side-effect
             let has_side_effect = match instr {
                 Instruction::MethodCall { .. }
                 | Instruction::Ret { .. }
@@ -286,19 +287,23 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
             };
 
             let keep_instr = match &dest {
-                Some(var) => live.contains(var) || has_side_effect,
+                // TODO: add another condition to require liveness, and has a use
+                // in a successor
+                Some(var) => has_side_effect || (live.contains(var)),
                 None => true,
             };
 
 
             if keep_instr {
-                // Update live set
+                // Insert used variables into live set
                 for var in &used {
                     live.insert(var.clone());
                 }
 
+                // Remove defined variables from the live set
                 if let Some(var) = &dest {
                     // TODO: Don't (?) remove from liveness if is a def and a use
+                    // This condition should NOT be necessary
                     if !&used.contains(var) {
                         live.remove(var);
                     }
