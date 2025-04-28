@@ -57,44 +57,41 @@ for file in "$BASE_DIR/$INPUT_DIR"/*; do
         actual_output="$file.result"
         debug_output="$file.debug"
 
-        # Preemptively clean up stale result files
         rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
 
         echo -e "\n========================================" | tee -a "$OUTPUT_FILE"
         echo "Running: ./run.sh -t assembly \"$file\" -O all --debug" | tee -a "$OUTPUT_FILE"
         echo "----------------------------------------" | tee -a "$OUTPUT_FILE"
 
-        # Generate assembly with --debug output
         ./run.sh -t assembly "$file" -O all --debug -o "$assembly_file" > "$debug_output"
         exit_code=$?
 
         if [[ $exit_code -ne 0 ]]; then
             echo "Compilation failed for $file" | tee -a "$OUTPUT_FILE"
             incorrect=$((incorrect + 1))
+            rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
             continue
         fi
 
-        # Count optimization transformations
         count_optimizations "$debug_output"
 
-        # Assemble and link
         gcc -O0 -no-pie "$assembly_file" -o "$executable_file"
         if [[ $? -ne 0 ]]; then
             echo "Assembly linking failed for $file" | tee -a "$OUTPUT_FILE"
             incorrect=$((incorrect + 1))
+            rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
             continue
         fi
 
-        # Run the executable and capture output
         "$executable_file" > "$actual_output"
         exit_code=$?
         if [[ $exit_code -ne 0 ]]; then
             echo "Execution for $file returned with an error" | tee -a "$OUTPUT_FILE"
             incorrect=$((incorrect + 1))
+            rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
             continue
         fi
 
-        # Compare output
         if compare_outputs "$actual_output" "$expected_output"; then
             echo "Test passed for $file" | tee -a "$OUTPUT_FILE"
             correct=$((correct + 1))
@@ -104,6 +101,9 @@ for file in "$BASE_DIR/$INPUT_DIR"/*; do
             diff "$actual_output" "$expected_output" | tee -a "$OUTPUT_FILE"
             incorrect=$((incorrect + 1))
         fi
+
+        # Clean up temporary files after each file
+        rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
     fi
 done
 
@@ -128,16 +128,17 @@ for file in "$BASE_DIR/$ERROR_DIR"/*; do
         if [[ $exit_code -ne 0 ]]; then
             echo "Compilation failed for $file" | tee -a "$OUTPUT_FILE"
             incorrect=$((incorrect + 1))
+            rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
             continue
         fi
 
-        # Count optimization transformations
         count_optimizations "$debug_output"
 
         gcc -O0 -no-pie "$assembly_file" -o "$executable_file"
         if [[ $? -ne 0 ]]; then
             echo "Assembly linking failed for $file" | tee -a "$OUTPUT_FILE"
             incorrect=$((incorrect + 1))
+            rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
             continue
         fi
 
@@ -150,6 +151,9 @@ for file in "$BASE_DIR/$ERROR_DIR"/*; do
             echo "Incorrectly succeeded for $file" | tee -a "$OUTPUT_FILE"
             incorrect=$((incorrect + 1))
         fi
+
+        # Clean up temporary files after each file
+        rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
     fi
 done
 
