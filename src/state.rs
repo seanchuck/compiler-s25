@@ -10,6 +10,8 @@ pub type CopyMap = HashMap<String, String>;
 
 pub type AvailableExpressions = HashMap<Expression, String>; // maps expression to variable
 
+pub type LiveVariables = HashSet<String>; // names of live local variables
+
 #[derive(Hash, PartialEq, Eq, Clone)]
 pub enum Expression {
     Add(String, String),
