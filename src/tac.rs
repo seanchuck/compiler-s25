@@ -182,3 +182,6 @@ pub enum Instruction {
         typ: Type
     },
 }
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct InstructionRef(pub *const Instruction);

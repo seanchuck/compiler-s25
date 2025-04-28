@@ -5,7 +5,7 @@ use crate::cfg::{Global, Local};
 use crate::cfg::{INT_SIZE, LONG_SIZE};
 use crate::ast::Type;
 use crate::dataflow::optimize_dataflow;
-use crate::tac::*;
+use crate::{regalloc::reg_alloc, tac::*};
 use crate::utils::cli::Optimization;
 use crate::utils::print::{html_cfgs, print_cfg};
 use crate::x86::*;
@@ -650,6 +650,9 @@ pub fn generate_assembly(file: &str, filename: &str, optimizations: HashSet<Opti
 
     // Perform dataflow optimizations
     optimize_dataflow(&mut method_cfgs, &optimizations, debug);
+    
+    // Allocate registers to the CFG
+    reg_alloc(&mut method_cfgs, debug);
 
     if debug {
         print_cfg(&method_cfgs);
