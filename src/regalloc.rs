@@ -134,71 +134,18 @@ fn get_local_var_name(operand: &Operand) -> Option<String> {
     }
 }
 
-// Worklist equations for liveness analysis:
-//      IN[B]  = USE[B] ∪ (OUT[B] - DEF[B])
-//      OUT[B] = ∪ IN[S] for all successors S of B
-// Returns a tuple (in_map, out_map)
-fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, LiveVariables>, HashMap<i32, LiveVariables>) {
-    // Compute predecessor and successor graphs
-    let cfg_preds = compute_predecessors(&method_cfg);
-    let cfg_succs = compute_successors(&method_cfg);
-
-    // Variables that are live going in to this block; hashmap keyed by block_id
-    let mut in_map: HashMap<i32, LiveVariables> = HashMap::new();
-    // Variables that are live going out of this block; hashmap keyed by block_id
-    let mut out_map: HashMap<i32, LiveVariables> = HashMap::new();
-
-    let def_use_sets = compute_def_use_sets(method_cfg);
-
-    // Worklist of basic block ids
-    let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect::<VecDeque<i32>>();
-
-
-    // Iterate until a fixed point
-    while let Some(block_id) = worklist.pop_front() {
-        let defs = &def_use_sets.get(&block_id).unwrap().defs;
-        let uses = &def_use_sets.get(&block_id).unwrap().uses;
-
-        // compute OUT
-        let mut out = HashSet::new();
-        if let Some(succs) = cfg_succs.get(&block_id) {
-            for succ_id in succs {
-                if let Some(in_succ) = in_map.get(succ_id) {
-                    out = &out | in_succ; // union
-                }
-            }
-        }
-
-        // compute IN
-        let mut in_set = uses.clone();
-        let out_minus_def: HashSet<_> = out.difference(defs).cloned().collect();
-        in_set.extend(out_minus_def);
-
-        // update maps
-        in_map.insert(block_id, in_set.clone());
-        out_map.insert(block_id, out.clone());
-
-        // if anything changed, queue predecessors
-        let old_in = in_map.get(&block_id).cloned().unwrap();
-        let old_out = out_map.get(&block_id).cloned().unwrap();
-        if in_set != old_in || out != old_out {
-            if let Some(preds) = cfg_preds.get(&block_id) {
-                for pred_id in preds {
-                    if !worklist.contains(pred_id) {
-                        worklist.push_back(*pred_id);
-                    }
-                }
-            }
-        }
-    }
-
-    (in_map, out_map)
+fn uses_from_def() -> HashSet<&Instruction>{
+    todo!()
 }
+
+fn defs_from_use() -> HashSet<&Instruction>{
+    todo!()
+}
+
 
 fn compute_live_ranges(method_cfg: &CFG) -> BTreeMap<i32, Web> { 
     todo!()
 }
-
 
 
 fn compute_interference() {
@@ -218,10 +165,10 @@ fn compute_spill_costs() {
 fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) -> BTreeMap<i32, X86Operand> {
     todo!();
 
-    let live_ranges = HashMap::new();
+    let live_ranges: HashMap<&String, BTreeMap<i32, Web>> = HashMap::new();
 
     for (method_name, cfg) in method_cfgs {
-        let method_ranges = compute_live_ranges(cfg);
+        let method_ranges: BTreeMap<i32, Web> = compute_live_ranges(cfg);
         live_ranges.insert(method_name, method_ranges);
 
     }
