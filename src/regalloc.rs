@@ -1,45 +1,7 @@
-use crate::{cfg::CFG, tac::Instruction, x86::X86Operand, tac::Operand, tac::InstructionRef};
-use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet, VecDeque}};
+use crate::{cfg::CFG, tac::Instruction, x86::X86Operand, tac::Operand, web::*};
+use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet, VecDeque}, hash::Hash};
 use crate::state::*;
 
-// Def and reachable uses must be in same web
-// All defs that reach a common use must be in same web
-// All defs and uses to the variable within a web will be 
-// done on the same register.
-#[derive(Debug, Eq, PartialEq, Clone)]
-struct Web {
-    id: i32,
-    variable: String,
-    defs: Vec<InstructionRef>,
-    uses: Vec<InstructionRef>,
-}
-
-#[derive(Debug, Clone)]
-pub struct InterferenceGraph {
-    pub edges: HashMap<String, HashSet<String>> // maps each variable to the variables its live range conflicts with
-}
-
-impl InterferenceGraph {
-    pub fn new() -> Self {
-        InterferenceGraph {
-            edges: HashMap::new(),
-        }
-    }
-
-    pub fn add_edge(&mut self, u: String, v: String) {
-        self.edges.entry(u.clone()).or_insert_with(HashSet::new).insert(v.clone());
-        self.edges.entry(v).or_insert_with(HashSet::new).insert(u);
-    }
-
-    pub fn neighbors(&self, u: &String) -> Option<&HashSet<String>> {
-        self.edges.get(u)
-    }
-}
-
-struct DefUse {
-    defs: HashSet<String>, // all variables that are defined in this basic block
-    uses: HashSet<String> // all variables that are used in this basic block
-}
 
 // Initialize a counter for naming webs
 thread_local! {
@@ -54,6 +16,20 @@ fn next_web_id() -> i32 {
         id as i32
     })
 }
+
+
+fn compute_instr_map(method_cfg: &CFG) -> InstructionMap {
+    let mut map = HashMap::new();
+
+    for (block_id, block) in &method_cfg.blocks {
+        for (instr_idx, instr) in block.instructions.iter().enumerate() {
+            map.insert(InstructionIndex {block_id: *block_id, instr_index: instr_idx as i32}, instr.clone());
+        }
+    }
+
+    InstructionMap(map)
+}
+
 
 // only consider local variables for now (no array elements)
 fn compute_def_use_sets(method_cfg: &CFG) -> BTreeMap<i32, DefUse> {
@@ -221,14 +197,14 @@ fn instr_defs_var(inst: &Instruction, var: &str) -> bool {
     false
 }
 
-fn uses_from_def(cfg: &CFG, start_inst: *const Instruction, var: &str) -> HashSet<InstructionRef> {
+
+fn uses_from_def(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> HashSet<InstructionIndex> {
     let mut uses = HashSet::new();
-    let mut visited = HashSet::new(); // to avoid cycles in CFG
+    let mut visited = HashSet::new(); // to avoid cycles
     let mut worklist = VecDeque::new();
 
     // Start at (block, index) right after start_inst
-    let (start_block_id, start_index) = cfg.locate_instruction(start_inst);
-    worklist.push_back((start_block_id, start_index + 1));
+    worklist.push_back((start_inst.block_id, start_inst.instr_index + 1));
 
     while let Some((block_id, inst_idx)) = worklist.pop_front() {
         if !visited.insert((block_id, inst_idx)) {
@@ -238,12 +214,21 @@ fn uses_from_def(cfg: &CFG, start_inst: *const Instruction, var: &str) -> HashSe
         let block = &cfg.blocks[&block_id];
         let instructions = &block.instructions;
 
+        if inst_idx >= instructions.len() as i32 {
+            // Went past last instruction, move to successors
+            for succ in cfg.successors(block_id) {
+                worklist.push_back((succ, 0));
+            }
+            continue;
+        }
+
         // Start scanning from inst_idx
         for i in inst_idx..instructions.len() as i32 {
             let inst = &instructions[i as usize];
+            let inst_index = InstructionIndex { block_id, instr_index: i };
 
             if inst.get_used_vars().contains(var) {
-                uses.insert(InstructionRef(inst));
+                uses.insert(inst_index);
             }
 
             if instr_defs_var(inst, var) {
@@ -251,20 +236,21 @@ fn uses_from_def(cfg: &CFG, start_inst: *const Instruction, var: &str) -> HashSe
             }
         }
 
-        // If you scanned to end of block without redefinition:
-        if instructions[inst_idx as usize..]
-            .iter()
-            .all(|inst| !instr_defs_var(inst, var))
+        // If scanned to end of block without redefinition:
+        if (inst_idx as usize) < instructions.len() &&
+            instructions[inst_idx as usize..]
+                .iter()
+                .all(|inst| !instr_defs_var(inst, var))
         {
-            // Add all successors to worklist
-            for edge in cfg.successors(block_id) {
-                worklist.push_back((edge, 0)); // start at instruction 0 in the successor
+            for succ in cfg.successors(block_id) {
+                worklist.push_back((succ, 0)); // start at instruction 0 in the successor
             }
         }
     }
 
     uses
 }
+
 
 
 
@@ -317,29 +303,42 @@ fn add_new_use(use_set: &mut HashSet<String>, def_set: &HashSet<String>, operand
     }
 }
 
-fn defs_from_use(cfg: &CFG, start_inst: *const Instruction, var: &str) -> HashSet<InstructionRef> {
+
+
+fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> HashSet<InstructionIndex> {
     let mut defs = HashSet::new();
-    let mut visited = HashSet::new(); // (block_id, instruction_idx) pairs
+    let mut visited = HashSet::new();
     let mut worklist = VecDeque::new();
 
-    // Start at (block, index) AT the use instruction
-    let (start_block_id, start_index) = cfg.locate_instruction(start_inst);
-    worklist.push_back((start_block_id, start_index));
+    worklist.push_back((start_inst.block_id, start_inst.instr_index));
 
     while let Some((block_id, inst_idx)) = worklist.pop_front() {
         if !visited.insert((block_id, inst_idx)) {
-            continue; // Already visited
+            continue;
         }
 
         let block = &cfg.blocks[&block_id];
         let instructions = &block.instructions;
 
-        // Search backward within the block
+        // move to predecessor block
+        if inst_idx < 0 {
+            for pred_id in cfg.predecessors(block_id) {
+                let pred_block = &cfg.blocks[&pred_id];
+                let last_idx = (pred_block.instructions.len() - 1) as i32;
+                worklist.push_back((pred_id, last_idx));
+            }
+            continue;
+        }
+
+         // Search backward within the block
         for i in (0..=inst_idx).rev() {
             let inst = &instructions[i as usize];
 
             if instr_defs_var(inst, var) {
-                defs.insert(InstructionRef(inst));
+                defs.insert(InstructionIndex {
+                    block_id,
+                    instr_index: i,
+                });
                 break; // Found a definition => stop this path
             }
         }
@@ -347,7 +346,7 @@ fn defs_from_use(cfg: &CFG, start_inst: *const Instruction, var: &str) -> HashSe
         // If no def found in this block before the start_idx, move to predecessors
         let def_found_in_block = (0..=inst_idx)
             .any(|i| instr_defs_var(&instructions[i as usize], var));
-        
+
         if !def_found_in_block {
             for pred_id in cfg.predecessors(block_id) {
                 let pred_block = &cfg.blocks[&pred_id];
@@ -360,17 +359,22 @@ fn defs_from_use(cfg: &CFG, start_inst: *const Instruction, var: &str) -> HashSe
     defs
 }
 
-fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
+
+
+fn compute_webs(method_cfg: &CFG, instr_map: &InstructionMap) -> BTreeMap<i32, Web> {
     let mut webs = BTreeMap::new();
     let mut visited_defs = HashSet::new();
     let mut visited_uses = HashSet::new();
 
     for (block_id, block) in &method_cfg.blocks {
-        for inst in &block.instructions {
+        for (instr_idx, inst) in block.instructions.iter().enumerate() {
             if let Some(var) = inst.get_def_var() {
-                let inst_ref = InstructionRef(inst);
+                let inst_idx = InstructionIndex {
+                    block_id: *block_id,
+                    instr_index: instr_idx as i32,
+                };
 
-                if visited_defs.contains(&inst_ref) {
+                if visited_defs.contains(&inst_idx) {
                     continue;
                 }
 
@@ -378,26 +382,24 @@ fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
                 let mut uses = HashSet::new();
                 let mut worklist = VecDeque::new();
 
-                defs.insert(inst_ref);
-                visited_defs.insert(inst_ref);
-                worklist.push_back(inst_ref);
+                defs.insert(inst_idx);
+                visited_defs.insert(inst_idx);
+                worklist.push_back(inst_idx);
 
                 // FP Algo to collect all associated defs and uses into one web
-                while let Some(def) = worklist.pop_front() {
-                    let def_inst = def.0;
+                while let Some(def_idx) = worklist.pop_front() {
+                    let reachable_uses = uses_from_def(method_cfg, def_idx, &var);
 
-                    let reachable_uses = uses_from_def(method_cfg, def_inst, &var);
+                    for use_idx in reachable_uses {
+                        if visited_uses.insert(use_idx) {
+                            uses.insert(use_idx);
 
-                    for use_ref in reachable_uses {
-                        if visited_uses.insert(use_ref) {
-                            uses.insert(use_ref);
+                            let reaching_defs = defs_from_use(method_cfg, def_idx, &var);
 
-                            let reaching_defs = defs_from_use(method_cfg, unsafe { &*use_ref.0 }, &var);
-
-                            for reaching_def in reaching_defs {
-                                if visited_defs.insert(reaching_def) {
-                                    defs.insert(reaching_def);
-                                    worklist.push_back(reaching_def);
+                            for reaching_def_idx in reaching_defs {
+                                if visited_defs.insert(reaching_def_idx) {
+                                    defs.insert(reaching_def_idx);
+                                    worklist.push_back(reaching_def_idx);
                                 }
                             }
                         }
@@ -420,6 +422,7 @@ fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
 
     webs
 }
+
 
 fn remove_def(def_set: &mut HashSet<String>, operand: &Operand) {
     if let Some(name) = get_local_var_name(operand) {
@@ -550,7 +553,8 @@ pub fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) -> BTreeMa
     let mut webs: HashMap<&String, BTreeMap<i32, Web>> = HashMap::new();
 
     for (method_name, cfg) in method_cfgs {
-        let method_ranges: BTreeMap<i32, Web> = compute_webs(cfg);
+        let instr_map = compute_instr_map(&cfg);
+        let method_ranges: BTreeMap<i32, Web> = compute_webs(cfg, &instr_map);
         webs.insert(method_name, method_ranges);
     }
 

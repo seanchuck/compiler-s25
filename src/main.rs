@@ -10,7 +10,7 @@ mod tac;
 mod token;
 mod x86;
 mod state;
-mod regalloc;
+mod web;
 
 mod buildcfg;
 mod codegen;
@@ -19,6 +19,7 @@ mod scan;
 mod semcheck;
 mod traverse;
 mod dataflow;
+mod regalloc;
 
 fn get_writer(output: &Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
     match output {

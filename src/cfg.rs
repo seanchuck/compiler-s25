@@ -148,14 +148,14 @@ impl CFG {
     }
 
     // Get the block id and the index of instruction from within a block
-    pub fn locate_instruction(&self, instruction: *const Instruction) -> (i32, i32) {
-        for (block_id, block) in &self.blocks {
-            if let Some(index) = block.instructions.iter().position(|insn| insn as *const _ == instruction) {
-                return (*block_id, index as i32);
-            }
-        }
-        panic!("Instruction not found in any block");
-    }
+    // pub fn locate_instruction(&self, instruction: *const Instruction) -> (i32, i32) {
+    //     for (block_id, block) in &self.blocks {
+    //         if let Some(index) = block.instructions.iter().position(|insn| insn as *const _ == instruction) {
+    //             return (*block_id, index as i32);
+    //         }
+    //     }
+    //     panic!("Instruction not found in any block");
+    // }
 
     // Get the block ids that are successors to a given block
     pub fn successors(&self, block: i32) -> HashSet<i32> {

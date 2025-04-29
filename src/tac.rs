@@ -94,7 +94,7 @@ impl fmt::Display for Operand {
 }
 
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub enum Instruction {
     // ARITHMETIC BINARY OPERATIONS
     // t <- X + Y
@@ -357,5 +357,3 @@ impl Instruction {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
-pub struct InstructionRef(pub *const Instruction);
