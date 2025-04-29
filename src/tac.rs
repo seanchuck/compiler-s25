@@ -64,6 +64,18 @@ impl Operand {
             | Operand::Argument { typ, .. } => typ.clone(),
         }
     }
+
+    pub fn get_reg(&self) -> Option<X86Operand> {
+        match self {
+            Operand::GlobalVar { reg , ..}
+            | Operand::GlobalArrElement { reg , ..}
+            | Operand::String { reg , ..}
+            | Operand::LocalVar { reg , ..}
+            | Operand::LocalArrElement { reg , ..}
+            | Operand::Const { reg , ..}
+            | Operand::Argument { reg, ..} => reg.clone()
+        }
+    }
 }
     
 

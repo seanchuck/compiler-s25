@@ -58,25 +58,25 @@ fn map_operand(
     globals: &HashMap<String, Global>
 ) -> X86Operand {
     match operand {
-        Operand::Const(val, _) => X86Operand::Constant(*val),
+        Operand::Const { value, .. } => X86Operand::Constant(*value),
 
-        Operand::LocalVar(temp, _) => {
-            let typ = method_cfg.locals.get(temp).expect("missing temp in scope").typ.clone();
-            X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), typ)
+        Operand::LocalVar { name, typ, reg } => {
+            let typ = method_cfg.locals.get(name).expect("missing temp in scope").typ.clone();
+            X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(name), typ)
             // X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), Type::Long)
         }
 
-        Operand::GlobalVar(val, _) => X86Operand::Global(val.to_string()),
+        Operand::GlobalVar { name, .. } => X86Operand::Global(name.to_string()),
 
-        Operand::LocalArrElement(arr, idx, _) => {
-            let array_typ: Type = method_cfg.locals.get(arr).expect("expected array entry").typ.clone();
-            let idx_op = map_operand(method_cfg, idx, x86_instructions, globals);
+        Operand::LocalArrElement { name, index, typ, reg } => {
+            let array_typ: Type = method_cfg.locals.get(name).expect("expected array entry").typ.clone();
+            let idx_op = map_operand(method_cfg, index, x86_instructions, globals);
 
             let index_reg: Register = reg_for_type(Register::R10, &Type::Int);
 
             // Load base address of array into R11
             x86_instructions.push(X86Insn::Lea(
-                X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(arr), Type::Long),
+                X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(name), Type::Long),
                 X86Operand::Reg(Register::R11),
             ));
 
@@ -102,9 +102,9 @@ fn map_operand(
 
         }
 
-        Operand::GlobalArrElement(arr, idx, typ) => {
-            let array_typ: Type = globals.get(arr).expect("Global array not defined!").typ.clone();
-            let idx_op = map_operand(method_cfg, idx, x86_instructions, globals);
+        Operand::GlobalArrElement { name, index, typ, reg } => {
+            let array_typ: Type = globals.get(name).expect("Global array not defined!").typ.clone();
+            let idx_op = map_operand(method_cfg, index, x86_instructions, globals);
 
             let index_reg: Register = reg_for_type(Register::R10, &Type::Int);
 
@@ -122,11 +122,11 @@ fn map_operand(
                 INT_SIZE
             };
 
-            X86Operand::Address(Some(arr.to_string()), None, Register::R10, element_size, typ.clone())
+            X86Operand::Address(Some(name.to_string()), None, Register::R10, element_size, typ.clone())
         }
 
-        Operand::Argument(pos, typ) => {
-            match pos {
+        Operand::Argument { position, typ, reg } => {
+            match position {
                 0 => X86Operand::Reg(reg_for_type(Register::Rdi, typ)),
                 1 => X86Operand::Reg(reg_for_type(Register::Rsi, typ)),
                 2 => X86Operand::Reg(reg_for_type(Register::Rdx, typ)),
@@ -136,7 +136,7 @@ fn map_operand(
                 _ => {
                     // Args are always the first local temps defined
                     // Should properly handle ints and longs
-                    let temp_name = method_cfg.param_to_temp.get(pos).expect("Param mapping does not exist").name.clone();
+                    let temp_name = method_cfg.param_to_temp.get(position).expect("Param mapping does not exist").name.clone();
                     let local = method_cfg.locals.get(&temp_name);
                     let Some(Local { typ, .. }) = local else {
                         panic!("Expected a variable, found something else!");
@@ -144,7 +144,7 @@ fn map_operand(
                     
                     // Only used for callee retrieving operand, caller pushes without using map_operand!
                     // 16 byte offset beca, globalsuse: old_rbp and ra stored betweeen new_rbp and args
-                    let offset = 16 + ((pos - 6) as i64 * 8);
+                    let offset = 16 + ((position - 6) as i64 * 8);
 
                     // match typ {
                     //     Type::Int 
@@ -159,7 +159,7 @@ fn map_operand(
                 }
             }
         }
-        Operand::String(idx, ..) => X86Operand::RegLabel(Register::Rip, format!("str{idx}")),
+        Operand::String { id, .. } => X86Operand::RegLabel(Register::Rip, format!("str{id}")),
     }
 }
 
@@ -265,8 +265,9 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             // First 6 args go in registers
             for (i, arg) in args.iter().take(6).enumerate() {
                 let arg_typ = arg.get_type();
-                let arg_reg =
-                    map_operand(method_cfg, &Operand::Argument(i as i32, arg_typ.clone()), x86_instructions, globals);
+                let optional_reg = arg.get_reg();
+                let arg_reg = 
+                    map_operand(method_cfg, &Operand::Argument { position: i as i32, typ: arg_typ.clone(), reg: optional_reg }, x86_instructions, globals);
                 let arg_val = map_operand(method_cfg, arg, x86_instructions, globals);
                 x86_instructions.push(X86Insn::Mov(arg_val, arg_reg, arg_typ));
             }

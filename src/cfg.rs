@@ -5,7 +5,7 @@ Consists of basic blocks and directed edges
 between those basic blocks.
 **/
 
-use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*};
+use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*, x86::X86Operand};
 use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet}, rc::Rc};
 
 // #################################################
@@ -300,21 +300,22 @@ pub struct CFGScope {
 
 impl CFGScope {
     /// Returns this global variable, or the temp variable associated to this local variable
-    pub fn lookup_var(&self, var: String, typ: Type) -> Operand {
+    pub fn lookup_var(&self, var: String, typ: Type, register: Option<X86Operand>) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&var) {
-            Operand::LocalVar(temp.to_string(), typ.clone())
+            Operand::LocalVar { name: temp.to_string(), typ: typ.clone(), reg: register }
         } else if let Some(parent) = &self.parent {
-            parent.lookup_var(var ,typ.clone())
+            parent.lookup_var(var ,typ.clone(), register)
         } else {
             // assume it is in the global CFGScope
-            Operand::GlobalVar(var, typ.clone())
+            //Operand::GlobalVar(var, typ.clone())
+            Operand::GlobalVar { name: var, typ: typ.clone(), reg: register }
         }
     }
 
     /// Returns this global array element, or the temp array element associated to this local array element
     pub fn lookup_arr(&self, arr: String, idx: Operand, sym_scope: &Rc<RefCell<Scope>>, typ: Type) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&arr) {
-            Operand::LocalArrElement(temp.to_string(), Box::new(idx), typ.clone())
+            Operand::LocalArrElement { name: temp.to_string(), index: Box::new(idx), typ: typ.clone(), reg: None } // TODO: right now no array elements in registers
         } else if let Some(parent) = &self.parent {
             parent.lookup_arr(arr, idx, sym_scope, typ.clone())
         } else {
@@ -323,7 +324,8 @@ impl CFGScope {
             let TableEntry::Variable {  typ, .. } = table_entry else {
                 panic!("Expected a variable, found something else!");
             };
-            Operand::GlobalArrElement(arr, Box::new(idx), typ.clone())
+            // Operand::GlobalArrElement(arr, Box::new(idx), typ.clone())
+            Operand::GlobalArrElement { name: arr, index: Box::new(idx), typ: typ.clone(), reg: None }  // TODO: right now no array elements in registers
         }
     }
 
