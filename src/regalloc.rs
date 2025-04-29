@@ -16,16 +16,26 @@ struct Web {
     uses: Vec<Instruction>,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-struct InterferenceGraph {
-    id_to_web: BTreeMap<i32, Web>,
-    outgoing_edges: BTreeMap<i32, HashSet<Edge>>
+#[derive(Debug, Clone)]
+pub struct InterferenceGraph {
+    pub edges: HashMap<String, HashSet<String>> // maps each variable to the variables its live range conflicts with
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Hash)]
-pub struct Edge {
-    pub src_web: i32,
-    pub dest_web: i32,
+impl InterferenceGraph {
+    pub fn new() -> Self {
+        InterferenceGraph {
+            edges: HashMap::new(),
+        }
+    }
+
+    pub fn add_edge(&mut self, u: String, v: String) {
+        self.edges.entry(u.clone()).or_insert_with(HashSet::new).insert(v.clone());
+        self.edges.entry(v).or_insert_with(HashSet::new).insert(u);
+    }
+
+    pub fn neighbors(&self, u: &String) -> Option<&HashSet<String>> {
+        self.edges.get(u)
+    }
 }
 
 struct DefUse {
@@ -55,8 +65,8 @@ fn compute_def_use_sets(method_cfg: &CFG) -> BTreeMap<i32, DefUse> {
         {
             match instr {
                 Instruction::Assign { src, dest, .. } => {
-                    process_use(&mut use_set, &def_set, src);
-                    process_def(&mut def_set, dest);
+                    add_use(&mut use_set, &def_set, src);
+                    add_def(&mut def_set, dest);
                 }
                 Instruction::Add { left, right, dest, .. }
                 | Instruction::Subtract { left, right, dest, .. }
@@ -69,35 +79,35 @@ fn compute_def_use_sets(method_cfg: &CFG) -> BTreeMap<i32, DefUse> {
                 | Instruction::GreaterEqual { left, right, dest }
                 | Instruction::Equal { left, right, dest }
                 | Instruction::NotEqual { left, right, dest } => {
-                    process_use(&mut use_set, &def_set, left);
-                    process_use(&mut use_set, &def_set, right);
-                    process_def(&mut def_set, dest);
+                    add_use(&mut use_set, &def_set, left);
+                    add_use(&mut use_set, &def_set, right);
+                    add_def(&mut def_set, dest);
                 }
                 Instruction::Not { expr, dest }
                 | Instruction::Cast { expr, dest, .. }
                 | Instruction::Len { expr, dest, .. }
                 | Instruction::LoadString { src: expr, dest } => {
-                    process_use(&mut use_set, &def_set, expr);
-                    process_def(&mut def_set, dest);
+                    add_use(&mut use_set, &def_set, expr);
+                    add_def(&mut def_set, dest);
                 }
                 Instruction::MethodCall { args, dest, .. } => {
                     for arg in args {
-                        process_use(&mut use_set, &def_set, arg);
+                        add_use(&mut use_set, &def_set, arg);
                     }
                     if let Some(d) = dest {
-                        process_def(&mut def_set, d);
+                        add_def(&mut def_set, d);
                     }
                 }
                 Instruction::CJmp { condition, .. } => {
-                    process_use(&mut use_set, &def_set, condition);
+                    add_use(&mut use_set, &def_set, condition);
                 }
                 Instruction::Ret { value, .. } => {
                     if let Some(v) = value {
-                        process_use(&mut use_set, &def_set, v);
+                        add_use(&mut use_set, &def_set, v);
                     }
                 }
                 Instruction::LoadConst { dest, .. } => {
-                    process_def(&mut def_set, dest);
+                    add_def(&mut def_set, dest);
                 }
                 Instruction::Exit { .. } 
                 | Instruction::UJmp { .. } => {
@@ -112,7 +122,7 @@ fn compute_def_use_sets(method_cfg: &CFG) -> BTreeMap<i32, DefUse> {
     block_def_use
 }
 
-fn process_use(use_set: &mut HashSet<String>, def_set: &HashSet<String>, operand: &Operand) {
+fn add_use(use_set: &mut HashSet<String>, def_set: &HashSet<String>, operand: &Operand) {
     if let Some(name) = get_local_var_name(operand) {
         // don't include uses of variables that were defined within this basic block
         if !def_set.contains(&name) {
@@ -121,7 +131,7 @@ fn process_use(use_set: &mut HashSet<String>, def_set: &HashSet<String>, operand
     }
 }
 
-fn process_def(def_set: &mut HashSet<String>, operand: &Operand) {
+fn add_def(def_set: &mut HashSet<String>, operand: &Operand) {
     if let Some(name) = get_local_var_name(operand) {
         def_set.insert(name);
     }
@@ -195,16 +205,165 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, LiveVariable
     (in_map, out_map)
 }
 
-fn compute_live_ranges(method_cfg: &CFG) -> BTreeMap<i32, Web> { 
-    todo!()
+// add an edge between two variables if they are ever live at the same program point
+fn compute_interference(method_cfg: &mut CFG, debug: bool) -> BTreeMap<i32, InterferenceGraph> {
+    let (in_map, out_map) = compute_maps(method_cfg, debug);
+    let mut interference_map: BTreeMap<i32, InterferenceGraph> = BTreeMap::new();
+
+    for (block_id, block) in method_cfg.blocks.iter() {
+        let in_set = todo!();  // get from in_map
+        let out_set = todo!();  // get from out_map
+
+        // process instructions backwards
+        let mut live_out: HashSet<String> = todo!(); // initialize to OUT set of this basic block
+        for instr in block.instructions.iter().rev() {
+            // compute the set of variables that are live going into this instruction
+
+            let mut live_in = live_out.clone();
+
+            // remove variables defined by this instruction
+            if let Some(defs) = get_defs(instr) {
+                for def in defs {
+                    live_in.remove(&def);
+                }
+            }
+
+            // add variables used by this instruction
+            if let Some(uses) = get_uses(instr) {
+                for use_var in uses {
+                    live_in.insert(use_var);
+                }
+            }
+
+            
+
+            // the IN set of this instruction becomes the OUT set of the previous one
+            live_out = live_in;
+        }
+    }
+
+    interference_map
 }
 
-
-
-fn compute_interference() {
-    todo!()
-
+fn add_new_use(use_set: &mut HashSet<String>, def_set: &HashSet<String>, operand: &Operand) {
+    if let Some(name) = get_local_var_name(operand) {
+        // don't include uses of variables that were defined within this basic block
+        if !def_set.contains(&name) {
+            use_set.insert(name);
+        }
+    }
 }
+
+fn remove_def(def_set: &mut HashSet<String>, operand: &Operand) {
+    if let Some(name) = get_local_var_name(operand) {
+        def_set.remove(&name);
+    }
+}
+
+fn get_defs(instr: &Instruction) -> Option<Vec<String>> {
+    match instr {
+        Instruction::Assign { dest, .. } |
+        Instruction::Add { dest, .. } |
+        Instruction::Subtract { dest, .. } |
+        Instruction::Multiply { dest, .. } |
+        Instruction::Divide { dest, .. } |
+        Instruction::Modulo { dest, .. } |
+        Instruction::Not { dest, .. } |
+        Instruction::Cast { dest, .. } |
+        Instruction::Len { dest, .. } |
+        Instruction::Greater { dest, .. } |
+        Instruction::Less { dest, .. } |
+        Instruction::LessEqual { dest, .. } |
+        Instruction::GreaterEqual { dest, .. } |
+        Instruction::Equal { dest, .. } |
+        Instruction::NotEqual { dest, .. } |
+        Instruction::LoadString { dest, .. } |
+        Instruction::LoadConst { dest, .. } => {
+            if let Operand::LocalVar(name, _) = dest {
+                Some(vec![name.clone()])
+            } else {
+                None
+            }
+        }
+        Instruction::MethodCall { dest, .. } => {
+            if let Some(Operand::LocalVar(name, _)) = dest {
+                Some(vec![name.clone()])
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn get_uses(instr: &Instruction) -> Option<Vec<String>> {
+    let mut uses = Vec::new();
+    match instr {
+        Instruction::Assign { src, .. } |
+        Instruction::LoadString { src, .. } => {
+            if let Some(name) = get_local_var_name(src) {
+                uses.push(name);
+            }
+        }
+
+        Instruction::Add { left, right, .. }
+        | Instruction::Subtract { left, right, .. }
+        | Instruction::Multiply { left, right, .. }
+        | Instruction::Divide { left, right, .. }
+        | Instruction::Modulo { left, right, .. }
+        | Instruction::Greater { left, right, .. }
+        | Instruction::Less { left, right, .. }
+        | Instruction::LessEqual { left, right, .. }
+        | Instruction::GreaterEqual { left, right, .. }
+        | Instruction::Equal { left, right, .. }
+        | Instruction::NotEqual { left, right, .. } => {
+            if let Some(name) = get_local_var_name(left) {
+                uses.push(name);
+            }
+            if let Some(name) = get_local_var_name(right) {
+                uses.push(name);
+            }
+        }
+
+        Instruction::Not { expr, .. } |
+        Instruction::Cast { expr, .. } |
+        Instruction::Len { expr, .. } => {
+            if let Some(name) = get_local_var_name(expr) {
+                uses.push(name);
+            }
+        }
+
+        Instruction::CJmp { condition, .. } => {
+            if let Some(name) = get_local_var_name(condition) {
+                uses.push(name);
+            }
+        }
+
+        Instruction::MethodCall { args, .. } => {
+            for arg in args {
+                if let Some(name) = get_local_var_name(arg) {
+                    uses.push(name);
+                }
+            }
+        }
+
+        Instruction::Ret { value, .. } => {
+            if let Some(val) = value {
+                if let Some(name) = get_local_var_name(val) {
+                    uses.push(name);
+                }
+            }
+        }
+
+        _ => {}
+    }
+    if uses.is_empty() {
+        None
+    } else {
+        Some(uses)
+    }
+}
+
 
 
 fn compute_spill_costs() {
@@ -218,11 +377,11 @@ fn compute_spill_costs() {
 fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) -> BTreeMap<i32, X86Operand> {
     todo!();
 
-    let live_ranges = HashMap::new();
+    // let live_ranges = HashMap::new();
 
     for (method_name, cfg) in method_cfgs {
-        let method_ranges = compute_live_ranges(cfg);
-        live_ranges.insert(method_name, method_ranges);
+        // let method_ranges = compute_live_ranges(cfg);
+        // live_ranges.insert(method_name, method_ranges);
 
     }
 
