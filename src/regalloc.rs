@@ -140,16 +140,13 @@ fn get_local_var_name(operand: &Operand) -> Option<String> {
     }
 }
 
-fn instruction_uses_var(inst: &Instruction, var: &str) -> bool {
-    todo!()
-}
-
-fn instruction_defs_var(inst: &Instruction, var: &str) -> bool {
-    todo!()
-}
-
-fn get_def_var(inst: &Instruction) -> Option<String> {
-    todo!()
+fn instr_defs_var(inst: &Instruction, var: &str) -> bool {
+    if let Some(def) = inst.get_def_var() {
+        if def == var {
+            return true;
+        }
+    }
+    false
 }
 
 fn uses_from_def(cfg: &CFG, start_inst: *const Instruction, var: &str) -> HashSet<InstructionRef> {
@@ -173,11 +170,11 @@ fn uses_from_def(cfg: &CFG, start_inst: *const Instruction, var: &str) -> HashSe
         for i in inst_idx..instructions.len() as i32 {
             let inst = &instructions[i as usize];
 
-            if instruction_uses_var(inst, var) {
+            if inst.get_used_vars().contains(var) {
                 uses.insert(InstructionRef(inst));
             }
 
-            if instruction_defs_var(inst, var) {
+            if instr_defs_var(inst, var) {
                 break; // Variable redefined, stop exploring this path
             }
         }
@@ -185,7 +182,7 @@ fn uses_from_def(cfg: &CFG, start_inst: *const Instruction, var: &str) -> HashSe
         // If you scanned to end of block without redefinition:
         if instructions[inst_idx as usize..]
             .iter()
-            .all(|inst| !instruction_defs_var(inst, var))
+            .all(|inst| !instr_defs_var(inst, var))
         {
             // Add all successors to worklist
             for edge in cfg.successors(block_id) {
@@ -219,7 +216,7 @@ fn defs_from_use(cfg: &CFG, start_inst: *const Instruction, var: &str) -> HashSe
         for i in (0..=inst_idx).rev() {
             let inst = &instructions[i as usize];
 
-            if instruction_defs_var(inst, var) {
+            if instr_defs_var(inst, var) {
                 defs.insert(InstructionRef(inst));
                 break; // Found a definition => stop this path
             }
@@ -227,7 +224,7 @@ fn defs_from_use(cfg: &CFG, start_inst: *const Instruction, var: &str) -> HashSe
 
         // If no def found in this block before the start_idx, move to predecessors
         let def_found_in_block = (0..=inst_idx)
-            .any(|i| instruction_defs_var(&instructions[i as usize], var));
+            .any(|i| instr_defs_var(&instructions[i as usize], var));
         
         if !def_found_in_block {
             for pred_id in cfg.predecessors(block_id) {
@@ -248,7 +245,7 @@ fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
 
     for (block_id, block) in &method_cfg.blocks {
         for inst in &block.instructions {
-            if let Some(var) = get_def_var(inst) {
+            if let Some(var) = inst.get_def_var() {
                 let inst_ref = InstructionRef(inst);
 
                 if visited_defs.contains(&inst_ref) {
@@ -314,18 +311,24 @@ fn compute_spill_costs() {
 }
 
 
+fn apply_reg_assignments(web_assignments: HashMap<&String, BTreeMap<i32, Web>>, method_cfgs: &mut HashMap<String, CFG>,) {
+    
+}
+
 
 /// Performs graph-coloring algorithm, assigning every web
 /// either a register or a stack space.
 pub fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) -> BTreeMap<i32, X86Operand> {
 
-    let mut live_ranges: HashMap<&String, BTreeMap<i32, Web>> = HashMap::new();
+    let mut webs: HashMap<&String, BTreeMap<i32, Web>> = HashMap::new();
 
     for (method_name, cfg) in method_cfgs {
         let method_ranges: BTreeMap<i32, Web> = compute_webs(cfg);
-        live_ranges.insert(method_name, method_ranges);
+        webs.insert(method_name, method_ranges);
 
     }
+
+
 
     let out = BTreeMap::new();
     out
