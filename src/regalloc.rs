@@ -135,7 +135,7 @@ fn process_def(def_set: &mut HashSet<String>, operand: &Operand) {
 
 fn get_local_var_name(operand: &Operand) -> Option<String> {
     match operand {
-        Operand::LocalVar(name, _) => Some(name.clone()),
+        Operand::LocalVar { name, .. } => Some(name.clone()),
         _ => None
     }
 }
@@ -312,7 +312,7 @@ fn compute_spill_costs() {
 
 
 fn apply_reg_assignments(web_assignments: HashMap<&String, BTreeMap<i32, Web>>, method_cfgs: &mut HashMap<String, CFG>,) {
-    
+
 }
 
 

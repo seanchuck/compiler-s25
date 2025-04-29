@@ -177,7 +177,7 @@ fn destruct_expr(
 
         SymExpr::Identifier { entry, .. } => match entry {
             TableEntry::Variable { name, typ, length: _, span: _ } => {
-                (cur_block_id, cfg_scope.lookup_var(name.to_string(), typ.clone()))
+                (cur_block_id, cfg_scope.lookup_var(name.to_string(), typ.clone(), None))
             }
             _ => unreachable!(),
         },
@@ -508,7 +508,7 @@ fn destruct_expr(
 
             //allocate only for int for the temp to hold length
             cfg.add_temp_var(temp, Type::Int, None);
-            let operand: Operand = cfg_scope.lookup_var(id.to_string(), typ.clone());
+            let operand: Operand = cfg_scope.lookup_var(id.to_string(), typ.clone(), None);
 
             let instruction = Instruction::Len {
                 typ: Type::Int,
@@ -1309,7 +1309,7 @@ fn destruct_statement(
 
             //TODO SEAN FIGURE OUT WHY TEH ABOVE CODE DOESNT WORK I have the workaround but its inelligant
 
-            let lhs = cfg_scope.lookup_var(var.to_string(), var_typ.clone());
+            let lhs = cfg_scope.lookup_var(var.to_string(), var_typ.clone(), None);
             let rhs: Operand;
             (cur_block_id, rhs) =
                 destruct_expr(cfg, init, cur_block_id, cfg_scope, sym_scope, strings);
