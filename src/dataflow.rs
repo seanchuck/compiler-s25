@@ -3,10 +3,7 @@ Dataflow code generation optimizations.
 */
 use std::collections::{HashMap, HashSet, VecDeque};
 use crate::{
-    cfg::CFG,
-    utils::cli::Optimization,
-    tac::*,
-    state::*,
+    cfg::CFG, regalloc::reg_alloc, state::*, tac::*, utils::cli::Optimization
 };
 
 // #################################################
@@ -817,6 +814,11 @@ pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: 
                 }
             }
         }
+    }
+
+    // Register allocation optimization (NOT fixed point)
+    if optimizations.contains(&Optimization::Regalloc) {
+        reg_alloc(method_cfgs, debug);
     }
     
     method_cfgs.clone()

@@ -1,17 +1,14 @@
 import printf;
-
-void main () {
-    int a, b, c;
-
-    a = 0;
-    b = 3;
-
-    if (a > 3) {
-        a = 5;
-    } else {
-        a = 9;
-    }
-
-    printf("%d\n", a);
-
+int factorial ( int n ) {
+  if ( n <= 1 ) {
+    return 1;
+  }
+  else {
+    return n * factorial ( n - 1 );
+  }
+}
+void main ( ) {
+  int res;
+  res = factorial ( 10 );
+  printf ( "10! = %d (3628800)\n", res );
 }

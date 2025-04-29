@@ -17,7 +17,6 @@ fn next_web_id() -> i32 {
     })
 }
 
-
 fn compute_instr_map(method_cfg: &CFG) -> InstructionMap {
     let mut map = HashMap::new();
 
@@ -26,7 +25,6 @@ fn compute_instr_map(method_cfg: &CFG) -> InstructionMap {
             map.insert(InstructionIndex {block_id: *block_id, instr_index: instr_idx as i32}, instr.clone());
         }
     }
-
     InstructionMap(map)
 }
 
@@ -104,6 +102,117 @@ fn compute_def_use_sets(method_cfg: &CFG) -> BTreeMap<i32, DefUse> {
 
     block_def_use
 }
+
+fn remove_def(def_set: &mut HashSet<String>, operand: &Operand) {
+    if let Some(name) = get_local_var_name(operand) {
+        def_set.remove(&name);
+    }
+}
+
+fn get_defs(instr: &Instruction) -> Option<Vec<String>> {
+    match instr {
+        Instruction::Assign { dest, .. } |
+        Instruction::Add { dest, .. } |
+        Instruction::Subtract { dest, .. } |
+        Instruction::Multiply { dest, .. } |
+        Instruction::Divide { dest, .. } |
+        Instruction::Modulo { dest, .. } |
+        Instruction::Not { dest, .. } |
+        Instruction::Cast { dest, .. } |
+        Instruction::Len { dest, .. } |
+        Instruction::Greater { dest, .. } |
+        Instruction::Less { dest, .. } |
+        Instruction::LessEqual { dest, .. } |
+        Instruction::GreaterEqual { dest, .. } |
+        Instruction::Equal { dest, .. } |
+        Instruction::NotEqual { dest, .. } |
+        Instruction::LoadString { dest, .. } |
+        Instruction::LoadConst { dest, .. } => {
+            if let Operand::LocalVar { name, .. } = dest {
+                Some(vec![name.clone()])
+            } else {
+                None
+            }
+        }
+        Instruction::MethodCall { dest, .. } => {
+            if let Some(Operand::LocalVar { name, .. }) = dest {
+                Some(vec![name.clone()])
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn get_uses(instr: &Instruction) -> Option<Vec<String>> {
+    let mut uses = Vec::new();
+    match instr {
+        Instruction::Assign { src, .. } |
+        Instruction::LoadString { src, .. } => {
+            if let Some(name) = get_local_var_name(src) {
+                uses.push(name);
+            }
+        }
+
+        Instruction::Add { left, right, .. }
+        | Instruction::Subtract { left, right, .. }
+        | Instruction::Multiply { left, right, .. }
+        | Instruction::Divide { left, right, .. }
+        | Instruction::Modulo { left, right, .. }
+        | Instruction::Greater { left, right, .. }
+        | Instruction::Less { left, right, .. }
+        | Instruction::LessEqual { left, right, .. }
+        | Instruction::GreaterEqual { left, right, .. }
+        | Instruction::Equal { left, right, .. }
+        | Instruction::NotEqual { left, right, .. } => {
+            if let Some(name) = get_local_var_name(left) {
+                uses.push(name);
+            }
+            if let Some(name) = get_local_var_name(right) {
+                uses.push(name);
+            }
+        }
+
+        Instruction::Not { expr, .. } |
+        Instruction::Cast { expr, .. } |
+        Instruction::Len { expr, .. } => {
+            if let Some(name) = get_local_var_name(expr) {
+                uses.push(name);
+            }
+        }
+
+        Instruction::CJmp { condition, .. } => {
+            if let Some(name) = get_local_var_name(condition) {
+                uses.push(name);
+            }
+        }
+
+        Instruction::MethodCall { args, .. } => {
+            for arg in args {
+                if let Some(name) = get_local_var_name(arg) {
+                    uses.push(name);
+                }
+            }
+        }
+
+        Instruction::Ret { value, .. } => {
+            if let Some(val) = value {
+                if let Some(name) = get_local_var_name(val) {
+                    uses.push(name);
+                }
+            }
+        }
+
+        _ => {}
+    }
+    if uses.is_empty() {
+        None
+    } else {
+        Some(uses)
+    }
+}
+
 
 // Worklist equations for liveness analysis:
 //      IN[B]  = USE[B] ∪ (OUT[B] - DEF[B])
@@ -253,47 +362,6 @@ fn uses_from_def(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> HashSet<
 
 
 
-
-// add an edge between two variables if they are ever live at the same program point
-fn compute_interference(method_cfg: &mut CFG, debug: bool) -> BTreeMap<i32, InterferenceGraph> {
-    let (in_map, out_map) = compute_maps(method_cfg, debug);
-    let mut interference_map: BTreeMap<i32, InterferenceGraph> = BTreeMap::new();
-
-    for (block_id, block) in method_cfg.blocks.iter() {
-        let in_set = todo!();  // get from in_map
-        let out_set = todo!();  // get from out_map
-
-        // process instructions backwards
-        let mut live_out: HashSet<String> = todo!(); // initialize to OUT set of this basic block
-        for instr in block.instructions.iter().rev() {
-            // compute the set of variables that are live going into this instruction
-
-            let mut live_in = live_out.clone();
-
-            // remove variables defined by this instruction
-            if let Some(defs) = get_defs(instr) {
-                for def in defs {
-                    live_in.remove(&def);
-                }
-            }
-
-            // add variables used by this instruction
-            if let Some(uses) = get_uses(instr) {
-                for use_var in uses {
-                    live_in.insert(use_var);
-                }
-            }
-
-            
-
-            // the IN set of this instruction becomes the OUT set of the previous one
-            live_out = live_in;
-        }
-    }
-
-    interference_map
-}
-
 fn add_new_use(use_set: &mut HashSet<String>, def_set: &HashSet<String>, operand: &Operand) {
     if let Some(name) = get_local_var_name(operand) {
         // don't include uses of variables that were defined within this basic block
@@ -302,7 +370,6 @@ fn add_new_use(use_set: &mut HashSet<String>, def_set: &HashSet<String>, operand
         }
     }
 }
-
 
 
 fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> HashSet<InstructionIndex> {
@@ -360,8 +427,13 @@ fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> HashSet<
 }
 
 
+// #################################################
+// COMPUTE WEBS
+// #################################################
 
-fn compute_webs(method_cfg: &CFG, instr_map: &InstructionMap) -> BTreeMap<i32, Web> {
+/// Compute live range webs for a given method. Each web has a unique
+/// web index within its given method.
+fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
     let mut webs = BTreeMap::new();
     let mut visited_defs = HashSet::new();
     let mut visited_uses = HashSet::new();
@@ -424,115 +496,175 @@ fn compute_webs(method_cfg: &CFG, instr_map: &InstructionMap) -> BTreeMap<i32, W
 }
 
 
-fn remove_def(def_set: &mut HashSet<String>, operand: &Operand) {
-    if let Some(name) = get_local_var_name(operand) {
-        def_set.remove(&name);
+
+
+// #################################################
+// COMPUTE LIVENESS & INTERFERENCE
+// #################################################
+
+
+/// Computes liveness for each web_id, returning the in_map and out_map for the web
+/// at each basic block. Similar to DCE liveness but per-web instead of per-var.
+fn compute_webs_liveness(
+    method_cfg: &CFG,
+    method_webs: &BTreeMap<i32, Web>,
+    debug: bool,
+) -> (HashMap<i32, HashSet<i32>>, HashMap<i32, HashSet<i32>>) {
+    let predecessors = compute_predecessors(&method_cfg);
+    let successors = compute_successors(&method_cfg);
+
+    let mut in_map: HashMap<i32, HashSet<i32>> = HashMap::new();  // block_id -> live-in webs
+    let mut out_map: HashMap<i32, HashSet<i32>> = HashMap::new(); // block_id -> live-out webs
+
+    let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect();
+
+    // Map each instruction to its web_id (like before)
+    let mut instr_to_web: HashMap<InstructionIndex, i32> = HashMap::new();
+    for (web_id, web) in method_webs {
+        for &def in &web.defs {
+            instr_to_web.insert(def, *web_id);
+        }
+        for &use_site in &web.uses {
+            instr_to_web.insert(use_site, *web_id);
+        }
     }
-}
 
-fn get_defs(instr: &Instruction) -> Option<Vec<String>> {
-    match instr {
-        Instruction::Assign { dest, .. } |
-        Instruction::Add { dest, .. } |
-        Instruction::Subtract { dest, .. } |
-        Instruction::Multiply { dest, .. } |
-        Instruction::Divide { dest, .. } |
-        Instruction::Modulo { dest, .. } |
-        Instruction::Not { dest, .. } |
-        Instruction::Cast { dest, .. } |
-        Instruction::Len { dest, .. } |
-        Instruction::Greater { dest, .. } |
-        Instruction::Less { dest, .. } |
-        Instruction::LessEqual { dest, .. } |
-        Instruction::GreaterEqual { dest, .. } |
-        Instruction::Equal { dest, .. } |
-        Instruction::NotEqual { dest, .. } |
-        Instruction::LoadString { dest, .. } |
-        Instruction::LoadConst { dest, .. } => {
-            if let Operand::LocalVar { name, .. } = dest {
-                Some(vec![name.clone()])
-            } else {
-                None
-            }
-        }
-        Instruction::MethodCall { dest, .. } => {
-            if let Some(Operand::LocalVar { name, .. }) = dest {
-                Some(vec![name.clone()])
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
+    while let Some(block_id) = worklist.pop_front() {
+        // OUT[B] = ⋃ IN[S] for all successors
+        let out_set: HashSet<i32> = successors
+            .get(&block_id)
+            .map(|succs| {
+                succs.iter()
+                    .filter_map(|s| in_map.get(s))
+                    .fold(HashSet::new(), |mut acc, s| {
+                        acc.extend(s.clone());
+                        acc
+                    })
+            })
+            .unwrap_or_default();
 
-fn get_uses(instr: &Instruction) -> Option<Vec<String>> {
-    let mut uses = Vec::new();
-    match instr {
-        Instruction::Assign { src, .. } |
-        Instruction::LoadString { src, .. } => {
-            if let Some(name) = get_local_var_name(src) {
-                uses.push(name);
-            }
-        }
+        let mut use_set = HashSet::new();
+        let mut def_set = HashSet::new();
 
-        Instruction::Add { left, right, .. }
-        | Instruction::Subtract { left, right, .. }
-        | Instruction::Multiply { left, right, .. }
-        | Instruction::Divide { left, right, .. }
-        | Instruction::Modulo { left, right, .. }
-        | Instruction::Greater { left, right, .. }
-        | Instruction::Less { left, right, .. }
-        | Instruction::LessEqual { left, right, .. }
-        | Instruction::GreaterEqual { left, right, .. }
-        | Instruction::Equal { left, right, .. }
-        | Instruction::NotEqual { left, right, .. } => {
-            if let Some(name) = get_local_var_name(left) {
-                uses.push(name);
-            }
-            if let Some(name) = get_local_var_name(right) {
-                uses.push(name);
-            }
-        }
+        for (i, instr) in method_cfg.blocks.get(&block_id).unwrap().instructions.iter().enumerate().rev() {
+            let inst_idx = InstructionIndex {
+                block_id,
+                instr_index: i as i32,
+            };
 
-        Instruction::Not { expr, .. } |
-        Instruction::Cast { expr, .. } |
-        Instruction::Len { expr, .. } => {
-            if let Some(name) = get_local_var_name(expr) {
-                uses.push(name);
-            }
-        }
+            if let Some(&web_id) = instr_to_web.get(&inst_idx) {
+                // If this instruction uses a variable
+                if method_webs.get(&web_id).unwrap().uses.contains(&inst_idx) {
+                    use_set.insert(web_id);
+                }
 
-        Instruction::CJmp { condition, .. } => {
-            if let Some(name) = get_local_var_name(condition) {
-                uses.push(name);
-            }
-        }
-
-        Instruction::MethodCall { args, .. } => {
-            for arg in args {
-                if let Some(name) = get_local_var_name(arg) {
-                    uses.push(name);
+                // If this instruction defines a variable
+                if method_webs.get(&web_id).unwrap().defs.contains(&inst_idx) {
+                    def_set.insert(web_id);
                 }
             }
         }
 
-        Instruction::Ret { value, .. } => {
-            if let Some(val) = value {
-                if let Some(name) = get_local_var_name(val) {
-                    uses.push(name);
+        // IN[B] = USE[B] ∪ (OUT[B] - DEF[B])
+        let mut in_set = use_set.clone();
+        in_set.extend(out_set.difference(&def_set).copied());
+
+        // If IN or OUT changed, propagate backwards
+        if in_map.get(&block_id) != Some(&in_set) || out_map.get(&block_id) != Some(&out_set) {
+            in_map.insert(block_id, in_set);
+            out_map.insert(block_id, out_set);
+
+            if let Some(preds) = predecessors.get(&block_id) {
+                for pred in preds {
+                    worklist.push_back(*pred);
                 }
             }
         }
+    }
 
-        _ => {}
+    if debug {
+        println!("Computed Web Liveness: IN = {:#?}", in_map);
+        println!("Computed Web Liveness: OUT = {:#?}", out_map);
     }
-    if uses.is_empty() {
-        None
-    } else {
-        Some(uses)
-    }
+
+    (in_map, out_map)
 }
+
+
+
+/// Add an edge between two variables if they are ever live at the same program point
+/// This is a liveness analysis.
+fn compute_interference(method_cfg: &CFG, method_webs: &BTreeMap<i32, Web>, debug: bool) -> InterferenceGraph {
+    let (in_map, out_map) = compute_webs_liveness(method_cfg, method_webs, debug);
+    let mut graph = InterferenceGraph::new();
+
+    // For mapping InstructionIndex -> web_id
+    let mut inst_to_web: HashMap<InstructionIndex, i32> = HashMap::new();
+    for (web_id, web) in method_webs {
+        for &def in &web.defs {
+            inst_to_web.insert(def, *web_id);
+        }
+        for &use_site in &web.uses {
+            inst_to_web.insert(use_site, *web_id);
+        }
+    }
+
+    // For each block
+    for (block_id, block) in &method_cfg.blocks {
+        // Start with live-out of the block
+        let mut live: HashSet<i32> = out_map.get(block_id).cloned().unwrap_or_default();
+
+        // Walk instructions in reverse (backwards analysis)
+        for (i, instr) in block.instructions.iter().enumerate().rev() {
+            let inst_idx = InstructionIndex {
+                block_id: *block_id,
+                instr_index: i as i32,
+            };
+
+            if let Some(&web_id) = inst_to_web.get(&inst_idx) {
+                // If this instruction defines a web
+                if method_webs[&web_id].defs.contains(&inst_idx) {
+                    // Interfere with all currently live webs
+                    for &live_web in &live {
+                        if live_web == web_id {
+                            continue;
+                        }
+
+                        // Add edges between defs of web_id and live_web
+                        for &d1 in &method_webs[&web_id].defs {
+                            for &d2 in &method_webs[&live_web].defs {
+                                graph.add_edge(d1, d2);
+                            }
+                        }
+                    }
+
+                    // Kill: definition overrides old value
+                    live.remove(&web_id);
+                }
+
+                // If this instruction uses a web, it becomes live
+                if method_webs[&web_id].uses.contains(&inst_idx) {
+                    live.insert(web_id);
+                }
+            }
+        }
+    }
+
+    // Add all definition sites as graph nodes
+    for (_web_id, web) in method_webs {
+        for &def in &web.defs {
+            graph.nodes.insert(def);
+        }
+    }
+
+    if debug {
+        println!("Interference graph: {:#?}", graph);
+    }
+
+    graph
+}
+    
+
 
 
 
@@ -549,16 +681,21 @@ fn apply_reg_assignments(web_assignments: HashMap<&String, BTreeMap<i32, Web>>, 
 /// Performs graph-coloring algorithm, assigning every web
 /// either a register or a stack space.
 pub fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) -> BTreeMap<i32, X86Operand> {
+    // let mut webs: HashMap<&String, BTreeMap<i32, Web>> = HashMap::new();
+    let mut method_to_instrs: HashMap<String, InstructionMap> = HashMap::new();
 
-    let mut webs: HashMap<&String, BTreeMap<i32, Web>> = HashMap::new();
+    for (method_name, method_cfg) in method_cfgs {
+        let live_ranges: BTreeMap<i32, Web> = compute_webs(method_cfg);
+        println!("webs for {method_name} is {:#?}", live_ranges);
 
-    for (method_name, cfg) in method_cfgs {
-        let instr_map = compute_instr_map(&cfg);
-        let method_ranges: BTreeMap<i32, Web> = compute_webs(cfg, &instr_map);
-        webs.insert(method_name, method_ranges);
+        let interference = compute_interference(method_cfg, &live_ranges, debug);
+        println!("interference graph for {method_name} is {:#?}", interference);
+
+        // Populate instruction map for later use
+        let instr_map = compute_instr_map(method_cfg);
+        method_to_instrs.insert(method_name.to_string(), instr_map);
     }
 
-    println!("webs are: {:#?}", webs);
 
     let out = BTreeMap::new();
     out
