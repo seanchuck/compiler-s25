@@ -260,7 +260,7 @@ fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, u
             }
         }
 
-        Operand::GlobalVar(name, typ) => {
+        Operand::GlobalVar { name, typ, .. } => {
             let root_src = get_root_source(name, copy_to_src);
             if *name != root_src {
                 // DO NOT REMOVE: needed for testopt debugging
@@ -268,12 +268,12 @@ fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, u
                     println!("CP: Replacing {} with {}", name, root_src);
                 }
 
-                *op = Operand::GlobalVar(root_src, typ.clone());
+                *op = Operand::GlobalVar { name: root_src, typ: typ.clone(), reg: None };
                 *update_occurred = true;
             }
         }
 
-        Operand::LocalArrElement(_, index, _) => {
+        Operand::LocalArrElement { index, .. } => {
             substitute_operand(index, copy_to_src, update_occurred, debug);
         }
 
@@ -324,11 +324,11 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, CopyMap>, Ha
             match instr {
                 Instruction::Assign { typ: _, src, dest } => {
                     // Kill copies that use dest, since this assignment updates its values
-                    if let Operand::LocalVar(dest_name, _) = dest.clone() {
+                    if let Operand::LocalVar { name: dest_name, .. } = dest.clone() {
                         invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
 
                         // Gen[B]: this is a direct assignment (a = b), add to tables
-                        if let Operand::LocalVar(src_name, _) = src {
+                        if let Operand::LocalVar { name: src_name, .. } = src {
                             copy_to_src.insert(dest_name.clone(), src_name.clone());
                             src_to_copies.entry(src_name.clone()).or_default().insert(dest_name.clone());
                         }
@@ -433,10 +433,10 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                 Instruction::Assign { typ: _, src, dest } => {
                     substitute_operand(src, &copy_to_src, &mut update_occurred, debug);
 
-                    if let Operand::LocalVar(dest_name, _) = dest.clone() {
+                    if let Operand::LocalVar { name: dest_name, .. } = dest.clone() {
                         invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
 
-                        if let Operand::LocalVar(src_name, _) = src {
+                        if let Operand::LocalVar { name: src_name, .. } = src {
                             copy_to_src.insert(dest_name.clone(), src_name.clone());
                             src_to_copies
                                 .entry(src_name.clone())
@@ -560,17 +560,17 @@ fn compute_expression_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, A
                 | Instruction::Divide { left, right, ref dest, typ: _ }
                 | Instruction::Modulo { left, right, ref dest, typ: _ } => {
                     let left_var = match left {
-                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        Operand::LocalVar { name, .. } => Some(name.clone()),
                         _ => None,  // only do CSE on local variables
                     };
             
                     let right_var = match right {
-                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        Operand::LocalVar { name, .. } => Some(name.clone()),
                         _ => None,  // only do CSE on local variables
                     };
         
                     let dest_var = match dest {
-                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        Operand::LocalVar { name, .. } => Some(name.clone()),
                         _ => None  // only do CSE on local variables
                     };
 
@@ -610,7 +610,7 @@ fn compute_expression_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, A
                 | Instruction::NotEqual { dest, .. } => {
                     // kill expressions that involve dest
                     match dest {
-                        Operand::LocalVar(name, _) => kill_expressions(&mut out_expressions, name, debug),
+                        Operand::LocalVar { name, .. } => kill_expressions(&mut out_expressions, name, debug),
                         _ => continue  // only do CSE on local variables
                     };
                 }
@@ -681,17 +681,17 @@ fn common_subexpression_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
                 | Instruction::Divide { left, right, ref dest, ref typ }
                 | Instruction::Modulo { left, right, ref dest, ref typ } => {
                     let left_var = match left {
-                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        Operand::LocalVar { name, .. } => Some(name.clone()),
                         _ => None,  // only do CSE on local variables
                     };
             
                     let right_var = match right {
-                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        Operand::LocalVar { name, .. } => Some(name.clone()),
                         _ => None,  // only do CSE on local variables
                     };
         
                     let dest_var = match dest {
-                        Operand::LocalVar(name, _) => Some(name.clone()),
+                        Operand::LocalVar { name, .. } => Some(name.clone()),
                         _ => None  // only do CSE on local variables
                     };
 
@@ -712,7 +712,7 @@ fn common_subexpression_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
                             // replace this instruction with an assignment
                             *instr = Instruction::Assign {
                                 dest: dest.clone(),
-                                src: Operand::LocalVar(expression_var.clone(), typ.clone()),
+                                src: Operand::LocalVar { name: expression_var.clone(), typ: typ.clone(), reg: None },
                                 typ: typ.clone()
                             };
 
@@ -754,7 +754,7 @@ fn common_subexpression_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
                 | Instruction::NotEqual { dest, .. } => {
                     // kill expressions that involve dest
                     match dest {
-                        Operand::LocalVar(name, _) => kill_expressions(&mut expressions, name, debug),
+                        Operand::LocalVar { name, .. } => kill_expressions(&mut expressions, name, debug),
                         _ => continue  // only do CSE on local variables
                     };
                 }
