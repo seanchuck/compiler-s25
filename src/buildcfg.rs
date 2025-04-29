@@ -296,7 +296,7 @@ fn destruct_expr(
                         next_false_block.get_id(),
                         Instruction::Assign {
                             typ: Type::Bool,
-                            src: Operand::Const { value: 1, typ: Type::Bool, reg: None },
+                            src: Operand::Const { value: 0, typ: Type::Bool, reg: None },
                             dest: dest.clone(),
                         },
                     );
