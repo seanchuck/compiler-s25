@@ -653,7 +653,7 @@ pub fn generate_assembly(file: &str, filename: &str, optimizations: HashSet<Opti
     optimize_dataflow(&mut method_cfgs, &optimizations, debug);
     
     // Allocate registers to the CFG
-    //reg_alloc(&mut method_cfgs, debug);
+    reg_alloc(&mut method_cfgs, debug);
 
     if debug {
         print_cfg(&method_cfgs);

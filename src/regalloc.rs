@@ -328,6 +328,8 @@ pub fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) -> BTreeMa
 
     }
 
+    println!("webs are: {:#?}", webs);
+
 
 
     let out = BTreeMap::new();
