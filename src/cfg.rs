@@ -5,7 +5,7 @@ Consists of basic blocks and directed edges
 between those basic blocks.
 **/
 
-use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*};
+use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*, x86::X86Operand};
 use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet}, rc::Rc};
 
 // #################################################
@@ -147,6 +147,38 @@ impl CFG {
         self.locals.get(temp).unwrap().stack_offset
     }
 
+    // Get the block id and the index of instruction from within a block
+    pub fn locate_instruction(&self, instruction: *const Instruction) -> (i32, i32) {
+        for (block_id, block) in &self.blocks {
+            if let Some(index) = block.instructions.iter().position(|insn| insn as *const _ == instruction) {
+                return (*block_id, index as i32);
+            }
+        }
+        panic!("Instruction not found in any block");
+    }
+
+    // Get the block ids that are successors to a given block
+    pub fn successors(&self, block: i32) -> HashSet<i32> {
+        self.edges
+            .get(&block)
+            .map(|edges| edges.iter().map(|edge| edge.v).collect())
+            .unwrap_or_default()
+    }
+
+    // Get the block ids that are predecessors to a given block
+    pub fn predecessors(&self, block: i32) -> HashSet<i32> {
+        self.edges
+            .iter()
+            .filter_map(|(&from, edges)| {
+                if edges.iter().any(|edge| edge.v == block) {
+                    Some(from)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     // Used to get nice visualization of CFG
     pub fn to_dot(&self) -> String {
         let mut dot = String::new();
@@ -268,21 +300,22 @@ pub struct CFGScope {
 
 impl CFGScope {
     /// Returns this global variable, or the temp variable associated to this local variable
-    pub fn lookup_var(&self, var: String, typ: Type) -> Operand {
+    pub fn lookup_var(&self, var: String, typ: Type, register: Option<X86Operand>) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&var) {
-            Operand::LocalVar(temp.to_string(), typ.clone())
+            Operand::LocalVar { name: temp.to_string(), typ: typ.clone(), reg: register }
         } else if let Some(parent) = &self.parent {
-            parent.lookup_var(var ,typ.clone())
+            parent.lookup_var(var ,typ.clone(), register)
         } else {
             // assume it is in the global CFGScope
-            Operand::GlobalVar(var, typ.clone())
+            //Operand::GlobalVar(var, typ.clone())
+            Operand::GlobalVar { name: var, typ: typ.clone(), reg: register }
         }
     }
 
     /// Returns this global array element, or the temp array element associated to this local array element
     pub fn lookup_arr(&self, arr: String, idx: Operand, sym_scope: &Rc<RefCell<Scope>>, typ: Type) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&arr) {
-            Operand::LocalArrElement(temp.to_string(), Box::new(idx), typ.clone())
+            Operand::LocalArrElement { name: temp.to_string(), index: Box::new(idx), typ: typ.clone(), reg: None } // TODO: right now no array elements in registers
         } else if let Some(parent) = &self.parent {
             parent.lookup_arr(arr, idx, sym_scope, typ.clone())
         } else {
@@ -291,7 +324,8 @@ impl CFGScope {
             let TableEntry::Variable {  typ, .. } = table_entry else {
                 panic!("Expected a variable, found something else!");
             };
-            Operand::GlobalArrElement(arr, Box::new(idx), typ.clone())
+            // Operand::GlobalArrElement(arr, Box::new(idx), typ.clone())
+            Operand::GlobalArrElement { name: arr, index: Box::new(idx), typ: typ.clone(), reg: None }  // TODO: right now no array elements in registers
         }
     }
 
