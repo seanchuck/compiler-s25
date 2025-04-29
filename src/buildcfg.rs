@@ -89,13 +89,13 @@ fn destruct_expr(
         SymExpr::Literal { value, .. } => match value {
             Literal::String(val) => {
                 let temp = fresh_temp();
-                let temp_op = Operand::LocalVar(temp.clone(), Type::String);
+                let temp_op = Operand::LocalVar { name: temp.clone(), typ: Type::String, reg: None};
                 cfg.add_temp_var(temp, Type::String, None);
 
                 cfg.add_instruction_to_block(
                     cur_block_id,
                     Instruction::LoadString {
-                        src: Operand::String(strings.len().try_into().unwrap(), Type::String),
+                        src: Operand::String { id: strings.len().try_into().unwrap(), typ: Type::String, reg: None },
                         dest: temp_op.clone(),
                     },
                 );
@@ -103,12 +103,12 @@ fn destruct_expr(
                 (cur_block_id, temp_op)
             }
             Literal::Bool(val) => match val {
-                true => (cur_block_id, Operand::Const(1, Type::Bool)),
-                false => (cur_block_id, Operand::Const(0, Type::Bool)),
+                true => (cur_block_id, Operand::Const { value: 1, typ: Type::Bool, reg: None}),
+                false => (cur_block_id, Operand::Const { value: 0, typ: Type::Bool, reg: None})
             },
             Literal::Int(val) => {
                 let temp = fresh_temp();
-                let temp_op = Operand::LocalVar(temp.clone(), Type::Int);
+                let temp_op = Operand::LocalVar { name: temp.clone(), typ: Type::Int, reg: None };
                 cfg.add_temp_var(temp, Type::Int, None);
 
                 cfg.add_instruction_to_block(
@@ -125,7 +125,7 @@ fn destruct_expr(
 
             Literal::HexInt(val) => {
                 let temp = fresh_temp();
-                let temp_op = Operand::LocalVar(temp.clone(), Type::Int);
+                let temp_op = Operand::LocalVar { name: temp.clone(), typ: Type::Int, reg: None };
                 cfg.add_temp_var(temp, Type::Int, None);
 
                 cfg.add_instruction_to_block(
@@ -141,7 +141,7 @@ fn destruct_expr(
             }
             Literal::Long(val) => {
                 let temp = fresh_temp();
-                let temp_op = Operand::LocalVar(temp.clone(), Type::Long);
+                let temp_op = Operand::LocalVar { name: temp.clone(), typ: Type::Long, reg: None };
                 cfg.add_temp_var(temp, Type::Long, None);
 
                 cfg.add_instruction_to_block(
@@ -158,7 +158,7 @@ fn destruct_expr(
 
             Literal::HexLong(val) => {
                 let temp = fresh_temp();
-                let temp_op = Operand::LocalVar(temp.clone(), Type::Long);
+                let temp_op = Operand::LocalVar { name: temp.clone(), typ: Type::Long, reg: None };
                 cfg.add_temp_var(temp, Type::Long, None);
 
                 cfg.add_instruction_to_block(
@@ -172,7 +172,7 @@ fn destruct_expr(
 
                 (cur_block_id, temp_op)
             }
-            Literal::Char(val) => (cur_block_id, Operand::Const(*val as i64, Type::Long)),  //TODO what shoudl char type be?
+            Literal::Char(val) => (cur_block_id, Operand::Const { value: *val as i64, typ: Type::Long, reg: None }),  //TODO what shoudl char type be?
         },
 
         SymExpr::Identifier { entry, .. } => match entry {
@@ -192,7 +192,7 @@ fn destruct_expr(
 
             // Load array element into a temp
             let temp = fresh_temp();
-            let array_element = Operand::LocalVar(temp.to_string(), arr_typ.clone());
+            let array_element = Operand::LocalVar { name: temp.to_string(), typ: arr_typ.clone(), reg: None };
 
             let table_entry = sym_scope
                 .borrow()
@@ -240,7 +240,7 @@ fn destruct_expr(
             };
 
             let temp = fresh_temp();
-            let temp_method_result = Operand::LocalVar(temp.to_string(), return_type.clone());
+            let temp_method_result = Operand::LocalVar { name: temp.to_string(), typ: return_type.clone(), reg: None };
 
             cfg.add_temp_var(temp, return_type.clone(), None);
 
@@ -264,7 +264,7 @@ fn destruct_expr(
                 // short-circuiting (from recitation 6)
                 BinaryOp::And | BinaryOp::Or => {
                     let temp = fresh_temp();
-                    let dest = Operand::LocalVar(temp.to_string(), Type::Bool);
+                    let dest = Operand::LocalVar { name: temp.to_string(), typ: Type::Bool, reg: None };
                     cfg.add_temp_var(temp, Type::Bool, None);
                     let next_true_block = BasicBlock::new(next_bblock_id());
                     let next_false_block = BasicBlock::new(next_bblock_id());
@@ -279,7 +279,7 @@ fn destruct_expr(
                         next_true_block.get_id(),
                         Instruction::Assign {
                             typ: Type::Bool,
-                            src: Operand::Const(1, Type::Bool),
+                            src: Operand::Const { value: 1, typ: Type::Bool, reg: None },
                             dest: dest.clone(),
                         },
                     );
@@ -296,7 +296,7 @@ fn destruct_expr(
                         next_false_block.get_id(),
                         Instruction::Assign {
                             typ: Type::Bool,
-                            src: Operand::Const(0, Type::Bool),
+                            src: Operand::Const { value: 1, typ: Type::Bool, reg: None },
                             dest: dest.clone(),
                         },
                     );
@@ -355,7 +355,7 @@ fn destruct_expr(
                     assert_eq!(left_type, right_type, "Left and right types must match");
 
                     let temp = fresh_temp();
-                    let result = Operand::LocalVar(temp.to_string(), left_type.clone());
+                    let result = Operand::LocalVar { name: temp.to_string(), typ: left_type.clone(), reg: None };
 
                     cfg.add_temp_var(temp, left_type.clone(), None);
 
@@ -446,7 +446,7 @@ fn destruct_expr(
             .expect("type not defined");
 
             let temp = fresh_temp();
-            let result = Operand::LocalVar(temp.to_string(), inferred_type.clone());
+            let result = Operand::LocalVar { name: temp.to_string(), typ: inferred_type.clone(), reg: None };
 
             cfg.add_temp_var(temp, inferred_type.clone(), None);
             let operand: Operand;
@@ -456,7 +456,7 @@ fn destruct_expr(
             let instruction: Instruction = match op {
                 UnaryOp::Neg => Instruction::Subtract {
                     typ: inferred_type.clone(),
-                    left: Operand::Const(0, inferred_type.clone()),
+                    left: Operand::Const { value: 0, typ: inferred_type.clone(), reg: None },
                     right: operand,
                     dest: result.clone(),
                 },
@@ -475,7 +475,7 @@ fn destruct_expr(
             target_type, expr, ..
         } => {
             let temp = fresh_temp();
-            let result = Operand::LocalVar(temp.to_string(), target_type.clone());
+            let result = Operand::LocalVar { name: temp.to_string(), typ: target_type.clone(), reg: None };
             cfg.add_temp_var(temp, target_type.clone(), None);
 
             let operand: Operand;
@@ -504,7 +504,7 @@ fn destruct_expr(
             };
 
             let temp = fresh_temp();
-            let result = Operand::LocalVar(temp.to_string(), Type::Int);
+            let result = Operand::LocalVar { name: temp.to_string(), typ: Type::Int, reg: None };
 
             //allocate only for int for the temp to hold length
             cfg.add_temp_var(temp, Type::Int, None);
@@ -753,7 +753,7 @@ fn destruct_statement(
 
                             // load array element into a new temp
                             let array_temp = fresh_temp();
-                            let array_element_temp = Operand::LocalVar(array_temp.to_string(), target_typ.clone());
+                            let array_element_temp = Operand::LocalVar { name: array_temp.to_string(), typ: target_typ.clone(), reg: None };
 
                             let table_entry = sym_scope
                                 .borrow()
@@ -775,7 +775,7 @@ fn destruct_statement(
 
                             // add array element to rhs
                             let rhs_temp = fresh_temp();
-                            let new_rhs = Operand::LocalVar(rhs_temp.to_string(), target_typ.clone());
+                            let new_rhs = Operand::LocalVar { name: rhs_temp.to_string(), typ: target_typ.clone(), reg: None };
                             cfg.add_temp_var(rhs_temp, typ.clone(), None);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
@@ -803,7 +803,7 @@ fn destruct_statement(
 
                             // load array element into a new temp
                             let array_temp = fresh_temp();
-                            let array_element_temp = Operand::LocalVar(array_temp.to_string(), target_typ.clone());
+                            let array_element_temp = Operand::LocalVar { name: array_temp.to_string(), typ: target_typ.clone(), reg: None };
                             let table_entry = sym_scope
                                 .borrow()
                                 .lookup(id)
@@ -824,7 +824,7 @@ fn destruct_statement(
 
                             // subtract rhs from array element
                             let rhs_temp = fresh_temp();
-                            let new_rhs = Operand::LocalVar(rhs_temp.to_string(), target_typ.clone());
+                            let new_rhs = Operand::LocalVar { name: rhs_temp.to_string(), typ: target_typ.clone(), reg: None };
                             cfg.add_temp_var(rhs_temp, typ.clone(), None);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
@@ -852,7 +852,7 @@ fn destruct_statement(
 
                             // load array element into a new temp
                             let array_temp = fresh_temp();
-                            let array_element_temp = Operand::LocalVar(array_temp.to_string(), target_typ.clone());
+                            let array_element_temp = Operand::LocalVar { name: array_temp.to_string(), typ: target_typ.clone(), reg: None };
                             let table_entry = sym_scope
                                 .borrow()
                                 .lookup(id)
@@ -873,7 +873,7 @@ fn destruct_statement(
 
                             // multiply array element by rhs
                             let rhs_temp = fresh_temp();
-                            let new_rhs = Operand::LocalVar(rhs_temp.to_string(), target_typ.clone());
+                            let new_rhs = Operand::LocalVar { name: rhs_temp.to_string(), typ: target_typ.clone(), reg: None };
                             cfg.add_temp_var(rhs_temp, typ.clone(), None);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
@@ -901,7 +901,7 @@ fn destruct_statement(
 
                             // load array element into a new temp
                             let array_temp = fresh_temp();
-                            let array_element_temp = Operand::LocalVar(array_temp.to_string(), target_typ.clone());
+                            let array_element_temp = Operand::LocalVar { name: array_temp.to_string(), typ: target_typ.clone(), reg: None };
                             let table_entry = sym_scope
                                 .borrow()
                                 .lookup(id)
@@ -922,7 +922,7 @@ fn destruct_statement(
 
                             // divide array element by rhs
                             let rhs_temp = fresh_temp();
-                            let new_rhs = Operand::LocalVar(rhs_temp.to_string(), target_typ.clone());
+                            let new_rhs = Operand::LocalVar { name: rhs_temp.to_string(), typ: target_typ.clone(), reg: None };
                             cfg.add_temp_var(rhs_temp, typ.clone(), None);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
@@ -950,7 +950,7 @@ fn destruct_statement(
 
                             // load array element into a new temp
                             let array_temp = fresh_temp();
-                            let array_element_temp = Operand::LocalVar(array_temp.to_string(), target_typ.clone());
+                            let array_element_temp = Operand::LocalVar { name: array_temp.to_string(), typ: target_typ.clone(), reg: None };
                             let table_entry = sym_scope
                                 .borrow()
                                 .lookup(id)
@@ -959,7 +959,7 @@ fn destruct_statement(
                                 panic!("Expected a variable, found something else!");
                             };
 
-                            cfg.add_temp_var(array_temp, typ.clone(), None);
+                            cfg.add_temp_var(array_temp.clone(), typ.clone(), None);
 
                             cfg.add_instruction_to_block(
                                 cur_block_id,
@@ -972,7 +972,7 @@ fn destruct_statement(
 
                             // modulo array element by rhs
                             let rhs_temp = fresh_temp();
-                            let new_rhs = Operand::LocalVar(rhs_temp.to_string(), target_typ.clone());
+                            let new_rhs = Operand::LocalVar { name: array_temp.to_string(), typ: target_typ.clone(), reg: None };
                             cfg.add_temp_var(rhs_temp, typ.clone(), None);
                             cfg.add_instruction_to_block(
                                 cur_block_id,
@@ -1501,8 +1501,9 @@ fn destruct_statement(
                     cur_block_id,
                     Instruction::Assign {
                         typ: typ.clone(),
-                        src: Operand::Const(int_val.unwrap(), Type::Int),
-                        dest: Operand::LocalVar(temp, typ.clone()),   // IS this right that teh local var type is Int?
+                        src: Operand::Const { value: int_val.unwrap(), typ: Type::Int, reg: None },
+                        dest: Operand::LocalVar { name: temp, typ: typ.clone(), reg: None }, // IS this right that the local var type is Int? 
+                        
                     },
                 ); // set array length to first element of array
             } else {
@@ -1549,8 +1550,8 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
             cur_block_id,
             Instruction::Assign {
                 typ: typ.clone(),
-                src: Operand::Argument(pos as i32, typ.clone()),
-                dest: Operand::LocalVar(temp, typ.clone()),
+                src: Operand::Argument { position: pos as i32, typ: typ.clone(), reg: None },
+                dest: Operand::LocalVar { name: temp, typ: typ.clone(), reg: None },
             },
         );
     }
