@@ -25,6 +25,7 @@ pub enum Optimization {
     Cp, 
     Dce,
     All,
+    Regalloc,
 
     // "Negative" variants of optimizations
     #[clap(name = "-cse")]
@@ -33,6 +34,8 @@ pub enum Optimization {
     NoCp,
     #[clap(name = "-dce")]
     NoDce,
+    #[clap(name = "-regalloc")]
+    NoRegalloc
 }
 
 #[derive(Parser, Debug)]
@@ -76,6 +79,7 @@ impl Args {
             opts.insert(Cse);
             opts.insert(Dce);
             opts.insert(Cp);
+            opts.insert(Regalloc);
         }
 
         // Remove disabled opts
@@ -92,6 +96,12 @@ impl Args {
         if opts.contains(&NoDce) {
             opts.remove(&Dce);
             opts.remove(&NoDce);
+        }
+
+
+        if opts.contains(&NoRegalloc) {
+            opts.remove(&Regalloc);
+            opts.remove(&NoRegalloc);
         }
 
         opts
