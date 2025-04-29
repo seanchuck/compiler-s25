@@ -1,5 +1,5 @@
-use crate::{cfg::CFG, tac::Instruction, x86::X86Operand, tac::Operand, web::*};
-use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet, VecDeque}, hash::Hash};
+use crate::{cfg::CFG, tac::{Instruction, Operand}, web::*, x86::{Register, X86Operand}};
+use std::{cell::RefCell, collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque}, hash::Hash};
 use crate::state::*;
 
 
@@ -582,10 +582,9 @@ fn compute_webs_liveness(
         }
     }
 
-    if debug {
-        println!("Computed Web Liveness: IN = {:#?}", in_map);
-        println!("Computed Web Liveness: OUT = {:#?}", out_map);
-    }
+    // if debug {
+    //     println!("Computed Web Liveness: IN = {:#?}", in_map);
+    //     println!("Computed Web Liveness: OUT = {:#?}", out_map);
 
     (in_map, out_map)
 }
@@ -665,40 +664,142 @@ fn compute_interference(method_cfg: &CFG, method_webs: &BTreeMap<i32, Web>, debu
 }
     
 
-
-
-
+/// Spill webs onto the stack or split their live ranges
 fn compute_spill_costs() {
     todo!()
 }
 
 
-fn apply_reg_assignments(web_assignments: HashMap<&String, BTreeMap<i32, Web>>, method_cfgs: &mut HashMap<String, CFG>,) {
+/// Performs graph-coloring algorithm, assigning every web
+/// either a register or a stack space.
+fn assign_registers(
+    _method_cfg: &CFG,
+    interference: &InterferenceGraph,
+    method_webs: &BTreeMap<i32, Web>,
+    registers: &BTreeSet<X86Operand>,
+) -> HashMap<i32, Option<X86Operand>> {
+    let k = registers.len();
+    let mut degree: HashMap<InstructionIndex, usize> = HashMap::new();
+    let mut stack: Vec<InstructionIndex> = Vec::new();
+    let mut nodes: HashSet<InstructionIndex> = interference.nodes.clone();
+
+    // Map each instruction to its web_id (like before)
+    let mut instr_to_web: HashMap<InstructionIndex, i32> = HashMap::new();
+    for (web_id, web) in method_webs {
+        for &def in &web.defs {
+            instr_to_web.insert(def, *web_id);
+        }
+        for &use_site in &web.uses {
+            instr_to_web.insert(use_site, *web_id);
+        }
+    }
+
+    // Initialize degrees
+    for node in &nodes {
+        degree.insert(*node, interference.neighbors(node).map(|n| n.len()).unwrap_or(0));
+    }
+
+    // Simplify step: remove nodes with degree < k and push to stack
+    while !nodes.is_empty() {
+        if let Some((&node, _)) = degree.iter().find(|(&n, &deg)| deg < k && nodes.contains(&n)) {
+            stack.push(node);
+            nodes.remove(&node);
+            for neighbor in interference.neighbors(&node).unwrap_or(&HashSet::new()) {
+                if let Some(d) = degree.get_mut(neighbor) {
+                    *d = d.saturating_sub(1);
+                }
+            }
+            degree.remove(&node);
+        } else {
+            // All remaining nodes have degree >= k, choose a spill candidate
+            let &spill_node = nodes.iter().next().unwrap();
+            stack.push(spill_node);
+            nodes.remove(&spill_node);
+            for neighbor in interference.neighbors(&spill_node).unwrap_or(&HashSet::new()) {
+                if let Some(d) = degree.get_mut(neighbor) {
+                    *d = d.saturating_sub(1);
+                }
+            }
+            degree.remove(&spill_node);
+        }
+    }
+
+    // Assign colors (registers)
+    let mut assignment: HashMap<i32, Option<X86Operand>> = HashMap::new();
+    let mut assigned: HashMap<InstructionIndex, X86Operand> = HashMap::new();
+
+    while let Some(node) = stack.pop() {
+        let web = instr_to_web.get(&node).expect("Missing web for instruction");
+        let mut neighbor_colors: HashSet<&X86Operand> = HashSet::new();
+
+        for neighbor in interference.neighbors(&node).unwrap_or(&HashSet::new()) {
+            if let Some(color) = assigned.get(neighbor) {
+                neighbor_colors.insert(color);
+            }
+        }
+
+        let mut assigned_color = None;
+        for reg in registers {
+            if !neighbor_colors.contains(reg) {
+                assigned.insert(node, reg.clone());
+                assigned_color = Some(reg.clone());
+                break;
+            }
+        }
+
+        assignment.insert(web.clone(), assigned_color);
+    }
+
+    assignment
+}
+
+
+/// Modify the CFG based on the register assignments
+fn apply_reg_assignments(method_cfg: &mut HashMap<String, CFG>, assignments: HashMap<Web, Option<X86Operand>>) {
+    todo!()
 
 }
 
 
-/// Performs graph-coloring algorithm, assigning every web
-/// either a register or a stack space.
-pub fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) -> BTreeMap<i32, X86Operand> {
+/// Mutates CFG based on register assignments
+pub fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) {
     // let mut webs: HashMap<&String, BTreeMap<i32, Web>> = HashMap::new();
     let mut method_to_instrs: HashMap<String, InstructionMap> = HashMap::new();
 
+    // Start with just the truly general purpose registers
+    let usable_registers: BTreeSet<X86Operand> = vec![
+        X86Operand::Reg(Register::Rbx),
+        X86Operand::Reg(Register::R8),
+        X86Operand::Reg(Register::R9),
+        X86Operand::Reg(Register::R10),
+        X86Operand::Reg(Register::R11),
+        X86Operand::Reg(Register::R12),
+        X86Operand::Reg(Register::R13),
+        X86Operand::Reg(Register::R14),
+        X86Operand::Reg(Register::R15),
+    ].into_iter().collect();
+    
+
     for (method_name, method_cfg) in method_cfgs {
-        let live_ranges: BTreeMap<i32, Web> = compute_webs(method_cfg);
-        println!("webs for {method_name} is {:#?}", live_ranges);
-
-        let interference = compute_interference(method_cfg, &live_ranges, debug);
-        println!("interference graph for {method_name} is {:#?}", interference);
-
         // Populate instruction map for later use
         let instr_map = compute_instr_map(method_cfg);
         method_to_instrs.insert(method_name.to_string(), instr_map);
+
+        // Compute register assignments
+        let webs: BTreeMap<i32, Web> = compute_webs(method_cfg);
+        println!("webs for {method_name} is {:#?}", webs);
+
+        // TODO: broken
+        // let interference = compute_interference(method_cfg, &webs, debug);
+        // println!("interference graph for {method_name} is {:#?}", interference);
+
+        // let register_assignments = assign_registers(method_cfg, &interference, &webs, &usable_registers);
+        // println!("register assignments for {method_name} are {:#?}", register_assignments);
+        
     }
 
 
-    let out = BTreeMap::new();
-    out
+    // TODO: apply assignments
 }
 
 
