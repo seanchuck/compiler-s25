@@ -1,4 +1,5 @@
 #!/bin/bash
+# Use the same -O flags as the run.sh script to turn on/off optimizations
 
 # Set the base directory
 BASE_DIR="tests/phase3"
@@ -11,6 +12,23 @@ OUTPUT_FILE="out.out"
 
 # Clear the output file if it exists
 > "$OUTPUT_FILE"
+
+# Default optimization flag
+OPT_FLAGS="-O all"
+
+# Parse command-line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -O|--opt)
+            OPT_FLAGS="-O $2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            exit 1
+            ;;
+    esac
+done
 
 # Counters for test results
 correct=0
@@ -41,7 +59,6 @@ count_optimizations() {
     echo "  --> DCE: $dce_count" | tee -a "$OUTPUT_FILE"
     echo "  --> CSE: $cse_count" | tee -a "$OUTPUT_FILE"
 
-    # Add to total counters
     total_cp=$((total_cp + cp_count))
     total_dce=$((total_dce + dce_count))
     total_cse=$((total_cse + cse_count))
@@ -60,10 +77,10 @@ for file in "$BASE_DIR/$INPUT_DIR"/*; do
         rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
 
         echo -e "\n========================================" | tee -a "$OUTPUT_FILE"
-        echo "Running: ./run.sh -t assembly \"$file\" -O all --debug" | tee -a "$OUTPUT_FILE"
+        echo "Running: ./run.sh -t assembly \"$file\" $OPT_FLAGS --debug" | tee -a "$OUTPUT_FILE"
         echo "----------------------------------------" | tee -a "$OUTPUT_FILE"
 
-        ./run.sh -t assembly "$file" -O all --debug -o "$assembly_file" > "$debug_output"
+        ./run.sh -t assembly "$file" $OPT_FLAGS --debug -o "$assembly_file" > "$debug_output"
         exit_code=$?
 
         if [[ $exit_code -ne 0 ]]; then
@@ -102,7 +119,6 @@ for file in "$BASE_DIR/$INPUT_DIR"/*; do
             incorrect=$((incorrect + 1))
         fi
 
-        # Clean up temporary files after each file
         rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
     fi
 done
@@ -119,10 +135,10 @@ for file in "$BASE_DIR/$ERROR_DIR"/*; do
         rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
 
         echo -e "\n========================================" | tee -a "$OUTPUT_FILE"
-        echo "Running: ./run.sh -t assembly \"$file\" -O all --debug" | tee -a "$OUTPUT_FILE"
+        echo "Running: ./run.sh -t assembly \"$file\" $OPT_FLAGS --debug" | tee -a "$OUTPUT_FILE"
         echo "----------------------------------------" | tee -a "$OUTPUT_FILE"
 
-        ./run.sh -t assembly "$file" -O all --debug -o "$assembly_file" > "$debug_output"
+        ./run.sh -t assembly "$file" $OPT_FLAGS --debug -o "$assembly_file" > "$debug_output"
         exit_code=$?
 
         if [[ $exit_code -ne 0 ]]; then
@@ -152,7 +168,6 @@ for file in "$BASE_DIR/$ERROR_DIR"/*; do
             incorrect=$((incorrect + 1))
         fi
 
-        # Clean up temporary files after each file
         rm -f "$assembly_file" "$executable_file" "$actual_output" "$debug_output"
     fi
 done
@@ -169,7 +184,6 @@ echo "  --> Total CP: $total_cp" | tee -a "$OUTPUT_FILE"
 echo "  --> Total DCE: $total_dce" | tee -a "$OUTPUT_FILE"
 echo "  --> Total CSE: $total_cse" | tee -a "$OUTPUT_FILE"
 
-# Exit with an error code if any tests failed
 if [[ $incorrect -gt 0 ]]; then
     exit 1
 else
