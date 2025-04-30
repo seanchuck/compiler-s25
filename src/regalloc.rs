@@ -466,7 +466,7 @@ fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
                         if visited_uses.insert(use_idx) {
                             uses.insert(use_idx);
 
-                            let reaching_defs = defs_from_use(method_cfg, def_idx, &var);
+                            let reaching_defs = defs_from_use(method_cfg, use_idx, &var);
 
                             for reaching_def_idx in reaching_defs {
                                 if visited_defs.insert(reaching_def_idx) {
@@ -494,6 +494,7 @@ fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
 
     webs
 }
+
 
 
 
@@ -836,13 +837,13 @@ pub fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) {
         println!("webs for {method_name} is {:#?}", method_webs);
 
         // TODO: broken
-        // let interference = compute_interference(&method_webs, debug);
-        // println!("interference graph for {method_name} is {:#?}", interference);
+        let interference = compute_interference(&method_webs, debug);
+        println!("interference graph for {method_name} is {:#?}", interference);
 
-        // let register_assignments = assign_registers(&interference, &usable_registers);
-        // for (web_id, reg) in register_assignments {
-        //     println!("assigning web {:#?} to register {:#?}", method_webs.get(&web_id), reg);
-        // }
+        let register_assignments = assign_registers(&interference, &usable_registers);
+        for (web_id, reg) in register_assignments {
+            println!("assigning web {:#?} to register {:#?}", method_webs.get(&web_id), reg);
+        }
         
         // TODO: apply assignments
     }
