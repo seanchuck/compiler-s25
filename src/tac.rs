@@ -76,6 +76,20 @@ impl Operand {
             | Operand::Argument { reg, ..} => reg.clone()
         }
     }
+
+    pub fn set_reg(&mut self, new_reg: &Option<X86Operand>) {
+        match self {
+            Operand::GlobalVar { reg, .. }
+            | Operand::GlobalArrElement { reg, .. }
+            | Operand::String { reg, .. }
+            | Operand::LocalVar { reg, .. }
+            | Operand::LocalArrElement { reg, .. }
+            | Operand::Const { reg, .. }
+            | Operand::Argument { reg, .. } => {
+                *reg = new_reg.clone();
+            }
+        }
+    }
 }
     
 

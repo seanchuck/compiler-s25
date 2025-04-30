@@ -36,6 +36,10 @@ fn reg_for_type(reg: Register, typ: &Type) -> Register {
         (Register::Rax, _) => Register::Eax,
         (Register::R10, _) => Register::R10d,
         (Register::R11, _) => Register::R11d,
+        (Register::R12, _) => Register::R12d,
+        (Register::R13, _) => Register::R13d,
+        (Register::R14, _) => Register::R14d,
+        (Register::R15, _) => Register::R15d,
         (Register::R8, _) => Register::R8d,
         (Register::R9, _) => Register::R9d,
         (Register::Rcx, _) => Register::Ecx,
@@ -57,6 +61,12 @@ fn map_operand(
     x86_instructions: &mut Vec<X86Insn>,
     globals: &HashMap<String, Global>
 ) -> X86Operand {
+    if let Some(opt_reg) = operand.get_reg() {
+        if let X86Operand::Reg(reg) = opt_reg {
+            let replacement_reg = reg_for_type(reg, &operand.get_type());
+            return X86Operand::Reg(replacement_reg);
+        }
+    }
     match operand {
         Operand::Const { value, .. } => X86Operand::Constant(*value),
 
@@ -70,7 +80,9 @@ fn map_operand(
 
         Operand::LocalArrElement { name, index, typ, reg } => {
             let array_typ: Type = method_cfg.locals.get(name).expect("expected array entry").typ.clone();
+            println!("Matching operand for {:?}", index);
             let idx_op = map_operand(method_cfg, index, x86_instructions, globals);
+            println!("index operand is  {:?}", idx_op);
 
             let index_reg: Register = reg_for_type(Register::R10, &Type::Int);
 
@@ -134,31 +146,37 @@ fn map_operand(
                 4 => X86Operand::Reg(reg_for_type(Register::R8, typ)),
                 5 => X86Operand::Reg(reg_for_type(Register::R9, typ)),
                 _ => {
-                    // Args are always the first local temps defined
-                    // Should properly handle ints and longs
-                    let temp_name = method_cfg.param_to_temp.get(position).expect("Param mapping does not exist").name.clone();
-                    let local = method_cfg.locals.get(&temp_name);
-                    let Some(Local { typ, .. }) = local else {
-                        panic!("Expected a variable, found something else!");
-                    };
-                    
-                    // Only used for callee retrieving operand, caller pushes without using map_operand!
-                    // 16 byte offset beca, globalsuse: old_rbp and ra stored betweeen new_rbp and args
-                    let offset = 16 + ((position - 6) as i64 * 8);
-
-                    // match typ {
-                    //     Type::Int 
-                    //     |Type::Bool => {
-                    //         X86Operand::RegInt(Register::Rbp, offset, Type::Int)
-                    //     }
-                        // Type::Long => {
-                            X86Operand::RegInt(Register::Rbp, offset, typ.clone())
-                    //     }
-                    //     _=> panic!("Only numeric and bool args alllowed")
-                    // }
+                    // Offset must now include space for 4 saved registers: R12–R15
+                    // Layout:
+                    //   RBP+0  = old RBP
+                    //   RBP+8  = RA
+                    //   RBP+16 = R12
+                    //   RBP+24 = R13
+                    //   RBP+32 = R14
+                    //   RBP+40 = R15
+                    //   RBP+48 = stack arg 0 (position 6)
+        
+                    let temp_name = method_cfg
+                        .param_to_temp
+                        .get(position)
+                        .expect("Param mapping does not exist")
+                        .name
+                        .clone();
+        
+                    let typ = method_cfg
+                        .locals
+                        .get(&temp_name)
+                        .expect("Expected a local param")
+                        .typ
+                        .clone();
+        
+                    let saved_regs_size = 8 * 4; // R12, R13, R14, R15
+                    let offset = 16 + saved_regs_size + ((position - 6) as i64 * 8);
+        
+                    X86Operand::RegInt(Register::Rbp, offset, typ)
                 }
             }
-        }
+        }        
         Operand::String { id, .. } => X86Operand::RegLabel(Register::Rip, format!("str{id}")),
     }
 }
@@ -166,10 +184,12 @@ fn map_operand(
 
 // Adds the x86 instructions corresponding to insn to x86_instructions
 fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut Vec<X86Insn>, globals: &HashMap<String, Global>) {
+    println!("Adding instruction: {:?}", insn);
     match insn {
         Instruction::LoadConst { src, dest, typ } => {
             match typ {
                 Type::Int => {
+                    println!("Loading Const to {:?}", dest);
                     let dest_location = map_operand(method_cfg, dest, x86_instructions, globals);
                     x86_instructions.push(X86Insn::Mov(
                         X86Operand::Constant(src.clone()),
@@ -231,6 +251,8 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let src_op = map_operand(method_cfg, src, x86_instructions, globals);
 
+            println!("Assigning {:?} to {:?}", dest, dest_op);
+
             // // Reason that this matters is because we might have src as an array and we are using full
             // // 64 bits for the length if its long array, so we must move using src typ then only take
             // // The necessary dest bits for the final move
@@ -265,9 +287,8 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             // First 6 args go in registers
             for (i, arg) in args.iter().take(6).enumerate() {
                 let arg_typ = arg.get_type();
-                let optional_reg = arg.get_reg();
                 let arg_reg = 
-                    map_operand(method_cfg, &Operand::Argument { position: i as i32, typ: arg_typ.clone(), reg: optional_reg }, x86_instructions, globals);
+                    map_operand(method_cfg, &Operand::Argument { position: i as i32, typ: arg_typ.clone(), reg: None }, x86_instructions, globals);
                 let arg_val = map_operand(method_cfg, arg, x86_instructions, globals);
                 x86_instructions.push(X86Insn::Mov(arg_val, arg_reg, arg_typ));
             }
@@ -326,6 +347,11 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
                 X86Operand::Reg(Register::Rsp),
                 Type::Long
             ));
+
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R15)));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R14)));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R13)));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R12)));
             x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp)));
             x86_instructions.push(X86Insn::Ret);
         }
@@ -410,8 +436,16 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             dest,
             target_type,
         } => {
+            let dest_op: X86Operand = map_operand(method_cfg, dest, x86_instructions, globals);
+
+            if let Some(expr_reg) = expr.get_reg(){
+                if let X86Operand::Reg(register) = expr_reg {
+                    let sized_reg = reg_for_type(register, target_type);
+                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(sized_reg), dest_op, target_type.clone()));
+                    return;
+                }
+            }
             let expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
 
             let expr_typ = expr.get_type();
             let expr_reg = reg_for_type(Register::Rax, &expr_typ);
@@ -582,6 +616,11 @@ fn generate_method_x86(
 
     // method prologue
     x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rbp))); // push base pointer onto stack
+    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R12)));
+    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R13)));
+    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R14)));
+    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R15)));
+
     x86_instructions.push(X86Insn::Mov(
         X86Operand::Reg(Register::Rsp),
         X86Operand::Reg(Register::Rbp),
@@ -631,7 +670,13 @@ fn generate_method_x86(
                 X86Operand::Reg(Register::Rsp),
                 Type::Long
             )); // move base pointer to stack pointer
+
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R15)));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R14)));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R13)));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R12)));
             x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
+
             x86_instructions.push(X86Insn::Ret); // return to where function was called
         }
     }

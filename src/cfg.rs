@@ -142,6 +142,12 @@ impl CFG {
         );
     }
 
+    // Gets an instruction at location block, instr_idx
+    pub fn get_instruction(&mut self, block_id: i32, instruction_index: i32) -> &mut Instruction {
+        let block = self.get_block_with_id(block_id);
+        block.instructions.get_mut(instruction_index as usize).unwrap_or_else(|| panic!("Instruction index out of bounds"))
+    }
+
     /// Get the stack offset of a temp var
     pub fn get_stack_offset(&self, temp: &String) -> i64 {
         self.locals.get(temp).unwrap().stack_offset
@@ -248,38 +254,38 @@ impl CFG {
         dot
     }
 
-        /// Generate SVG (or PNG) directly from the DOT representation
-        pub fn render_dot(&self, output_format: &str) -> Vec<u8> {
-            let dot_code = self.to_dot();
-    
-            let mut child = std::process::Command::new("dot")
-                .arg(format!("-T{}", output_format)) // example: -Tsvg or -Tpng
-                .stdin(std::process::Stdio::piped())
-                .stdout(std::process::Stdio::piped())
-                .spawn()
-                .expect("Failed to spawn dot command");
-    
-            {
-                let stdin = child.stdin.as_mut().expect("Failed to open stdin");
-                use std::io::Write;
-                stdin
-                    .write_all(dot_code.as_bytes())
-                    .expect("Failed to write DOT code to dot process");
-            }
-    
-            let output = child
-                .wait_with_output()
-                .expect("Failed to read dot output");
-    
-            if output.status.success() {
-                output.stdout
-            } else {
-                panic!(
-                    "Graphviz 'dot' command failed:\n{}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
-            }
+    /// Generate SVG (or PNG) directly from the DOT representation
+    pub fn render_dot(&self, output_format: &str) -> Vec<u8> {
+        let dot_code = self.to_dot();
+
+        let mut child = std::process::Command::new("dot")
+            .arg(format!("-T{}", output_format)) // example: -Tsvg or -Tpng
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .expect("Failed to spawn dot command");
+
+        {
+            let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+            use std::io::Write;
+            stdin
+                .write_all(dot_code.as_bytes())
+                .expect("Failed to write DOT code to dot process");
         }
+
+        let output = child
+            .wait_with_output()
+            .expect("Failed to read dot output");
+
+        if output.status.success() {
+            output.stdout
+        } else {
+            panic!(
+                "Graphviz 'dot' command failed:\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
