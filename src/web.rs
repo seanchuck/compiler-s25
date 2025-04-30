@@ -18,8 +18,8 @@ pub struct Web {
 
 #[derive(Debug, Clone)]
 pub struct InterferenceGraph {
-    pub nodes: HashSet<InstructionIndex>,
-    pub edges: HashMap<InstructionIndex, HashSet<InstructionIndex>>, // maps each def site to conflicting defs (graph is undirected)
+    pub nodes: HashSet<i32>, // Web IDs
+    pub edges: HashMap<i32, HashSet<i32>>, // Undirected edges between interfering web IDs
 }
 
 impl InterferenceGraph {
@@ -30,18 +30,21 @@ impl InterferenceGraph {
         }
     }
 
-    pub fn add_edge(&mut self, u: InstructionIndex, v: InstructionIndex) {
+    pub fn add_edge(&mut self, u: i32, v: i32) {
         if u == v {
             return; // prevent self-loops
         }
+        self.nodes.insert(u);
+        self.nodes.insert(v);
         self.edges.entry(u).or_insert_with(HashSet::new).insert(v);
         self.edges.entry(v).or_insert_with(HashSet::new).insert(u);
     }
 
-    pub fn neighbors(&self, u: &InstructionIndex) -> Option<&HashSet<InstructionIndex>> {
+    pub fn neighbors(&self, u: &i32) -> Option<&HashSet<i32>> {
         self.edges.get(u)
     }
 }
+
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct InstructionIndex {
