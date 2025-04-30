@@ -2,8 +2,11 @@ use crate::cfg::*;
 use crate::scope::*;
 use crate::symtable::*;
 use crate::tac::*;
+use crate::web::{Web, InterferenceGraph, InstructionMap};
+use crate::utils::visualizer::RegisterAllocationGraph;
+
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::rc::Rc;
 use std::fs::File;
 use std::io::Write;
@@ -251,4 +254,34 @@ pub fn html_cfgs(method_cfgs: &HashMap<String, CFG>, filename: String) {
     writeln!(html, "</body></html>").unwrap();
     println!("✅ Generated {} with inline CFG diagrams.", filename);
 }
+
+pub fn html_web_graphs(
+    web_data: &HashMap<String, (BTreeMap<i32, Web>, InterferenceGraph, InstructionMap)>,
+    filename: String,
+) {
+    let mut html = File::create(&filename).expect("Failed to create HTML file");
+
+    writeln!(
+        html,
+        "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Register Allocation Viewer</title></head><body><h1>Register Allocation Graphs</h1>"
+    )
+    .unwrap();
+
+    for (method_name, (webs, interference, instr_map)) in web_data {
+        let graph = RegisterAllocationGraph {
+            webs: webs.clone(),
+            interference: interference.clone(),
+            instr_map: instr_map.clone(),
+        };
+
+        let svg_data = graph.render_dot("svg");
+        let svg_str = String::from_utf8(svg_data).expect("Invalid UTF-8 in SVG output");
+
+        writeln!(html, "<h2>{}</h2>{}<br><br>", method_name, svg_str).unwrap();
+    }
+
+    writeln!(html, "</body></html>").unwrap();
+    println!("✅ Generated {} with inline register allocation diagrams.", filename);
+}
+
 

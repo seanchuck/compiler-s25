@@ -1,4 +1,4 @@
-use crate::{cfg::CFG, tac::{Instruction, Operand}, web::*, x86::{Register, X86Operand}};
+use crate::{cfg::CFG, tac::{Instruction, Operand}, utils::print::html_web_graphs, web::*, x86::{Register, X86Operand}};
 use std::{cell::RefCell, collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque}, env::var, hash::Hash};
 use crate::state::*;
 
@@ -820,29 +820,38 @@ pub fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) {
         X86Operand::Reg(Register::R15),
     ].into_iter().collect();
 
-    
+    // For building HTML visualizer
+    let mut web_data: HashMap<String, (BTreeMap<i32, Web>, InterferenceGraph, InstructionMap)> = HashMap::new();
 
     for (method_name, method_cfg) in method_cfgs {
-        // Populate instruction map for later use
+        // Build instruction map
         let instr_map = compute_instr_map(method_cfg);
         method_to_instrs.insert(method_name.to_string(), instr_map.clone());
 
-        // Compute register assignments
-        let method_webs: BTreeMap<i32, Web> = compute_webs(method_cfg);
-        println!("webs for {method_name} is {:#?}", method_webs);
-
-        // Compute Interference
+        // Build webs and interference graph
+        let method_webs = compute_webs(method_cfg);
         let live_spans = compute_use_liveness_spans(&method_webs, method_cfg, &instr_map);
         let interference = build_interference_graph_from_spans(&live_spans);
-        println!("interference graph for {method_name} is {:#?}", interference);
 
-        let register_assignments: HashMap<Web, Option<X86Operand>> = assign_registers(&interference, &usable_registers, &method_webs);
+        if debug {
+            println!("webs for {method_name} is {:#?}", method_webs);
+            println!("interference graph for {method_name} is {:#?}", interference);
+        }
+
+        // Save data for visualization
+        web_data.insert(method_name.clone(), (method_webs.clone(), interference.clone(), instr_map.clone()));
+
+        // Assign registers
+        let register_assignments = assign_registers(&interference, &usable_registers, &method_webs);
         for (web, reg) in &register_assignments {
             println!("assigning web {:#?} to register {:#?}", web, reg);
         }
-        
+
         apply_reg_assignments(method_cfg, register_assignments);
     }
+
+    // Generate visual HTML for all methods
+    html_web_graphs(&web_data, "reg_alloc.html".to_string());
 
 }
 
