@@ -1,0 +1,219 @@
+import printf;
+import num_open_file_write;
+import num_write_num;
+import num_close_file;
+import ptr_alloc;
+import ptr_add_int;
+import ptr_write_int;
+import ptr_read_int;
+import num_write_num_int;
+import ptr_get_lower;
+import ptr_get_upper;
+import ptr_free;
+import start_timer;
+import end_timer;
+import timer_print;
+import timer_write;
+
+int SAMPLED_INTS[250];
+int ARR_SIZE;
+
+int abs(int a){
+    if (a < 0) {
+        return a * -1;
+    }
+    return a;
+}
+
+long fix_neg(int a, int offset) {
+    if (a < 0) {
+        return long(a) + (long(offset) * long(offset));
+    } else {
+        return long(a);
+    }
+}
+
+
+void merge(long arr_ptr, int l, int m, int r) {
+  int i, j, k;
+  int n1;
+  int n2;
+  long L_ptr;
+  long R_ptr;
+  long alloc_size;
+  int offset;
+
+  offset = 65536;
+  n1 = m - l + 1;
+  n2 = r - m;
+
+  alloc_size = long(n1) * 4L;
+  ptr_alloc(alloc_size);
+  L_ptr = long(fix_neg(ptr_get_lower(), offset)) + (long(abs(ptr_get_upper())) * long(offset) * long(offset));
+  //printf("L: %lld\n", L_ptr);
+
+  alloc_size = long(n2) * 4L;
+  ptr_alloc(alloc_size);
+  R_ptr = long(fix_neg(ptr_get_lower(), offset)) + (long(abs(ptr_get_upper())) * long(offset) * long(offset));
+  //printf("R: %lld\n", R_ptr);
+
+  for (i = 0; i < n1; i++) {
+    long loc;
+    long l_loc;
+    int result;
+
+    loc = arr_ptr + (4L*long(l+i));
+    l_loc = L_ptr + (4L*long(i));
+    result = ptr_read_int(loc);
+    ptr_write_int(l_loc, result);
+  }
+
+  for (j = 0; j < n2; j++) {
+    long loc;
+    long r_loc;
+    int result;
+
+    loc = arr_ptr + (4L*long(m + 1 + j));
+    r_loc = R_ptr + (4L*long(j));
+    result = ptr_read_int(loc);
+    ptr_write_int(r_loc, result);
+  }
+
+
+  i = 0;
+  j = 0;
+  k = l;
+  while (i < n1 && j < n2) {
+    long loc;
+    long l_loc;
+    long r_loc;
+    int l_val;
+    int r_val;
+
+    loc = arr_ptr + (4L*long(k));
+    l_loc = L_ptr + (4L*long(i));
+    r_loc = R_ptr + (4L*long(j));
+
+    l_val = ptr_read_int(l_loc);
+    r_val = ptr_read_int(r_loc);
+
+    if (l_val <= r_val) {
+      ptr_write_int(loc, l_val);
+      i++;
+    } else {
+      ptr_write_int(loc, r_val);
+      j++;
+    }
+    k++;
+  }
+
+  while (i < n1) {
+    long loc;
+    long l_loc;
+    int result;
+
+    loc = arr_ptr + (4L*long(k));
+    l_loc = L_ptr + (4L*long(i));
+
+
+    result = ptr_read_int(l_loc);
+    ptr_write_int(loc, result);
+    i++;
+    k++;
+  }
+
+  while (j < n2) {
+    long loc;
+    long r_loc;
+    int result;
+
+    loc = arr_ptr + (4L*long(k));
+    r_loc = R_ptr + (4L*long(j));
+
+    result = ptr_read_int(r_loc);
+    ptr_write_int(loc, result);
+    j++;
+    k++;
+  }
+
+  ptr_free(L_ptr);
+  ptr_free(R_ptr);
+}
+
+void merge_sort(long arr_ptr, int l, int r) {
+  if (l < r) {
+    int m;
+
+    m = l + (r - l) / 2;
+    merge_sort(arr_ptr, l, m);
+    merge_sort(arr_ptr, m + 1, r);
+
+    merge(arr_ptr, l, m, r);
+  }
+}
+
+long allocate() {
+  long arr_ptr;
+  long alloc_size;
+  int offset;
+  int i;
+
+  offset = 65536;
+  alloc_size = long(ARR_SIZE) * 4L;
+  ptr_alloc(alloc_size);
+  arr_ptr = long(fix_neg(ptr_get_lower(), offset)) + (long(abs(ptr_get_upper())) * (long(offset) * long(offset)));
+  //printf("M: %lld, %d, %d\n", arr_ptr, ptr_get_lower(), ptr_get_upper());
+  for (i = 0; i < ARR_SIZE; i++) {
+    long loc;
+    int num;
+
+    num = (i % 3559) * 5581 - (i % 1777) * (8693 - (i % 9151));
+    loc = arr_ptr + (4L*long(ARR_SIZE - i));
+    ptr_write_int(loc, num);
+  }
+  return arr_ptr;
+}
+
+void sample_output(long arr_ptr) {
+  int i;
+  for (i = 0; i < ARR_SIZE; i += 10000) {
+    long loc;
+    int r;
+
+    loc = arr_ptr + 4L*long(i);
+    r = ptr_read_int(loc);
+    SAMPLED_INTS[i / 10000] = r;
+  }
+  ptr_free(arr_ptr);
+}
+
+
+void perform_sort_and_print(long arr_ptr, int array_size) {
+  merge_sort(arr_ptr, 0, array_size - 1);
+}
+
+void write_array() {
+  int i;
+
+  num_open_file_write("output/mergesort.txt");
+  for (i = 0; i < 250; i++) {
+    num_write_num_int(SAMPLED_INTS[i]);
+  }
+  num_close_file();
+}
+
+void main() {
+  long arr_ptr;
+
+  ARR_SIZE = 2500000;
+  arr_ptr = allocate();
+
+  start_timer();
+  perform_sort_and_print(arr_ptr, ARR_SIZE);
+  end_timer();
+  timer_print();
+
+  sample_output(arr_ptr);
+  write_array();
+  timer_write();
+}
