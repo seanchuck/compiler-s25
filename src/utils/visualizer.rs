@@ -74,9 +74,12 @@ impl RegisterAllocationGraph {
                 cluster.push_str(&format!("    {} [label={} shape=plaintext];\n", current, label));
 
                 for neighbor in self.interference.neighbors(&current).unwrap_or(&HashSet::new()) {
-                    cluster.push_str(&format!("    {} -- {};\n", current, neighbor));
+                    if current < *neighbor {
+                        cluster.push_str(&format!("    {} -- {};\n", current, neighbor));
+                    }
                     stack.push(*neighbor);
                 }
+                
             }
 
             cluster.push_str("  }\n");
