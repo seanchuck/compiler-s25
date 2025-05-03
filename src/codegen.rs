@@ -80,9 +80,9 @@ fn map_operand(
 
         Operand::LocalArrElement { name, index, typ, reg } => {
             let array_typ: Type = method_cfg.locals.get(name).expect("expected array entry").typ.clone();
-            println!("Matching operand for {:?}", index);
+            // println!("Matching operand for {:?}", index);
             let idx_op = map_operand(method_cfg, index, x86_instructions, globals);
-            println!("index operand is  {:?}", idx_op);
+            // println!("index operand is  {:?}", idx_op);
 
             let index_reg: Register = reg_for_type(Register::R10, &Type::Int);
 
@@ -184,12 +184,12 @@ fn map_operand(
 
 // Adds the x86 instructions corresponding to insn to x86_instructions
 fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut Vec<X86Insn>, globals: &HashMap<String, Global>) {
-    println!("Adding instruction: {:?}", insn);
+    // println!("Adding instruction: {:?}", insn);
     match insn {
         Instruction::LoadConst { src, dest, typ } => {
             match typ {
                 Type::Int => {
-                    println!("Loading Const to {:?}", dest);
+                    // println!("Loading Const to {:?}", dest);
                     let dest_location = map_operand(method_cfg, dest, x86_instructions, globals);
                     x86_instructions.push(X86Insn::Mov(
                         X86Operand::Constant(src.clone()),
@@ -251,7 +251,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let src_op = map_operand(method_cfg, src, x86_instructions, globals);
 
-            println!("Assigning {:?} to {:?}", dest, dest_op);
+            // println!("Assigning {:?} to {:?}", dest, dest_op);
 
             // // Reason that this matters is because we might have src as an array and we are using full
             // // 64 bits for the length if its long array, so we must move using src typ then only take

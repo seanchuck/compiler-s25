@@ -252,7 +252,7 @@ pub fn html_cfgs(method_cfgs: &HashMap<String, CFG>, filename: String) {
     }
 
     writeln!(html, "</body></html>").unwrap();
-    println!("✅ Generated {} with inline CFG diagrams.", filename);
+    // println!("✅ Generated {} with inline CFG diagrams.", filename);
 }
 
 pub fn html_web_graphs(

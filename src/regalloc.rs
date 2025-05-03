@@ -843,8 +843,10 @@ pub fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) {
 
         // Assign registers
         let register_assignments = assign_registers(&interference, &usable_registers, &method_webs);
-        for (web, reg) in &register_assignments {
-            println!("assigning web {:#?} to register {:#?}", web, reg);
+        if debug {
+            for (web, reg) in &register_assignments {
+                println!("assigning web {:#?} to register {:#?}", web, reg);
+            }
         }
 
         apply_reg_assignments(method_cfg, register_assignments);
