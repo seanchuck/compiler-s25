@@ -1,7 +1,7 @@
 /**
 Dataflow code generation optimizations.
 */
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use crate::{
     cfg::CFG, regalloc::reg_alloc, state::*, tac::*, utils::cli::Optimization
 };
@@ -766,8 +766,8 @@ fn common_subexpression_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
 
 /// Perform multiple passes over the CFG to apply the given optimizations
 /// Returns the optimized CFG
-pub fn optimize_dataflow(method_cfgs: &mut HashMap<String, CFG>, optimizations: &HashSet<Optimization>, debug: bool
-) -> HashMap<String, CFG> {
+pub fn optimize_dataflow(method_cfgs: &mut BTreeMap<String, CFG>, optimizations: &HashSet<Optimization>, debug: bool
+) -> BTreeMap<String, CFG> {
     if debug {
         println!("============= Optimizing dataflow =============");
         for opt in optimizations {

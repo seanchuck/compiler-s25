@@ -12,7 +12,7 @@ use crate::{
     token::{Literal, Span},
     traverse::infer_expr_type,
 };
-use std::io;
+use std::{collections::BTreeMap, io};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 const UNREACHABLE_BLOCK: i32 = -1; // id for an unreachable block
@@ -1631,8 +1631,8 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
 }
 
 /// Destruct a program AST node into basic blocks
-fn destruct_program(program: &SymProgram, strings: &mut Vec<String>) -> HashMap<String, CFG> {
-    let mut method_cfgs: HashMap<String, CFG> = HashMap::new(); // Hash map to map method names to associated CFG
+fn destruct_program(program: &SymProgram, strings: &mut Vec<String>) -> BTreeMap<String, CFG> {
+    let mut method_cfgs: BTreeMap<String, CFG> = BTreeMap::new(); // Hash map to map method names to associated CFG
 
     for (name, method) in &program.methods {
         let cfg: CFG = destruct_method(method, strings);
@@ -1650,12 +1650,12 @@ pub fn build_cfg(
     filename: &str,
     writer: &mut dyn std::io::Write,
     debug: bool,
-) -> (HashMap<String, CFG>, HashMap<String, Global>, Vec<String>) {
+) -> (BTreeMap<String, CFG>, BTreeMap<String, Global>, Vec<String>) {
     // Create symbol table IR
     let sym_tree: SymProgram = semcheck(file, filename, writer, debug);
 
     // global variables
-    let mut globals: HashMap<String, Global> = HashMap::new();
+    let mut globals: BTreeMap<String, Global> = BTreeMap::new();
     let scope = &sym_tree.global_scope.borrow().table;
     
     for (_, entry) in scope {
@@ -1680,6 +1680,6 @@ pub fn build_cfg(
     let mut strings: Vec<String> = Vec::new();
 
     // Generate a CFG for each method
-    let method_cfgs: HashMap<String, CFG> = destruct_program(&sym_tree, &mut strings);
+    let method_cfgs: BTreeMap<String, CFG> = destruct_program(&sym_tree, &mut strings);
     (method_cfgs, globals, strings)
 }

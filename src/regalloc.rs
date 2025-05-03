@@ -1,5 +1,5 @@
 use crate::{cfg::CFG, tac::{Instruction, Operand}, utils::print::html_web_graphs, web::*, x86::{Register, X86Operand}};
-use std::{cell::RefCell, collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque}, env::var, hash::Hash};
+use std::{cell::RefCell, collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque}};
 use crate::state::*;
 
 
@@ -18,7 +18,7 @@ fn next_web_id() -> i32 {
 }
 
 fn compute_instr_map(method_cfg: &CFG) -> InstructionMap {
-    let mut map = HashMap::new();
+    let mut map = BTreeMap::new();
 
     for (block_id, block) in &method_cfg.blocks {
         for (instr_idx, instr) in block.instructions.iter().enumerate() {
@@ -307,9 +307,9 @@ fn instr_defs_var(inst: &Instruction, var: &str) -> bool {
 }
 
 
-fn uses_from_def(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> HashSet<InstructionIndex> {
-    let mut uses = HashSet::new();
-    let mut visited = HashSet::new(); // to avoid cycles
+fn uses_from_def(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet<InstructionIndex> {
+    let mut uses = BTreeSet::new();
+    let mut visited = BTreeSet::new(); // to avoid cycles
     let mut worklist = VecDeque::new();
 
     // Start at (block, index) right after start_inst
@@ -362,7 +362,7 @@ fn uses_from_def(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> HashSet<
 
 
 
-fn add_new_use(use_set: &mut HashSet<String>, def_set: &HashSet<String>, operand: &Operand) {
+fn add_new_use(use_set: &mut BTreeSet<String>, def_set: &BTreeSet<String>, operand: &Operand) {
     if let Some(name) = get_local_var_name(operand) {
         // don't include uses of variables that were defined within this basic block
         if !def_set.contains(&name) {
@@ -372,9 +372,9 @@ fn add_new_use(use_set: &mut HashSet<String>, def_set: &HashSet<String>, operand
 }
 
 
-fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> HashSet<InstructionIndex> {
-    let mut defs = HashSet::new();
-    let mut visited = HashSet::new();
+fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet<InstructionIndex> {
+    let mut defs = BTreeSet::new();
+    let mut visited = BTreeSet::new();
     let mut worklist = VecDeque::new();
 
     worklist.push_back((start_inst.block_id, start_inst.instr_index));
@@ -435,7 +435,7 @@ fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> HashSet<
 /// web index within its given method.
 fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
     let mut webs = BTreeMap::new();
-    let mut visited_defs = HashSet::new();
+    let mut visited_defs = BTreeSet::new();
 
     for (block_id, block) in &method_cfg.blocks {
         for (instr_idx, inst) in block.instructions.iter().enumerate() {
@@ -449,8 +449,8 @@ fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
                     continue;
                 }
 
-                let mut defs = HashSet::new();
-                let mut uses = HashSet::new();
+                let mut defs = BTreeSet::new();
+                let mut uses = BTreeSet::new();
                 let mut worklist = VecDeque::new();
 
                 defs.insert(inst_idx);
@@ -507,18 +507,18 @@ pub fn compute_use_liveness_spans(
     webs: &BTreeMap<i32, Web>,
     method_cfg: &CFG,
     instr_map: &InstructionMap,
-) -> HashMap<(i32, InstructionIndex), HashSet<InstructionIndex>> {
-    let mut result = HashMap::new();
+) -> BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>> {
+    let mut result = BTreeMap::new();
     let preds = compute_predecessors(method_cfg);
 
     for (web_id, web) in webs {
         let var = &web.variable;
         for use_idx in &web.uses {
-            let mut visited = HashSet::new();
+            let mut visited = BTreeSet::new();
             let mut worklist = VecDeque::new();
             worklist.push_back(*use_idx);
 
-            let mut live_span = HashSet::new();
+            let mut live_span = BTreeSet::new();
 
             while let Some(idx) = worklist.pop_front() {
                 if visited.contains(&idx) {
@@ -566,7 +566,7 @@ pub fn compute_use_liveness_spans(
 
 
 pub fn build_interference_graph_from_spans(
-    use_liveness_spans: &HashMap<(i32, InstructionIndex), HashSet<InstructionIndex>>,
+    use_liveness_spans: &BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>>,
 ) -> InterferenceGraph {
     let mut graph = InterferenceGraph::new();
 
@@ -599,9 +599,9 @@ pub fn assign_registers(
     interference: &InterferenceGraph,
     registers: &BTreeSet<X86Operand>,
     method_webs: &BTreeMap<i32, Web>,
-) -> HashMap<Web, Option<X86Operand>> {
+) -> BTreeMap<Web, Option<X86Operand>> {
     let mut stack: Vec<i32> = Vec::new();
-    let mut removed: HashSet<i32> = HashSet::new();
+    let mut removed: BTreeSet<i32> = BTreeSet::new();
     let graph = interference.edges.clone(); // Clone the interference graph
 
     let k = registers.len();
@@ -638,10 +638,10 @@ pub fn assign_registers(
     }
 
     // Step 3: Assign colors
-    let mut coloring: HashMap<Web, Option<X86Operand>> = HashMap::new();
+    let mut coloring: BTreeMap<Web, Option<X86Operand>> = BTreeMap::new();
 
     while let Some(node) = stack.pop() {
-        let mut used_colors = HashSet::new();
+        let mut used_colors = BTreeSet::new();
 
         if let Some(neighbors) = interference.neighbors(&node) {
             for neighbor in neighbors {
@@ -774,7 +774,11 @@ fn add_use_reg(instruction: &mut Instruction, register: &Option<X86Operand>, var
 
 
 /// Modify the CFG based on the register assignments
-fn apply_reg_assignments(method_cfg: &mut CFG, assignments: HashMap<Web, Option<X86Operand>>) {
+fn apply_reg_assignments(method_cfg: &mut CFG, assignments: BTreeMap<Web, Option<X86Operand>>) {
+    println!("applying assignments:\n");
+    for (web, op) in assignments.clone() {
+        println!(" {}: {:#?}", web.id, op.unwrap());
+    }
     for (web, reg_opt) in assignments.iter() {
         for web_def in web.defs.iter() {
             // Replace def instruction so def operand has register: reg_opt
@@ -792,9 +796,12 @@ fn apply_reg_assignments(method_cfg: &mut CFG, assignments: HashMap<Web, Option<
 
 
 /// Mutates CFG based on register assignments
-pub fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) {
+pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, debug: bool) {
+    for (name, cfg) in method_cfgs.clone() {
+        println!("{}", name);
+    }
     // let mut webs: HashMap<&String, BTreeMap<i32, Web>> = HashMap::new();
-    let mut method_to_instrs: HashMap<String, InstructionMap> = HashMap::new();
+    let mut method_to_instrs: BTreeMap<String, InstructionMap> = BTreeMap::new();
 
     // Start with just the truly general purpose registers
     let usable_registers: BTreeSet<X86Operand> = vec![
@@ -821,7 +828,7 @@ pub fn reg_alloc(method_cfgs: &mut HashMap<String, CFG>, debug: bool) {
     ].into_iter().collect();
 
     // For building HTML visualizer
-    let mut web_data: HashMap<String, (BTreeMap<i32, Web>, InterferenceGraph, InstructionMap)> = HashMap::new();
+    let mut web_data: BTreeMap<String, (BTreeMap<i32, Web>, InterferenceGraph, InstructionMap)> = BTreeMap::new();
 
     for (method_name, method_cfg) in method_cfgs {
         // Build instruction map

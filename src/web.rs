@@ -8,7 +8,7 @@ use std::{
 // All defs that reach a common use must be in same web
 // All defs and uses to the variable within a web will be
 // done on the same register.
-#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
 pub struct Web {
     pub id: i32,
     pub variable: String,
@@ -46,14 +46,14 @@ impl InterferenceGraph {
 }
 
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
 pub struct InstructionIndex {
     pub block_id: i32,
     pub instr_index: i32,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct InstructionMap(pub HashMap<InstructionIndex, Instruction>);
+pub struct InstructionMap(pub BTreeMap<InstructionIndex, Instruction>);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct DefUse {

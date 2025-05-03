@@ -12,7 +12,7 @@ use std::fs::File;
 use std::io::Write;
 
 /// Pretty-print the CFG
-pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
+pub fn print_cfg(method_cfgs: &BTreeMap<String, CFG>) {
     println!("\n==================== CFG =======================");
 
     for (method_name, cfg) in method_cfgs {
@@ -235,7 +235,7 @@ fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
 }
 
 
-pub fn html_cfgs(method_cfgs: &HashMap<String, CFG>, filename: String) {
+pub fn html_cfgs(method_cfgs: &BTreeMap<String, CFG>, filename: String) {
     let mut html = File::create(&filename).expect("Failed to create HTML file");
 
     writeln!(
@@ -256,7 +256,7 @@ pub fn html_cfgs(method_cfgs: &HashMap<String, CFG>, filename: String) {
 }
 
 pub fn html_web_graphs(
-    web_data: &HashMap<String, (BTreeMap<i32, Web>, InterferenceGraph, InstructionMap)>,
+    web_data: &BTreeMap<String, (BTreeMap<i32, Web>, InterferenceGraph, InstructionMap)>,
     filename: String,
 ) {
     let mut html = File::create(&filename).expect("Failed to create HTML file");
@@ -281,7 +281,7 @@ pub fn html_web_graphs(
     }
 
     writeln!(html, "</body></html>").unwrap();
-    println!("✅ Generated {} with inline register allocation diagrams.", filename);
+    // println!("✅ Generated {} with inline register allocation diagrams.", filename);
 }
 
 

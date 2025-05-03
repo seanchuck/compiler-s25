@@ -11,7 +11,7 @@ use crate::utils::print::{html_cfgs, print_cfg};
 use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use core::panic;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 
 fn is_immediate_operand(op: &X86Operand) -> bool {
@@ -59,7 +59,7 @@ fn map_operand(
     method_cfg: &CFG,
     operand: &Operand,
     x86_instructions: &mut Vec<X86Insn>,
-    globals: &HashMap<String, Global>
+    globals: &BTreeMap<String, Global>
 ) -> X86Operand {
     if let Some(opt_reg) = operand.get_reg() {
         if let X86Operand::Reg(reg) = opt_reg {
@@ -183,7 +183,7 @@ fn map_operand(
 
 
 // Adds the x86 instructions corresponding to insn to x86_instructions
-fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut Vec<X86Insn>, globals: &HashMap<String, Global>) {
+fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut Vec<X86Insn>, globals: &BTreeMap<String, Global>) {
     // println!("Adding instruction: {:?}", insn);
     match insn {
         Instruction::LoadConst { src, dest, typ } => {
@@ -604,7 +604,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
 fn generate_method_x86(
     method_name: &String,
     method_cfg: &mut CFG,
-    globals: &HashMap<String, Global>
+    globals: &BTreeMap<String, Global>
 ) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
