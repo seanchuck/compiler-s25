@@ -12,7 +12,7 @@ pub type AvailableExpressions = BTreeMap<Expression, String>; // maps expression
 
 pub type LiveVariables = BTreeSet<String>; // names of live local variables
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum Expression {
     Add(String, String),
     Subtract(String, String),

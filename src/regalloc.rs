@@ -777,7 +777,11 @@ fn add_use_reg(instruction: &mut Instruction, register: &Option<X86Operand>, var
 fn apply_reg_assignments(method_cfg: &mut CFG, assignments: BTreeMap<Web, Option<X86Operand>>) {
     println!("applying assignments:\n");
     for (web, op) in assignments.clone() {
-        println!(" {}: {:#?}", web.id, op.unwrap());
+        if op.is_some() {
+            println!(" {}: {:#?}", web.id, op.unwrap());
+        } else {
+            println!(" {}: {:#?}", web.id, op);
+        }
     }
     for (web, reg_opt) in assignments.iter() {
         for web_def in web.defs.iter() {

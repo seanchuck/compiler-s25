@@ -1,7 +1,6 @@
-use crate::web::{Web, InterferenceGraph, InstructionMap, InstructionIndex};
-use std::collections::{BTreeMap, HashSet};
+use crate::web::{Web, InterferenceGraph, InstructionMap};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use petgraph::graphmap::UnGraphMap;
-use petgraph::algo::connected_components;
 
 pub struct RegisterAllocationGraph {
     pub webs: BTreeMap<i32, Web>,               // web_id -> Web
@@ -73,7 +72,7 @@ impl RegisterAllocationGraph {
 
                 cluster.push_str(&format!("    {} [label={} shape=plaintext];\n", current, label));
 
-                for neighbor in self.interference.neighbors(&current).unwrap_or(&HashSet::new()) {
+                for neighbor in self.interference.neighbors(&current).unwrap_or(&BTreeSet::new()) {
                     if current < *neighbor {
                         cluster.push_str(&format!("    {} -- {};\n", current, neighbor));
                     }

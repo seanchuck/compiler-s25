@@ -11,7 +11,7 @@ use crate::utils::print::{html_cfgs, print_cfg};
 use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use core::panic;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 
 fn is_immediate_operand(op: &X86Operand) -> bool {
@@ -685,7 +685,7 @@ fn generate_method_x86(
 }
 
 /// Generate x86 assembly code from the CFG/
-pub fn generate_assembly(file: &str, filename: &str, optimizations: HashSet<Optimization>, writer: &mut dyn std::io::Write, debug: bool) {
+pub fn generate_assembly(file: &str, filename: &str, optimizations: BTreeSet<Optimization>, writer: &mut dyn std::io::Write, debug: bool) {
     // Generate the method CFGS
     let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
 

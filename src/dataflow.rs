@@ -1,7 +1,7 @@
 /**
 Dataflow code generation optimizations.
 */
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use crate::{
     cfg::CFG, regalloc::reg_alloc, state::*, tac::*, utils::cli::Optimization
 };
@@ -12,10 +12,10 @@ use crate::{
 
 /// Map intersection for IN
 fn intersect_maps(
-    mapa: &HashMap<String, String>,
-    mapb: &HashMap<String, String>
-) -> HashMap<String, String> {
-    let mut result = HashMap::new();
+    mapa: &BTreeMap<String, String>,
+    mapb: &BTreeMap<String, String>
+) -> BTreeMap<String, String> {
+    let mut result = BTreeMap::new();
     for (k, val1) in mapa {
         if let Some(val2) = mapb.get(k) {
             if val1 == val2 {
@@ -27,8 +27,8 @@ fn intersect_maps(
 }
     
 /// Reverse (key, map) pairs for easier invalidation
-fn reverse_map(map: &HashMap<String, String>) -> HashMap<String, HashSet<String>> {
-    let mut rev: HashMap<String, HashSet<String>> = HashMap::new();
+fn reverse_map(map: &BTreeMap<String, String>) -> BTreeMap<String, BTreeSet<String>> {
+    let mut rev: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for (dst, src) in map {
         rev.entry(src.clone()).or_default().insert(dst.clone());
     }
@@ -47,15 +47,15 @@ fn reverse_map(map: &HashMap<String, String>) -> HashMap<String, HashSet<String>
 /// 
 /// USE[B] := vars used in B before any local assignment
 /// DEF[B] := vars defined in B before any use (any prev. def is not live)
-fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<String>>, HashMap<i32, HashSet<String>>) {
+fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (BTreeMap<i32, BTreeSet<String>>, BTreeMap<i32, BTreeSet<String>>) {
     // Compute predecessor and successor graphs
     let predecessors = compute_predecessors(&method_cfg);
     let successors = compute_successors(&method_cfg);
 
-    // Variables that are live going into this block; hashmap keyed by block_id
-    let mut in_map: HashMap<i32, HashSet<String>> = HashMap::new();
-    // Variables that are live going out of this block; hashmap keyed by block_id
-    let mut out_map: HashMap<i32, HashSet<String>> = HashMap::new();
+    // Variables that are live going into this block; BTreeMap keyed by block_id
+    let mut in_map: BTreeMap<i32, BTreeSet<String>> = BTreeMap::new();
+    // Variables that are live going out of this block; BTreeMap keyed by block_id
+    let mut out_map: BTreeMap<i32, BTreeSet<String>> = BTreeMap::new();
 
     // Worklist of basic block ids (order doesn't matter since iterates until fixed point)
     let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect::<VecDeque<i32>>();
@@ -64,20 +64,20 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, HashSet<
     // Run fixed point algorithm to get steady-state liveness maps
     while let Some(block_id) = worklist.pop_front() {
         // OUT[B] = ∪ IN[S] for successors S
-        let out_set: HashSet<String> = successors
+        let out_set: BTreeSet<String> = successors
             .get(&block_id)
             .map(|succs| {
                 succs.iter()
                     .filter_map(|s| in_map.get(s))
-                    .fold(HashSet::new(), |mut acc, s| {
+                    .fold(BTreeSet::new(), |mut acc, s| {
                         acc.extend(s.clone());
                         acc
                     })
             })
             .unwrap_or_default();
 
-        let mut use_set = HashSet::new();
-        let mut def_set = HashSet::new();
+        let mut use_set = BTreeSet::new();
+        let mut def_set = BTreeSet::new();
 
         // iterate in reverse within the basic block
         for instr in method_cfg.blocks.get(&block_id).unwrap().instructions.iter().rev() {
@@ -125,7 +125,7 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
 
 
     for (block_id, block) in method_cfg.blocks.iter_mut() {
-        let out_set = out_maps.get(&block_id).unwrap_or(&HashSet::new()).clone();
+        let out_set = out_maps.get(&block_id).unwrap_or(&BTreeSet::new()).clone();
 
         // We will add any non-dead code to this vector
         let mut new_instrs = Vec::new();
@@ -205,8 +205,8 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
 /// do copy propagation of stale values.
 fn invalidate(
     dest_name: &str,
-    copy_to_src: &mut HashMap<String, String>,
-    src_to_copies: &mut HashMap<String, HashSet<String>>,
+    copy_to_src: &mut BTreeMap<String, String>,
+    src_to_copies: &mut BTreeMap<String, BTreeSet<String>>,
 ) {
     // Remove dest from its source's copy set
     if let Some(src) = copy_to_src.remove(dest_name) {
@@ -227,7 +227,7 @@ fn invalidate(
 /// Returns the input variable if it is not a copy of anything.
 fn get_root_source(
     var_name: &str,
-    copy_to_src: &HashMap<String, String>,
+    copy_to_src: &BTreeMap<String, String>,
 ) -> String {
     let mut current: &str = var_name;
     while let Some(next) = copy_to_src.get(current) {
@@ -239,7 +239,7 @@ fn get_root_source(
 /// If the given operand is a direct copy of another operand,
 /// replace it with the source operand. Otherwise, this has no effect.
 /// Returns true iff a mutation occurred.
-fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, update_occurred: &mut bool, debug: bool) {
+fn substitute_operand(op: &mut Operand, copy_to_src: &BTreeMap<String, String>, update_occurred: &mut bool, debug: bool) {
     match op {
         //Operand::LocalVar(name, typ) => {
         Operand::LocalVar { name, typ, reg }=> {
@@ -285,15 +285,15 @@ fn substitute_operand(op: &mut Operand, copy_to_src: &HashMap<String, String>, u
 //      IN[B]  = ⋂ OUT[P] for all predecessors P of B
 //      OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
 // Returns a tuple (in_map, out_map)
-fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, CopyMap>, HashMap<i32, CopyMap> ) {
+fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (BTreeMap<i32, CopyMap>, BTreeMap<i32, CopyMap> ) {
     // Compute predecessor and successor graphs
     let cfg_preds = compute_predecessors(&method_cfg);
     let cfg_succs = compute_successors(&method_cfg);
 
-    // Copies that are valid going in to this block; hashmap keyed by block_id
-    let mut in_map: HashMap<i32, CopyMap> = HashMap::new();
-    // Copies that are valid going out of this block; hashmap keyed by block_id
-    let mut out_map: HashMap<i32, CopyMap> = HashMap::new();
+    // Copies that are valid going in to this block; BTreeMap keyed by block_id
+    let mut in_map: BTreeMap<i32, CopyMap> = BTreeMap::new();
+    // Copies that are valid going out of this block; BTreeMap keyed by block_id
+    let mut out_map: BTreeMap<i32, CopyMap> = BTreeMap::new();
 
     // Worklist of basic block ids
     let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect::<VecDeque<i32>>();
@@ -310,12 +310,12 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, CopyMap>, Ha
                 .unwrap_or_default()
         } else {
             // If there are no predecessors, IN is empty
-            HashMap::new()
+            BTreeMap::new()
         };
     
         // Copy state we'll update during this block
         let mut copy_to_src = in_copies.clone();
-        let mut src_to_copies: HashMap<String, HashSet<String>> = reverse_map(&copy_to_src);
+        let mut src_to_copies: BTreeMap<String, BTreeSet<String>> = reverse_map(&copy_to_src);
     
         for instr in method_cfg.blocks.get_mut(&block_id).unwrap().instructions.iter_mut() {
             match instr {
@@ -387,7 +387,7 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, CopyMap>, Ha
         }
     
         // OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
-        let out_copies: HashMap<String, String> = copy_to_src.clone();
+        let out_copies: BTreeMap<String, String> = copy_to_src.clone();
     
         // Update maps if either IN or OUT changed
         if in_map.get(&block_id) != Some(&in_copies) || out_map.get(&block_id) != Some(&out_copies) {
@@ -505,7 +505,7 @@ fn intersect_expressions(
     mapa: &AvailableExpressions,
     mapb: &AvailableExpressions
 ) -> AvailableExpressions {
-    let mut result = HashMap::new();
+    let mut result = BTreeMap::new();
     for (k, val1) in mapa {
         if let Some(val2) = mapb.get(k) {
             if val1 == val2 {
@@ -520,15 +520,15 @@ fn intersect_expressions(
 //      IN[B]  = ⋂ OUT[P] for all predecessors P of B
 //      OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
 // Returns a tuple (in_map, out_map)
-fn compute_expression_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, AvailableExpressions>, HashMap<i32, AvailableExpressions> ) {
+fn compute_expression_maps(method_cfg: &mut CFG, debug: bool) -> (BTreeMap<i32, AvailableExpressions>, BTreeMap<i32, AvailableExpressions> ) {
     // Compute predecessor and successor graphs
     let cfg_preds = compute_predecessors(&method_cfg);
     let cfg_succs = compute_successors(&method_cfg);
 
-    // Expressions that are valid going in to this block; hashmap keyed by block_id
-    let mut in_map: HashMap<i32, AvailableExpressions> = HashMap::new();
-    // Expressions that are valid going out of this block; hashmap keyed by block_id
-    let mut out_map: HashMap<i32, AvailableExpressions> = HashMap::new();
+    // Expressions that are valid going in to this block; BTreeMap keyed by block_id
+    let mut in_map: BTreeMap<i32, AvailableExpressions> = BTreeMap::new();
+    // Expressions that are valid going out of this block; BTreeMap keyed by block_id
+    let mut out_map: BTreeMap<i32, AvailableExpressions> = BTreeMap::new();
 
     // Worklist of basic block ids
     let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect::<VecDeque<i32>>();
@@ -544,7 +544,7 @@ fn compute_expression_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, A
                 .unwrap_or_default()
         } else {
             // If there are no predecessors, IN is empty
-            HashMap::new()
+            BTreeMap::new()
         };
     
         let mut out_expressions = in_expressions.clone();  // maps expression to variable
@@ -766,7 +766,7 @@ fn common_subexpression_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
 
 /// Perform multiple passes over the CFG to apply the given optimizations
 /// Returns the optimized CFG
-pub fn optimize_dataflow(method_cfgs: &mut BTreeMap<String, CFG>, optimizations: &HashSet<Optimization>, debug: bool
+pub fn optimize_dataflow(method_cfgs: &mut BTreeMap<String, CFG>, optimizations: &BTreeSet<Optimization>, debug: bool
 ) -> BTreeMap<String, CFG> {
     if debug {
         println!("============= Optimizing dataflow =============");
