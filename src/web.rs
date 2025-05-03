@@ -1,6 +1,6 @@
 use crate::tac::Instruction;
 use std::{
-    collections::{HashMap, HashSet, BTreeMap},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     hash::Hash,
 };
 
@@ -18,15 +18,15 @@ pub struct Web {
 
 #[derive(Debug, Clone)]
 pub struct InterferenceGraph {
-    pub nodes: HashSet<i32>, // Web IDs
-    pub edges: HashMap<i32, HashSet<i32>>, // Undirected edges between interfering web IDs
+    pub nodes: BTreeSet<i32>, // Web IDs
+    pub edges: BTreeMap<i32, BTreeSet<i32>>, // Undirected edges between interfering web IDs
 }
 
 impl InterferenceGraph {
     pub fn new() -> Self {
         InterferenceGraph {
-            nodes: HashSet::new(),
-            edges: HashMap::new(),
+            nodes: BTreeSet::new(),
+            edges: BTreeMap::new(),
         }
     }
 
@@ -36,11 +36,11 @@ impl InterferenceGraph {
         }
         self.nodes.insert(u);
         self.nodes.insert(v);
-        self.edges.entry(u).or_insert_with(HashSet::new).insert(v);
-        self.edges.entry(v).or_insert_with(HashSet::new).insert(u);
+        self.edges.entry(u).or_insert_with(BTreeSet::new).insert(v);
+        self.edges.entry(v).or_insert_with(BTreeSet::new).insert(u);
     }
 
-    pub fn neighbors(&self, u: &i32) -> Option<&HashSet<i32>> {
+    pub fn neighbors(&self, u: &i32) -> Option<&BTreeSet<i32>> {
         self.edges.get(u)
     }
 }
@@ -57,6 +57,6 @@ pub struct InstructionMap(pub BTreeMap<InstructionIndex, Instruction>);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct DefUse {
-    pub defs: HashSet<String>, // all variables that are defined in this basic block
-    pub uses: HashSet<String>, // all variables that are used in this basic block
+    pub defs: BTreeSet<String>, // all variables that are defined in this basic block
+    pub uses: BTreeSet<String>, // all variables that are used in this basic block
 }

@@ -34,8 +34,8 @@ fn compute_def_use_sets(method_cfg: &CFG) -> BTreeMap<i32, DefUse> {
     let mut block_def_use = BTreeMap::new();
 
     for (block_id, _) in method_cfg.blocks.iter() {
-        let mut def_set = HashSet::new();
-        let mut use_set = HashSet::new();
+        let mut def_set = BTreeSet::new();
+        let mut use_set = BTreeSet::new();
 
         for instr in method_cfg
             .blocks
@@ -103,7 +103,7 @@ fn compute_def_use_sets(method_cfg: &CFG) -> BTreeMap<i32, DefUse> {
     block_def_use
 }
 
-fn remove_def(def_set: &mut HashSet<String>, operand: &Operand) {
+fn remove_def(def_set: &mut BTreeSet<String>, operand: &Operand) {
     if let Some(name) = get_local_var_name(operand) {
         def_set.remove(&name);
     }
@@ -218,29 +218,29 @@ fn get_uses(instr: &Instruction) -> Option<Vec<String>> {
 //      IN[B]  = USE[B] ∪ (OUT[B] - DEF[B])
 //      OUT[B] = ∪ IN[S] for all successors S of B
 // Returns a tuple (in_map, out_map)
-fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, LiveVariables>, HashMap<i32, LiveVariables>) {
+fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (BTreeMap<i32, LiveVariables>, BTreeMap<i32, LiveVariables>) {
     // Compute predecessor and successor graphs
     let cfg_preds = compute_predecessors(&method_cfg);
     let cfg_succs = compute_successors(&method_cfg);
 
     // Variables that are live going in to this block; hashmap keyed by block_id
-    let mut in_map: HashMap<i32, LiveVariables> = HashMap::new();
+    let mut in_map: BTreeMap<i32, LiveVariables> = BTreeMap::new();
     // Variables that are live going out of this block; hashmap keyed by block_id
-    let mut out_map: HashMap<i32, LiveVariables> = HashMap::new();
+    let mut out_map: BTreeMap<i32, LiveVariables> = BTreeMap::new();
 
     let def_use_sets = compute_def_use_sets(method_cfg);
 
     // Worklist of basic block ids
     let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect::<VecDeque<i32>>();
 
-
+    
     // Iterate until a fixed point
     while let Some(block_id) = worklist.pop_front() {
         let defs = &def_use_sets.get(&block_id).unwrap().defs;
         let uses = &def_use_sets.get(&block_id).unwrap().uses;
 
         // compute OUT
-        let mut out = HashSet::new();
+        let mut out = BTreeSet::new();
         if let Some(succs) = cfg_succs.get(&block_id) {
             for succ_id in succs {
                 if let Some(in_succ) = in_map.get(succ_id) {
@@ -251,7 +251,7 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, LiveVariable
 
         // compute IN
         let mut in_set = uses.clone();
-        let out_minus_def: HashSet<_> = out.difference(defs).cloned().collect();
+        let out_minus_def: BTreeSet<_> = out.difference(defs).cloned().collect();
         in_set.extend(out_minus_def);
 
         // update maps
@@ -275,7 +275,7 @@ fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (HashMap<i32, LiveVariable
     (in_map, out_map)
 }
 
-fn add_use(use_set: &mut HashSet<String>, def_set: &HashSet<String>, operand: &Operand) {
+fn add_use(use_set: &mut BTreeSet<String>, def_set: &BTreeSet<String>, operand: &Operand) {
     if let Some(name) = get_local_var_name(operand) {
         // don't include uses of variables that were defined within this basic block
         if !def_set.contains(&name) {
@@ -284,7 +284,7 @@ fn add_use(use_set: &mut HashSet<String>, def_set: &HashSet<String>, operand: &O
     }
 }
 
-fn add_def(def_set: &mut HashSet<String>, operand: &Operand) {
+fn add_def(def_set: &mut BTreeSet<String>, operand: &Operand) {
     if let Some(name) = get_local_var_name(operand) {
         def_set.insert(name);
     }

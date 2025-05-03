@@ -1,12 +1,14 @@
 main
+applying assignments:
+
  1: Reg(
-    R12,
+    R14,
 )
  2: Reg(
-    R13,
+    R12,
 )
  3: Reg(
-    R13,
+    R12,
 )
  5: Reg(
     R13,
@@ -58,27 +60,27 @@ main:
 main0:
     movl $0, -16(%rbp)
     movl -16(%rbp), %eax
-    movl %eax, %r12d
+    movl %eax, %r14d
     jmp main1
 main1:
-    movl $1000, %r13d
-    cmpl %r13d, %r12d
+    movl $1000, %r12d
+    cmpl %r12d, %r14d
     setl %al
     movzbq %al, %rax
-    movl %eax, %r13d
-    movl %r13d, %eax
+    movl %eax, %r12d
+    movl %r12d, %eax
     cmpl $0, %eax
     jne main2
 
     jmp main4
 main2:
-    movl %r12d, %r10d
+    movl %r14d, %r10d
     addl $1, %r10d
-    movl %r12d, %eax
+    movl %r14d, %eax
     movl %eax, x(, %r10, 4)
     leaq str0(%rip), %rax
     movq %rax, %r13
-    movl %r12d, %r10d
+    movl %r14d, %r10d
     addl $1, %r10d
     movl x(, %r10, 4), %eax
     movl %eax, %r12d
@@ -94,9 +96,9 @@ main2:
     jmp main3
 main3:
     movl $1, -48(%rbp)
-    movl %r12d, %eax
+    movl %r14d, %eax
     addl -48(%rbp), %eax
-    movl %eax, %r12d
+    movl %eax, %r14d
     jmp main1
 main4:
     movl $0, -52(%rbp)

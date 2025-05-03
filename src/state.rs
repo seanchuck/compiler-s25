@@ -1,16 +1,16 @@
 /*
 Data structures for dataflow analysis.
 */
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use crate::cfg::*;
 use std::fmt;
 
 // Map between variable and its source
-pub type CopyMap = HashMap<String, String>;
+pub type CopyMap = BTreeMap<String, String>;
 
-pub type AvailableExpressions = HashMap<Expression, String>; // maps expression to variable
+pub type AvailableExpressions = BTreeMap<Expression, String>; // maps expression to variable
 
-pub type LiveVariables = HashSet<String>; // names of live local variables
+pub type LiveVariables = BTreeSet<String>; // names of live local variables
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 pub enum Expression {
