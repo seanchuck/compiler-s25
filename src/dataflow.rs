@@ -817,9 +817,9 @@ pub fn optimize_dataflow(method_cfgs: &mut BTreeMap<String, CFG>, optimizations:
     }
 
     // Register allocation optimization (NOT fixed point)
-    // if optimizations.contains(&Optimization::Regalloc) {
-    //     reg_alloc(method_cfgs, debug);
-    // }
+    if optimizations.contains(&Optimization::Regalloc) {
+        reg_alloc(method_cfgs, debug);
+    }
     
     method_cfgs.clone()
 }

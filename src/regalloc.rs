@@ -833,6 +833,7 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, debug: bool) {
 
     // For building HTML visualizer
     let mut web_data: BTreeMap<String, (BTreeMap<i32, Web>, InterferenceGraph, InstructionMap)> = BTreeMap::new();
+    let mut register_data: BTreeMap<String, BTreeMap<i32, Option<X86Operand>>> = BTreeMap::new();
 
     for (method_name, method_cfg) in method_cfgs {
         // Build instruction map
@@ -852,6 +853,7 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, debug: bool) {
         // Save data for visualization
         web_data.insert(method_name.clone(), (method_webs.clone(), interference.clone(), instr_map.clone()));
 
+
         // Assign registers
         let register_assignments = assign_registers(&interference, &usable_registers, &method_webs);
         if debug {
@@ -860,11 +862,17 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, debug: bool) {
             }
         }
 
+        // register information for visualization
+        register_data.insert(method_name.clone(), register_assignments
+            .iter()
+            .map(|(web, reg)| (web.id, reg.clone()))
+            .collect());
+
         apply_reg_assignments(method_cfg, register_assignments);
     }
 
     // Generate visual HTML for all methods
-    html_web_graphs(&web_data, "reg_alloc.html".to_string());
+    html_web_graphs(&web_data, &register_data, "reg_alloc.html".to_string());
 
 }
 

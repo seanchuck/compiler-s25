@@ -29,3 +29,6 @@ output.log
 .DS_Store
 ._*
 
+# visualizations
+opt.html
+reg_alloc.html

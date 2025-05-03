@@ -1,4 +1,4 @@
-use crate::web::{Web, InterferenceGraph, InstructionMap};
+use crate::{web::{InstructionMap, InterferenceGraph, Web}, x86::X86Operand};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use petgraph::graphmap::UnGraphMap;
 
@@ -9,7 +9,7 @@ pub struct RegisterAllocationGraph {
 }
 
 impl RegisterAllocationGraph {
-    pub fn to_dot(&self) -> String {
+    pub fn to_dot(&self, register_assignments: &BTreeMap<i32, Option<X86Operand>>) -> String {
         let mut dot = String::new();
         dot.push_str("graph RegisterAllocation {\n");
         dot.push_str("  node [shape=box fontname=\"monospace\" fontsize=12 width=1.2 height=0.5];\n");
@@ -43,6 +43,13 @@ impl RegisterAllocationGraph {
                 }
 
                 let web = &self.webs[&current];
+                let register = register_assignments.get(&current).cloned().unwrap();
+                let reg_string;
+                if register.is_some() {
+                    reg_string = format!("{}", register.unwrap());
+                } else {
+                    reg_string = "unassigned".to_string();
+                }
 
                 let defs = web
                     .defs
@@ -61,11 +68,13 @@ impl RegisterAllocationGraph {
                     "<<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">\n\
                         <TR><TD COLSPAN=\"2\"><B>Web {}</B></TD></TR>\n\
                         <TR><TD><I>Var</I></TD><TD>{}</TD></TR>\n\
+                        <TR><TD><I>Register</I></TD><TD>{}</TD></TR>\n\
                         <TR><TD><I>Defs</I></TD><TD ALIGN=\"LEFT\">{}</TD></TR>\n\
                         <TR><TD><I>Uses</I></TD><TD ALIGN=\"LEFT\">{}</TD></TR>\n\
                         </TABLE>>",
                     web.id,
                     web.variable,
+                    reg_string,
                     defs.replace("\\l", "<BR ALIGN=\"LEFT\"/>"),
                     uses.replace("\\l", "<BR ALIGN=\"LEFT\"/>"),
                 );
@@ -90,8 +99,8 @@ impl RegisterAllocationGraph {
         dot
     }
 
-    pub fn render_dot(&self, output_format: &str) -> Vec<u8> {
-        let dot_code = self.to_dot();
+    pub fn render_dot(&self, register_assignments: &BTreeMap<i32, Option<X86Operand>>, output_format: &str) -> Vec<u8> {
+        let dot_code = self.to_dot(register_assignments);
 
         let mut child = std::process::Command::new("dot")
             .arg(format!("-T{}", output_format))

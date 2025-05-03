@@ -4,6 +4,7 @@ use crate::symtable::*;
 use crate::tac::*;
 use crate::web::{Web, InterferenceGraph, InstructionMap};
 use crate::utils::visualizer::RegisterAllocationGraph;
+use crate::x86::X86Operand;
 
 use std::cell::RefCell;
 use std::collections::{HashMap, BTreeMap};
@@ -257,6 +258,7 @@ pub fn html_cfgs(method_cfgs: &BTreeMap<String, CFG>, filename: String) {
 
 pub fn html_web_graphs(
     web_data: &BTreeMap<String, (BTreeMap<i32, Web>, InterferenceGraph, InstructionMap)>,
+    register_data: &BTreeMap<String, BTreeMap<i32, Option<X86Operand>>>,
     filename: String,
 ) {
     let mut html = File::create(&filename).expect("Failed to create HTML file");
@@ -274,7 +276,9 @@ pub fn html_web_graphs(
             instr_map: instr_map.clone(),
         };
 
-        let svg_data = graph.render_dot("svg");
+        let register_assignments = register_data.get(method_name).unwrap();
+
+        let svg_data = graph.render_dot(register_assignments, "svg");
         let svg_str = String::from_utf8(svg_data).expect("Invalid UTF-8 in SVG output");
 
         writeln!(html, "<h2>{}</h2>{}<br><br>", method_name, svg_str).unwrap();
