@@ -175,6 +175,15 @@ impl CFG {
             .collect()
     }
 
+    pub fn op_to_str(&self, op: &Operand) -> String {
+        if let Some(reg) = op.get_reg() {
+            format!("{op}[reg: {reg}]")
+        } else {
+            format!("{op}")
+        }
+    }
+    
+
     // Used to get nice visualization of CFG
     pub fn to_dot(&self) -> String {
         let mut dot = String::new();
@@ -187,49 +196,64 @@ impl CFG {
                 .iter().enumerate()
                 .map(|(idx, insn)| {
                     let s = match insn {
-                        Instruction::Add { left, right, dest, .. } => format!("{dest} <- {left} + {right}"),
-                        Instruction::Assign { src, dest, .. } => format!("{dest} <- {src}"),
-                        Instruction::CJmp { name, condition, id } => format!("cjmp {condition}, {name}{id}"),
-                        Instruction::Cast { expr, dest, target_type } => {
-                            format!("{dest} <- {target_type}({expr})")
-                        }
-                        Instruction::Divide {left, right, dest, .. } => format!("{dest} <- {left} / {right}"),
-                        Instruction::Equal { left, right, dest } => format!("{dest} <- {left} == {right}"),
-                        Instruction::Greater { left, right, dest } => format!("{dest} <- {left} > {right}"),
-                        Instruction::GreaterEqual { left, right, dest } => format!("{dest} <- {left} >= {right}"),
-                        Instruction::Len {expr, dest, .. } => format!("{dest} <- len({expr})"),
-                        Instruction::Less { left, right, dest } => format!("{dest} <- {left} < {right}"),
-                        Instruction::LessEqual { left, right, dest } => format!("{dest} <- {left} <= {right}"),
-                        Instruction::MethodCall { name, args, dest, .. }=> {
-                            let args_str = args
-                                .iter()
-                                .map(|op| op.to_string())
-                                .collect::<Vec<_>>()
-                                .join(", ");
+                        Instruction::Add { left, right, dest, .. } => 
+                            format!("{} <- {} + {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Assign { src, dest, .. } => 
+                            format!("{} <- {}", self.op_to_str(dest), self.op_to_str(src)),
+                        Instruction::CJmp { name, condition, id } => 
+                            format!("cjmp {}, {}{}", self.op_to_str(condition), name, id),
+                        Instruction::Cast { expr, dest, target_type } => 
+                            format!("{} <- {}({})", self.op_to_str(dest), target_type, self.op_to_str(expr)),
+                        Instruction::Divide { left, right, dest, .. } => 
+                            format!("{} <- {} / {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Equal { left, right, dest } => 
+                            format!("{} <- {} == {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Greater { left, right, dest } => 
+                            format!("{} <- {} > {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::GreaterEqual { left, right, dest } => 
+                            format!("{} <- {} >= {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Len { expr, dest, .. } => 
+                            format!("{} <- len({})", self.op_to_str(dest), self.op_to_str(expr)),
+                        Instruction::Less { left, right, dest } => 
+                            format!("{} <- {} < {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::LessEqual { left, right, dest } => 
+                            format!("{} <- {} <= {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::MethodCall { name, args, dest, .. } => {
+                            let args_str = args.iter().map(|op| self.op_to_str(op)).collect::<Vec<_>>().join(", ");
                             if let Some(d) = dest {
-                                format!("{d} <- {name}({args_str})")
+                                format!("{} <- {}({})", self.op_to_str(d), name, args_str)
                             } else {
-                                format!("{name}({args_str})")
+                                format!("{}({})", name, args_str)
                             }
-                        }
-                        Instruction::Modulo {left, right, dest , ..}=> format!("{dest} <- {left} % {right}"),
-                        Instruction::Multiply {left, right, dest , ..} => format!("{dest} <- {left} * {right}"),
-                        Instruction::Not { expr, dest } => format!("{dest} <- !{expr}"),
-                        Instruction::NotEqual { left, right, dest } => format!("{dest} <- {left} != {right}"),
-                        Instruction::Ret {value, .. }=> {
+                        },
+                        Instruction::Modulo { left, right, dest, .. } => 
+                            format!("{} <- {} % {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Multiply { left, right, dest, .. } => 
+                            format!("{} <- {} * {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Not { expr, dest } => 
+                            format!("{} <- !{}", self.op_to_str(dest), self.op_to_str(expr)),
+                        Instruction::NotEqual { left, right, dest } => 
+                            format!("{} <- {} != {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Ret { value, .. } => {
                             if let Some(v) = value {
-                                format!("ret {v}")
+                                format!("ret {}", self.op_to_str(v))
                             } else {
                                 "ret".to_string()
                             }
-                        }
-                        Instruction::Subtract { typ: _, left, right, dest }=> format!("{dest} <- {left} - {right}"),
-                        Instruction::UJmp { name, id } => format!("ujmp {name}{id}"),
-                        Instruction::LoadString { src, dest } => format!("{dest} <- {src:?}"),
-                        Instruction::Exit { exit_code } => format!("exit({})", exit_code),
-                        Instruction::LoadConst { src, dest, typ: _ } => format!("{dest} <- {src}"),
+                        },
+                        Instruction::Subtract { typ: _, left, right, dest } => 
+                            format!("{} <- {} - {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::UJmp { name, id } => 
+                            format!("ujmp {}{}", name, id),
+                        Instruction::LoadString { src, dest } => 
+                            format!("{} <- {:?}", self.op_to_str(dest), src),
+                        Instruction::Exit { exit_code } => 
+                            format!("exit({})", exit_code),
+                        Instruction::LoadConst { src, dest, typ: _ } => 
+                            format!("{} <- {}", self.op_to_str(dest), src),
                     };
-                    let numbered = format!("I{}: {}", idx + 1, s); // 1-based index
+                    
+                    let numbered = format!("I{}: {}", idx, s); // 1-based index
                     numbered.replace('\\', "\\\\").replace('"', "\\\"") // escape for DOT
                 })                           
                 .collect::<Vec<_>>()

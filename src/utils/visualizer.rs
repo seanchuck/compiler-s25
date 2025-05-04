@@ -54,13 +54,13 @@ impl RegisterAllocationGraph {
                 let defs = web
                     .defs
                     .iter()
-                    .map(|idx| format!("B{}:I{}", idx.block_id, idx.instr_index))
+                    .map(|idx| format!("Block{}:I{}", idx.block_id, idx.instr_index))
                     .collect::<Vec<_>>()
                     .join("\\l");
                 let uses = web
                     .uses
                     .iter()
-                    .map(|idx| format!("B{}:I{}", idx.block_id, idx.instr_index))
+                    .map(|idx| format!("Block{}:I{}", idx.block_id, idx.instr_index))
                     .collect::<Vec<_>>()
                     .join("\\l");
 
