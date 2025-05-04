@@ -416,6 +416,10 @@ fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet
 
         if !def_found_in_block {
             for pred_id in cfg.predecessors(block_id) {
+                // unreachable block
+                if pred_id == -1 {
+                    continue;
+                }
                 let pred_block = &cfg.blocks[&pred_id];
                 let last_idx = (pred_block.instructions.len() - 1) as i32;
                 worklist.push_back((pred_id, last_idx));
