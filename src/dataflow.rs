@@ -3,7 +3,7 @@ Dataflow code generation optimizations.
 */
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use crate::{
-    cfg::CFG, regalloc::reg_alloc, state::*, tac::*, utils::cli::Optimization
+    cfg::{Global, CFG}, regalloc::reg_alloc, state::*, tac::*, utils::cli::Optimization
 };
 
 // #################################################
@@ -771,7 +771,7 @@ fn common_subexpression_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
 
 /// Perform multiple passes over the CFG to apply the given optimizations
 /// Returns the optimized CFG
-pub fn optimize_dataflow(method_cfgs: &mut BTreeMap<String, CFG>, optimizations: &BTreeSet<Optimization>, debug: bool
+pub fn optimize_dataflow(method_cfgs: &mut BTreeMap<String, CFG>, optimizations: &BTreeSet<Optimization>, globals: &BTreeMap<String, Global>, debug: bool
 ) -> BTreeMap<String, CFG> {
     if debug {
         println!("============= Optimizing dataflow =============");
@@ -823,7 +823,7 @@ pub fn optimize_dataflow(method_cfgs: &mut BTreeMap<String, CFG>, optimizations:
 
     // Register allocation optimization (NOT fixed point)
     if optimizations.contains(&Optimization::Regalloc) {
-        reg_alloc(method_cfgs, debug);
+        reg_alloc(method_cfgs, globals, debug);
     }
     
     method_cfgs.clone()
