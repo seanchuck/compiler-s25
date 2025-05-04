@@ -6,7 +6,7 @@ Similar to the AST.rs file, but includes
 instructions that are simplified, and TAC.
 */
 
-use crate::{ast::Type, x86::X86Operand};
+use crate::{ast::Type, x86::{Register, X86Operand}};
 use std::{collections::HashSet, fmt};
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
@@ -74,6 +74,16 @@ impl Operand {
             | Operand::LocalArrElement { reg , ..}
             | Operand::Const { reg , ..}
             | Operand::Argument { reg, ..} => reg.clone()
+        }
+    }
+
+    pub fn get_reg_reg(&self) -> Register {
+        let op = self.get_reg();
+        match op {
+            Some(X86Operand::Reg(reg)) => reg,
+            _ => {
+                unreachable!();
+            }
         }
     }
 

@@ -942,7 +942,7 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, debug: bool) {
     }
 
     // Generate visual HTML for all methods
-    html_web_graphs(&web_data, &register_data, "reg_alloc.html".to_string());
+    // html_web_graphs(&web_data, &register_data, "reg_alloc.html".to_string());
 
 }
 
