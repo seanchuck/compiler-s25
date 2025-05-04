@@ -184,8 +184,8 @@ impl CFG {
         for (id, block) in &self.blocks {
             let label = block
                 .get_instructions()
-                .iter()
-                .map(|insn| {
+                .iter().enumerate()
+                .map(|(idx, insn)| {
                     let s = match insn {
                         Instruction::Add { left, right, dest, .. } => format!("{dest} <- {left} + {right}"),
                         Instruction::Assign { src, dest, .. } => format!("{dest} <- {src}"),
@@ -229,7 +229,8 @@ impl CFG {
                         Instruction::Exit { exit_code } => format!("exit({})", exit_code),
                         Instruction::LoadConst { src, dest, typ: _ } => format!("{dest} <- {src}"),
                     };
-                    s.replace('\\', "\\\\").replace('"', "\\\"") // escape for DOT
+                    let numbered = format!("I{}: {}", idx + 1, s); // 1-based index
+                    numbered.replace('\\', "\\\\").replace('"', "\\\"") // escape for DOT
                 })                           
                 .collect::<Vec<_>>()
                 .join("\\l"); // Graphviz line break
