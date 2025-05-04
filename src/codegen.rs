@@ -448,16 +448,18 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             if let Some(expr_reg) = expr.get_reg() {
                 let expr_reg_reg = expr.get_reg_reg();
                 match target_type {
-                    crate::ast::Type::Int => {
+                    Type::Int => {
                         let sized_reg = reg_for_type(expr_reg_reg, target_type);
                         x86_instructions.push(X86Insn::Mov(X86Operand::Reg(sized_reg), dest_op, target_type.clone()));
                     }
-                    crate::ast::Type::Long => {
+                    Type::Long => {
                         if expr_typ == Type::Int {  // only sign extend if its an int
                             let sized_reg = reg_for_type(expr_reg_reg, &expr_typ);
-                            x86_instructions.push(X86Insn::Movsxd(X86Operand::Reg(sized_reg), dest_op));
+                            // Movsxd must have 64-bit register as dest
+                            x86_instructions.push(X86Insn::Movsxd(X86Operand::Reg(sized_reg), X86Operand::Reg(Register::Rax)));
+                            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
                         } else {                    // Otherwise do basic move
-                            x86_instructions.push(X86Insn::Mov(expr_reg, dest_op, expr_typ.clone()));
+                            x86_instructions.push(X86Insn::Mov(expr_reg, dest_op.clone(), expr_typ.clone()));
                         }
                     }
                     _ => panic!("Shouldnt get here, cannot cast non int or long value"),
@@ -467,22 +469,24 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             }
 
             match target_type {
-                crate::ast::Type::Int => {
+                Type::Int => {
                     x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Eax), Type::Int));
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
                 }
-                crate::ast::Type::Long => {
+                Type::Long => {
                     x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(expr_reg.clone()), expr_typ.clone()));
                     if expr_typ == Type::Int {  // only sign extend if its an int
+                        // TODO: potentially redundant move if dest is already a reg
                         x86_instructions.push(X86Insn::Movsxd(X86Operand::Reg(expr_reg.clone()), X86Operand::Reg(Register::Rax)));
+                        x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
                     } else {                    // Otherwise do basic move
-                        x86_instructions.push(X86Insn::Mov(X86Operand::Reg(expr_reg.clone()), X86Operand::Reg(Register::Rax), expr_typ.clone()));
+                        x86_instructions.push(X86Insn::Mov(X86Operand::Reg(expr_reg.clone()), dest_op, expr_typ.clone()));
                     }
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_op, Type::Long));
                 }
                 _ => panic!("Shouldnt get here, cannot cast non int or long value"),
             }
         }
+
         Instruction::Len { expr, dest, .. } => {
                 let expr_typ = expr.get_type();
                 let dest_typ = dest.get_type();

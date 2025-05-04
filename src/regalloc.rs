@@ -382,10 +382,6 @@ pub fn compute_use_liveness_spans(
         let var = &web.variable;
 
         for use_idx in &web.uses {
-            if web.variable == "j".to_string(){
-                println!("use idx: {:#?}", use_idx);
-            }
-
             let mut visited = BTreeSet::new();
             let mut worklist = VecDeque::new();
             worklist.push_back(*use_idx);
@@ -406,10 +402,6 @@ pub fn compute_use_liveness_spans(
                     if def == *var && !web.uses.contains(&idx) {
                             continue;
                     }
-                }
-
-                if web.variable == "j".to_string(){
-                    println!("inserting: {:#?}", idx );
                 }
 
                 live_span.insert(idx);
@@ -444,12 +436,6 @@ pub fn compute_use_liveness_spans(
 }
 
 
-// compute DCE liveness IN and OUT for each block
-// GEN, KILL, PASS THROUGH
-// make { instruction: live_webs} 
-// for each PASS THROUGH, marked as live for entire basic block (other ones go instruction level)
-// for each KILL: 
-
 pub fn combine_spans_per_web(
     use_liveness_spans: &BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>>
 ) -> BTreeMap<i32, BTreeSet<InstructionIndex>> {
@@ -469,7 +455,6 @@ pub fn build_interference_graph_from_spans(
     use_liveness_spans: &BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>>,
 ) -> InterferenceGraph {
     let mut graph = InterferenceGraph::new();
-    // println!("liveness spans are: {:#?}", combine_spans_per_web(use_liveness_spans));
 
     let items: Vec<_> = use_liveness_spans.iter().collect();
 
@@ -713,26 +698,28 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<Str
 
     // Start with just the truly general purpose registers
     let usable_registers: BTreeSet<X86Operand> = vec![
-        // Caller saved
-        // X86Operand::Reg(Register::Rax),
-        // X86Operand::Reg(Register::Rcx),
-        // X86Operand::Reg(Register::Rdx),
-        // X86Operand::Reg(Register::Rip), 
-        // X86Operand::Reg(Register::Rsi),
-        // X86Operand::Reg(Register::Rdi),
-        // X86Operand::Reg(Register::R8),
-        // X86Operand::Reg(Register::R9),
-        // X86Operand::Reg(Register::R10),
-        // X86Operand::Reg(Register::R11),
-        
-        // Callee saved
-        // X86Operand::Reg(Register::Rbx),
-        // X86Operand::Reg(Register::Rbp),
-        // X86Operand::Reg(Register::Rsp), 
-        X86Operand::Reg(Register::R12),
-        X86Operand::Reg(Register::R13),
-        X86Operand::Reg(Register::R14),
-        X86Operand::Reg(Register::R15),
+        // Caller saved (volatile) — can be freely used, but caller must save if needed across calls
+        // X86Operand::Reg(Register::Rax),  // Return value
+        // X86Operand::Reg(Register::Rcx),  // 4th argument, also shift count, loop counter
+        // X86Operand::Reg(Register::Rdx),  // 3rd argument, also used in division
+        // X86Operand::Reg(Register::Rsi),  // 2nd argument
+        // X86Operand::Reg(Register::Rdi),  // 1st argument
+        // X86Operand::Reg(Register::R8),   // 5th argument
+        // X86Operand::Reg(Register::R9),   // 6th argument
+        // X86Operand::Reg(Register::R10),  // Scratch (caller-saved temp), rarely reserved by ABI
+        // X86Operand::Reg(Register::R11),  // Scratch (caller-saved temp), rarely reserved by ABI
+
+        // // Callee saved (non-volatile) — must be preserved by callee across calls
+        // X86Operand::Reg(Register::Rbx),  // Callee saved (general-purpose)
+        // X86Operand::Reg(Register::Rbp),  // Frame/base pointer
+        // X86Operand::Reg(Register::Rsp),  // Stack pointer (NEVER allocate)
+        X86Operand::Reg(Register::R12),  // Callee saved (you’re using this for allocation)
+        X86Operand::Reg(Register::R13),  // Callee saved
+        X86Operand::Reg(Register::R14),  // Callee saved
+        X86Operand::Reg(Register::R15),  // Callee saved
+
+        // Special
+        // X86Operand::Reg(Register::Rip),  // Instruction pointer (NEVER allocate)
     ].into_iter().collect();
 
     // For building HTML visualizer
