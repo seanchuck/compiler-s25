@@ -114,6 +114,11 @@ fn compute_liveness(method_cfg: &mut CFG, debug: bool) -> (BTreeMap<i32, BTreeSe
     (in_map, out_map)
 }
 
+// webs
+// different names for each web a1, a2
+// block-level liveness above
+// like DCE instruction level but add to sets instead of deleting instrutions
+
 
 /// Dataflow equations for DCE (backwards analysis):
 ///     - OUT[B] = ⋃ IN[S] for all successors S of B

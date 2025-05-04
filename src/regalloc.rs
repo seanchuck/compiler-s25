@@ -501,8 +501,36 @@ fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
 // COMPUTE INTERFERENCE
 // #################################################
 
+fn block_is_part_of_loop(
+    block_id: i32,
+    preds: &HashMap<i32, HashSet<i32>>,
+) -> bool {
+    let mut visited = BTreeSet::new();
+    let mut stack = vec![block_id];
+
+    while let Some(current) = stack.pop() {
+        if !visited.insert(current) {
+            continue;
+        }
+
+        // If any predecessor is >= block_id, assume it's a backedge
+        if let Some(pred_blocks) = preds.get(&current) {
+            for &pred in pred_blocks {
+                if pred >= block_id {
+                    return true; // found a backedge → this block is part of a loop
+                }
+                stack.push(pred);
+            }
+        }
+    }
+
+    false // no backedge found
+}
+
+
 /// Compute use-liveness spans for all uses in all webs.
 /// Requires instruction map and full CFG (with block predecessors).
+/// Returns {(web_id : a_use_id_in_web) : {live region from that use to all defs}}
 pub fn compute_use_liveness_spans(
     webs: &BTreeMap<i32, Web>,
     method_cfg: &CFG,
@@ -510,10 +538,16 @@ pub fn compute_use_liveness_spans(
 ) -> BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>> {
     let mut result = BTreeMap::new();
     let preds = compute_predecessors(method_cfg);
+    
 
     for (web_id, web) in webs {
         let var = &web.variable;
+
         for use_idx in &web.uses {
+            if web.variable == "j".to_string(){
+                println!("use idx: {:#?}", use_idx);
+            }
+
             let mut visited = BTreeSet::new();
             let mut worklist = VecDeque::new();
             worklist.push_back(*use_idx);
@@ -528,10 +562,16 @@ pub fn compute_use_liveness_spans(
 
                 let instr = instr_map.0.get(&idx).unwrap();
                 // Stop walking if we hit a definition of the variable
+                // Check if this def kills the variable in this control flow
                 if let Some(def) = instr.get_def_var() {
-                    if def == *var {
-                        continue;
+                    // TODO: visited set for instructions; remove use from worklist
+                    if def == *var && !web.uses.contains(&idx) {
+                            continue;
                     }
+                }
+
+                if web.variable == "j".to_string(){
+                    println!("inserting: {:#?}", idx );
                 }
 
                 live_span.insert(idx);
@@ -543,6 +583,7 @@ pub fn compute_use_liveness_spans(
                         instr_index: idx.instr_index - 1,
                     };
                     worklist.push_back(prev_idx);
+
                 } else if let Some(pred_blocks) = preds.get(&idx.block_id) {
                     for &pred_block in pred_blocks {
                         let pred_instrs = &method_cfg.blocks[&pred_block].instructions;
@@ -565,10 +606,32 @@ pub fn compute_use_liveness_spans(
 }
 
 
+// compute DCE liveness IN and OUT for each block
+// GEN, KILL, PASS THROUGH
+// make { instruction: live_webs} 
+// for each PASS THROUGH, marked as live for entire basic block (other ones go instruction level)
+// for each KILL: 
+
+pub fn combine_spans_per_web(
+    use_liveness_spans: &BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>>
+) -> BTreeMap<i32, BTreeSet<InstructionIndex>> {
+    let mut out: BTreeMap<i32, BTreeSet<InstructionIndex>> = BTreeMap::new();
+
+    for ((web_id, _web_use), span_instrs) in use_liveness_spans {
+        let entry = out.entry(*web_id).or_insert_with(BTreeSet::new);
+        for instr in span_instrs {
+            entry.insert(*instr);
+        }
+    }
+    out
+}
+
+
 pub fn build_interference_graph_from_spans(
     use_liveness_spans: &BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>>,
 ) -> InterferenceGraph {
     let mut graph = InterferenceGraph::new();
+    println!("liveness spans are: {:#?}", combine_spans_per_web(use_liveness_spans));
 
     let items: Vec<_> = use_liveness_spans.iter().collect();
 
@@ -775,15 +838,18 @@ fn add_use_reg(instruction: &mut Instruction, register: &Option<X86Operand>, var
 
 /// Modify the CFG based on the register assignments
 fn apply_reg_assignments(method_cfg: &mut CFG, assignments: BTreeMap<Web, Option<X86Operand>>) {
-    println!("applying assignments:\n");
-    for (web, op) in assignments.clone() {
-        if op.is_some() {
-            println!(" {}: {:#?}", web.id, op.unwrap());
-        } else {
-            println!(" {}: {:#?}", web.id, op);
-        }
-    }
+    // println!("applying assignments:\n");
+    // for (web, op) in assignments.clone() {
+    //     if op.is_some() {
+    //         println!(" {}: {:#?}", web.id, op.unwrap());
+    //     } else {
+    //         println!(" {}: {:#?}", web.id, op);
+    //     }
+    // }
     for (web, reg_opt) in assignments.iter() {
+        // if *reg_opt == Some(X86Operand::Reg(Register::R13)) && (web.id == 16  || web.id == 17){
+        //     continue;
+        // }
         for web_def in web.defs.iter() {
             // Replace def instruction so def operand has register: reg_opt
             let mut instruction = method_cfg.get_instruction(web_def.block_id, web_def.instr_index);
@@ -801,9 +867,9 @@ fn apply_reg_assignments(method_cfg: &mut CFG, assignments: BTreeMap<Web, Option
 
 /// Mutates CFG based on register assignments
 pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, debug: bool) {
-    for (name, cfg) in method_cfgs.clone() {
-        println!("{}", name);
-    }
+    // for (name, cfg) in method_cfgs.clone() {
+    //     println!("{}", name);
+    // }
     // let mut webs: HashMap<&String, BTreeMap<i32, Web>> = HashMap::new();
     let mut method_to_instrs: BTreeMap<String, InstructionMap> = BTreeMap::new();
 

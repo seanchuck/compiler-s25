@@ -78,7 +78,7 @@ impl Operand {
     }
 
     pub fn set_reg(&mut self, new_reg: &Option<X86Operand>) {
-        println!("set reg: {:#?}", new_reg);
+        // println!("set reg: {:#?}", new_reg);
         match self {
             Operand::GlobalVar { reg, .. }
             | Operand::GlobalArrElement { reg, .. }

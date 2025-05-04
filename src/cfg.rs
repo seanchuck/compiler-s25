@@ -177,7 +177,7 @@ impl CFG {
 
     pub fn op_to_str(&self, op: &Operand) -> String {
         if let Some(reg) = op.get_reg() {
-            format!("{op}[reg: {reg}]")
+            format!("{op}[*reg: {reg}*]")
         } else {
             format!("{op}")
         }
