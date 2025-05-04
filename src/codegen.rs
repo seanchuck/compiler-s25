@@ -262,6 +262,8 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             let src_reg = reg_for_type(Register::Rax, &src_typ);
             let dst_reg = reg_for_type(Register::Rax, &dest_typ);
 
+            
+
             x86_instructions.push(X86Insn::Mov(src_op, X86Operand::Reg(src_reg.clone()), src_typ.clone()));
             x86_instructions.push(X86Insn::Mov(X86Operand::Reg(dst_reg), dest_op, dest_typ.clone()));
 
@@ -489,7 +491,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
         | Instruction::NotEqual { left, right, dest } => {
             let mut left_op = map_operand(method_cfg, left, x86_instructions, globals);
             let mut right_op = map_operand(method_cfg, right, x86_instructions, globals);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+            let mut dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let mut swapped = false;
 
             let left_typ = left.get_type();
@@ -558,13 +560,21 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
                 Instruction::Equal { .. } => X86Insn::Sete(X86Operand::Reg(Register::Al)),
                 Instruction::NotEqual { .. } => X86Insn::Setne(X86Operand::Reg(Register::Al)),
                 _ => unreachable!(),
+
+
             };
 
             x86_instructions.push(set_instr);
             x86_instructions.push(X86Insn::Movzbq(
                 X86Operand::Reg(Register::Al),
-                X86Operand::Reg(Register::Rax),
+                X86Operand::Reg(Register::Rax), // sign-extend
             ));
+
+            // Resize reg to receive mov from EAX
+            dest_op = match &dest_op {
+                X86Operand::Reg(reg) => X86Operand::Reg(reg_for_type(reg.clone(), &Type::Int)),
+                _=> dest_op
+            };
             x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
         }
         Instruction::UJmp { name, id } => {
@@ -577,7 +587,14 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             id,
         } => {
             let label = format!("{}{}", name, id);
-            let cond_op = map_operand(method_cfg, condition, x86_instructions, globals);
+            let mut cond_op = map_operand(method_cfg, condition, x86_instructions, globals);
+
+            // Resize cond_op to compare with Eax
+            cond_op = match &cond_op {
+                X86Operand::Reg(reg) => X86Operand::Reg(reg_for_type(reg.clone(), &Type::Int)),
+                _ => cond_op,
+            };
+
 
             // cmp condition, 0 → is condition true?
             x86_instructions.push(X86Insn::Mov(cond_op, X86Operand::Reg(Register::Eax), Type::Int));
