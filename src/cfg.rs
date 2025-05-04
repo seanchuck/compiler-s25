@@ -384,6 +384,7 @@ impl BasicBlock {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Global {
     pub name: String,
     pub length: Option<i32>, // if array
@@ -396,7 +397,7 @@ pub struct Local {
     pub length: Option<i64>, // if array
     pub typ: Type
 }
-
+#[derive(Debug, Clone)]
 pub struct Loop {
     pub break_to: i32,    // ID of basic block following the loop
     pub continue_to: i32, // ID of loop's header basic block

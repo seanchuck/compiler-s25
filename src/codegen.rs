@@ -705,6 +705,7 @@ fn generate_method_x86(
 pub fn generate_assembly(file: &str, filename: &str, optimizations: BTreeSet<Optimization>, writer: &mut dyn std::io::Write, debug: bool) {
     // Generate the method CFGS
     let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
+    // println!("globals are {:#?}", globals);
 
     // if debug {
     //     html_cfgs(&method_cfgs, "no-opt.html".to_string());
@@ -712,7 +713,7 @@ pub fn generate_assembly(file: &str, filename: &str, optimizations: BTreeSet<Opt
     // }
 
     // Perform dataflow optimizations (includes register allocation)
-    optimize_dataflow(&mut method_cfgs, &optimizations, debug);
+    optimize_dataflow(&mut method_cfgs, &optimizations, &globals, debug);
     
     if debug {
         print_cfg(&method_cfgs);

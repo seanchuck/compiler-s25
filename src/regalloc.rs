@@ -1,4 +1,4 @@
-use crate::{cfg::CFG, tac::{Instruction, Operand}, utils::print::html_web_graphs, web::*, x86::{Register, X86Operand}};
+use crate::{cfg::{Global, CFG}, tac::{Instruction, Operand}, utils::print::html_web_graphs, web::*, x86::{Register, X86Operand}};
 use std::{cell::RefCell, collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque}};
 use crate::state::*;
 
@@ -103,177 +103,6 @@ fn compute_def_use_sets(method_cfg: &CFG) -> BTreeMap<i32, DefUse> {
     block_def_use
 }
 
-fn remove_def(def_set: &mut BTreeSet<String>, operand: &Operand) {
-    if let Some(name) = get_local_var_name(operand) {
-        def_set.remove(&name);
-    }
-}
-
-fn get_defs(instr: &Instruction) -> Option<Vec<String>> {
-    match instr {
-        Instruction::Assign { dest, .. } |
-        Instruction::Add { dest, .. } |
-        Instruction::Subtract { dest, .. } |
-        Instruction::Multiply { dest, .. } |
-        Instruction::Divide { dest, .. } |
-        Instruction::Modulo { dest, .. } |
-        Instruction::Not { dest, .. } |
-        Instruction::Cast { dest, .. } |
-        Instruction::Len { dest, .. } |
-        Instruction::Greater { dest, .. } |
-        Instruction::Less { dest, .. } |
-        Instruction::LessEqual { dest, .. } |
-        Instruction::GreaterEqual { dest, .. } |
-        Instruction::Equal { dest, .. } |
-        Instruction::NotEqual { dest, .. } |
-        Instruction::LoadString { dest, .. } |
-        Instruction::LoadConst { dest, .. } => {
-            if let Operand::LocalVar { name, .. } = dest {
-                Some(vec![name.clone()])
-            } else {
-                None
-            }
-        }
-        Instruction::MethodCall { dest, .. } => {
-            if let Some(Operand::LocalVar { name, .. }) = dest {
-                Some(vec![name.clone()])
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
-
-fn get_uses(instr: &Instruction) -> Option<Vec<String>> {
-    let mut uses = Vec::new();
-    match instr {
-        Instruction::Assign { src, .. } |
-        Instruction::LoadString { src, .. } => {
-            if let Some(name) = get_local_var_name(src) {
-                uses.push(name);
-            }
-        }
-
-        Instruction::Add { left, right, .. }
-        | Instruction::Subtract { left, right, .. }
-        | Instruction::Multiply { left, right, .. }
-        | Instruction::Divide { left, right, .. }
-        | Instruction::Modulo { left, right, .. }
-        | Instruction::Greater { left, right, .. }
-        | Instruction::Less { left, right, .. }
-        | Instruction::LessEqual { left, right, .. }
-        | Instruction::GreaterEqual { left, right, .. }
-        | Instruction::Equal { left, right, .. }
-        | Instruction::NotEqual { left, right, .. } => {
-            if let Some(name) = get_local_var_name(left) {
-                uses.push(name);
-            }
-            if let Some(name) = get_local_var_name(right) {
-                uses.push(name);
-            }
-        }
-
-        Instruction::Not { expr, .. } |
-        Instruction::Cast { expr, .. } |
-        Instruction::Len { expr, .. } => {
-            if let Some(name) = get_local_var_name(expr) {
-                uses.push(name);
-            }
-        }
-
-        Instruction::CJmp { condition, .. } => {
-            if let Some(name) = get_local_var_name(condition) {
-                uses.push(name);
-            }
-        }
-
-        Instruction::MethodCall { args, .. } => {
-            for arg in args {
-                if let Some(name) = get_local_var_name(arg) {
-                    uses.push(name);
-                }
-            }
-        }
-
-        Instruction::Ret { value, .. } => {
-            if let Some(val) = value {
-                if let Some(name) = get_local_var_name(val) {
-                    uses.push(name);
-                }
-            }
-        }
-
-        _ => {}
-    }
-    if uses.is_empty() {
-        None
-    } else {
-        Some(uses)
-    }
-}
-
-
-// Worklist equations for liveness analysis:
-//      IN[B]  = USE[B] ∪ (OUT[B] - DEF[B])
-//      OUT[B] = ∪ IN[S] for all successors S of B
-// Returns a tuple (in_map, out_map)
-fn compute_maps(method_cfg: &mut CFG, debug: bool) -> (BTreeMap<i32, LiveVariables>, BTreeMap<i32, LiveVariables>) {
-    // Compute predecessor and successor graphs
-    let cfg_preds = compute_predecessors(&method_cfg);
-    let cfg_succs = compute_successors(&method_cfg);
-
-    // Variables that are live going in to this block; hashmap keyed by block_id
-    let mut in_map: BTreeMap<i32, LiveVariables> = BTreeMap::new();
-    // Variables that are live going out of this block; hashmap keyed by block_id
-    let mut out_map: BTreeMap<i32, LiveVariables> = BTreeMap::new();
-
-    let def_use_sets = compute_def_use_sets(method_cfg);
-
-    // Worklist of basic block ids
-    let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect::<VecDeque<i32>>();
-
-    
-    // Iterate until a fixed point
-    while let Some(block_id) = worklist.pop_front() {
-        let defs = &def_use_sets.get(&block_id).unwrap().defs;
-        let uses = &def_use_sets.get(&block_id).unwrap().uses;
-
-        // compute OUT
-        let mut out = BTreeSet::new();
-        if let Some(succs) = cfg_succs.get(&block_id) {
-            for succ_id in succs {
-                if let Some(in_succ) = in_map.get(succ_id) {
-                    out = &out | in_succ; // union
-                }
-            }
-        }
-
-        // compute IN
-        let mut in_set = uses.clone();
-        let out_minus_def: BTreeSet<_> = out.difference(defs).cloned().collect();
-        in_set.extend(out_minus_def);
-
-        // update maps
-        in_map.insert(block_id, in_set.clone());
-        out_map.insert(block_id, out.clone());
-
-        // if anything changed, queue predecessors
-        let old_in = in_map.get(&block_id).cloned().unwrap();
-        let old_out = out_map.get(&block_id).cloned().unwrap();
-        if in_set != old_in || out != old_out {
-            if let Some(preds) = cfg_preds.get(&block_id) {
-                for pred_id in preds {
-                    if !worklist.contains(pred_id) {
-                        worklist.push_back(*pred_id);
-                    }
-                }
-            }
-        }
-    }
-
-    (in_map, out_map)
-}
 
 fn add_use(use_set: &mut BTreeSet<String>, def_set: &BTreeSet<String>, operand: &Operand) {
     if let Some(name) = get_local_var_name(operand) {
@@ -437,7 +266,7 @@ fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet
 
 /// Compute live range webs for a given method. Each web has a unique
 /// web index within its given method.
-fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
+fn compute_webs(method_cfg: &CFG, globals: &BTreeMap<String, Global>) -> BTreeMap<i32, Web> {
     let mut webs = BTreeMap::new();
     let mut visited_defs = BTreeSet::new();
 
@@ -450,6 +279,11 @@ fn compute_webs(method_cfg: &CFG) -> BTreeMap<i32, Web> {
                 };
 
                 if visited_defs.contains(&inst_idx) {
+                    continue;
+                }
+
+                // Do not assign webs to globals
+                if globals.contains_key(&var) {
                     continue;
                 }
 
@@ -635,7 +469,7 @@ pub fn build_interference_graph_from_spans(
     use_liveness_spans: &BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>>,
 ) -> InterferenceGraph {
     let mut graph = InterferenceGraph::new();
-    println!("liveness spans are: {:#?}", combine_spans_per_web(use_liveness_spans));
+    // println!("liveness spans are: {:#?}", combine_spans_per_web(use_liveness_spans));
 
     let items: Vec<_> = use_liveness_spans.iter().collect();
 
@@ -870,7 +704,7 @@ fn apply_reg_assignments(method_cfg: &mut CFG, assignments: BTreeMap<Web, Option
 
 
 /// Mutates CFG based on register assignments
-pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, debug: bool) {
+pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<String, Global>, debug: bool) {
     // for (name, cfg) in method_cfgs.clone() {
     //     println!("{}", name);
     // }
@@ -911,7 +745,7 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, debug: bool) {
         method_to_instrs.insert(method_name.to_string(), instr_map.clone());
 
         // Build webs and interference graph
-        let method_webs = compute_webs(method_cfg);
+        let method_webs = compute_webs(method_cfg, globals);
         let live_spans = compute_use_liveness_spans(&method_webs, method_cfg, &instr_map);
         let interference = build_interference_graph_from_spans(&live_spans);
 
