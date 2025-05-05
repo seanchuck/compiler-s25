@@ -619,7 +619,7 @@ fn build_cond(
                         Instruction::CJmp {
                             name: cfg.name.clone(),
                             condition: dest,
-                            id: next_true_block_id,
+                            id: next_false_block_id, // jump to false block if condition is FALSE
                         },
                     );
                     cfg.add_edge(
@@ -632,7 +632,7 @@ fn build_cond(
                         cur_block_id,
                         Instruction::UJmp {
                             name: cfg.name.clone(),
-                            id: next_false_block_id,
+                            id: next_true_block_id, // fall through to true block
                         },
                     );
                     cfg.add_edge(
@@ -670,7 +670,7 @@ fn build_cond(
                         Instruction::CJmp {
                             name: cfg.name.clone(),
                             condition: dest,
-                            id: next_true_block_id,
+                            id: next_false_block_id, // jump to false block if condition is FALSE
                         },
                     );
                     cfg.add_edge(cur_block_id, next_true_block_id, EdgeType::True);
@@ -679,7 +679,7 @@ fn build_cond(
                         cur_block_id,
                         Instruction::UJmp {
                             name: cfg.name.clone(),
-                            id: next_false_block_id,
+                            id: next_true_block_id, // fall through to true block
                         },
                     );
                     cfg.add_edge(cur_block_id, next_false_block_id, EdgeType::False);
@@ -697,7 +697,7 @@ fn build_cond(
                 Instruction::CJmp {
                     name: cfg.name.clone(),
                     condition: dest,
-                    id: next_true_block_id,
+                    id: next_false_block_id, // jump to false block if condition is FALSE
                 },
             );
             cfg.add_edge(cur_block_id, next_true_block_id, EdgeType::True);  
@@ -706,7 +706,7 @@ fn build_cond(
                 cur_block_id,
                 Instruction::UJmp {
                     name: cfg.name.clone(),
-                    id: next_false_block_id,
+                    id: next_true_block_id, // fall through to true block
                 },
             );
             cfg.add_edge(cur_block_id, next_false_block_id, EdgeType::False);

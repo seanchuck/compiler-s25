@@ -613,15 +613,14 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
                 _ => cond_op,
             };
 
-
-            // cmp condition, 0 → is condition true?
+            // cmp condition; jump if condition is FALSE
             x86_instructions.push(X86Insn::Mov(cond_op, X86Operand::Reg(Register::Eax), Type::Int));
             x86_instructions.push(X86Insn::Cmp(
                 X86Operand::Constant(0),
                 X86Operand::Reg(Register::Eax),
                 Type::Bool
             ));
-            x86_instructions.push(X86Insn::Jne(label)); // jump if condition != 0
+            x86_instructions.push(X86Insn::Je(label)); // jump if condition = 0
         }
         Instruction::Exit { exit_code } => {
             x86_instructions.push(X86Insn::Mov(
