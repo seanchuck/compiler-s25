@@ -1,3 +1,4 @@
+use core::hash;
 /**
 Data structures for x86 code generation.
 **/
@@ -41,7 +42,7 @@ pub enum X86Insn {
     Exit
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum X86Operand {
     // memory operands need type to determine how much to read/write
     Reg(Register),              // no offset
@@ -82,7 +83,7 @@ impl fmt::Display for X86Operand {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum Register {
 
     // 64-bit GPRs (16)

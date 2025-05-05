@@ -184,7 +184,7 @@ pub enum AssignOp {
     ModuloAssign,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Type {
     Int,
     Long,

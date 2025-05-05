@@ -6,49 +6,120 @@ Similar to the AST.rs file, but includes
 instructions that are simplified, and TAC.
 */
 
-use crate::ast::Type;
-use std::fmt;
+use crate::{ast::Type, x86::{Register, X86Operand}};
+use std::{collections::HashSet, fmt};
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub enum Operand {
-    GlobalVar(String, Type),
-    GlobalArrElement(String, Box<Operand>, Type), // name and index
-    String(i32, Type),                            // ID of string constant
-    LocalVar(String, Type),
-    LocalArrElement(String, Box<Operand>, Type),
-    Const(i64, Type),
-    Argument(i32, Type), // position of the argument and its type
+    GlobalVar {
+        name: String,
+        typ: Type,
+        reg: Option<X86Operand>,
+    },
+    GlobalArrElement {
+        name: String,
+        index: Box<Operand>,
+        typ: Type,
+        reg: Option<X86Operand>,
+    },
+    String {
+        id: i32,
+        typ: Type,
+        reg: Option<X86Operand>,
+    },
+    LocalVar {
+        name: String,
+        typ: Type,
+        reg: Option<X86Operand>,
+    },
+    LocalArrElement {
+        name: String,
+        index: Box<Operand>,
+        typ: Type,
+        reg: Option<X86Operand>,
+    },
+    Const {
+        value: i64,
+        typ: Type,
+        reg: Option<X86Operand>,
+    },
+    Argument {
+        position: i32,
+        typ: Type,
+        reg: Option<X86Operand>,
+    },
 }
 
+
+
 impl Operand {
-    pub fn get_type(& self) -> Type {
+    pub fn get_type(&self) -> Type {
         match self {
-            Operand::GlobalVar(_, typ) => typ.clone(),
-            Operand::GlobalArrElement(_, _, typ) => typ.clone(),
-            Operand::String(_, typ) => typ.clone(),
-            Operand::LocalVar(_, typ) => typ.clone(),
-            Operand::LocalArrElement(_, _, typ) => typ.clone(),
-            Operand::Const(_, typ) => typ.clone(),
-            Operand::Argument(_, typ) => typ.clone(),
+            Operand::GlobalVar { typ, .. }
+            | Operand::GlobalArrElement { typ, .. }
+            | Operand::String { typ, .. }
+            | Operand::LocalVar { typ, .. }
+            | Operand::LocalArrElement { typ, .. }
+            | Operand::Const { typ, .. }
+            | Operand::Argument { typ, .. } => typ.clone(),
+        }
+    }
+
+    pub fn get_reg(&self) -> Option<X86Operand> {
+        match self {
+            Operand::GlobalVar { reg , ..}
+            | Operand::GlobalArrElement { reg , ..}
+            | Operand::String { reg , ..}
+            | Operand::LocalVar { reg , ..}
+            | Operand::LocalArrElement { reg , ..}
+            | Operand::Const { reg , ..}
+            | Operand::Argument { reg, ..} => reg.clone()
+        }
+    }
+
+    pub fn get_reg_reg(&self) -> Register {
+        let op = self.get_reg();
+        match op {
+            Some(X86Operand::Reg(reg)) => reg,
+            _ => {
+                unreachable!();
+            }
+        }
+    }
+
+    pub fn set_reg(&mut self, new_reg: &Option<X86Operand>) {
+        // println!("set reg: {:#?}", new_reg);
+        match self {
+            Operand::GlobalVar { reg, .. }
+            | Operand::GlobalArrElement { reg, .. }
+            | Operand::String { reg, .. }
+            | Operand::LocalVar { reg, .. }
+            | Operand::LocalArrElement { reg, .. }
+            | Operand::Const { reg, .. }
+            | Operand::Argument { reg, .. } => {
+                *reg = new_reg.clone();
+            }
         }
     }
 }
+    
 
 impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Operand::Const(val, _) => write!(f, "{}", val),
-            Operand::String(id, _) => write!(f, "str{}", id),
-            Operand::GlobalVar(name, _) => write!(f, "{}", name),
-            Operand::GlobalArrElement(name, idx, _) => write!(f, "{}[{}]", name, idx),
-            Operand::LocalVar(name, _) => write!(f, "{}", name),
-            Operand::LocalArrElement(name, idx, _) => write!(f, "{}[{}]", name, idx),
-            Operand::Argument(pos, _) => write!(f, "arg{}", pos),
+            Operand::Const { value, .. } => write!(f, "{}", value),
+            Operand::String { id, .. } => write!(f, "str{}", id),
+            Operand::GlobalVar { name, .. } => write!(f, "{}", name),
+            Operand::GlobalArrElement { name, index, .. } => write!(f, "{}[{}]", name, index),
+            Operand::LocalVar { name, .. } => write!(f, "{}", name),
+            Operand::LocalArrElement { name, index, .. } => write!(f, "{}[{}]", name, index),
+            Operand::Argument { position, .. } => write!(f, "arg{}", position),
         }
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub enum Instruction {
     // ARITHMETIC BINARY OPERATIONS
     // t <- X + Y
@@ -182,3 +253,132 @@ pub enum Instruction {
         typ: Type
     },
 }
+
+impl Instruction {
+
+    // Recursively collects vars in an oeperand 
+    fn collect_vars_in_operand(&self, op: &Operand) -> HashSet<String> {
+        let mut vars: HashSet<String> = HashSet::new();
+        match op {
+            Operand::LocalVar { name, .. } | Operand::GlobalVar { name, .. }=> {vars.insert(name.clone());},
+
+            Operand::LocalArrElement { name, index, .. }
+            | Operand::GlobalArrElement { name, index, .. } => {
+                vars.insert(name.clone());
+
+                // Recurse on recursive operand idx
+                vars.extend(self.collect_vars_in_operand(index));
+            }
+
+            // These don’t reference any variable
+            Operand::Const{..} | Operand::String{..} | Operand::Argument{..} => {},
+        }
+        vars
+    }
+
+    /// Returns a HashSet of source vars involved in an instruction.
+    pub fn get_used_vars(&self) -> HashSet<String> {
+        match self {
+            // t <- X
+            Instruction::Assign { src, dest, .. } => {
+                let mut vars = self.collect_vars_in_operand(src);
+                if let Operand::LocalArrElement {index, ..}| Operand::GlobalArrElement {index, ..} = dest {
+                    vars.extend(self.collect_vars_in_operand(index));
+                }
+                vars
+            }
+
+            // t <- X op Y
+            Instruction::Add { left, right, .. }
+            | Instruction::Subtract { left, right, .. }
+            | Instruction::Multiply { left, right, .. }
+            | Instruction::Divide { left, right, .. }
+            | Instruction::Modulo { left, right, .. }
+            | Instruction::Greater { left, right, .. }
+            | Instruction::Less { left, right, .. }
+            | Instruction::LessEqual { left, right, .. }
+            | Instruction::GreaterEqual { left, right, .. }
+            | Instruction::Equal { left, right, .. }
+            | Instruction::NotEqual { left, right, .. } => {
+                let mut vars = self.collect_vars_in_operand(left);
+                vars.extend(self.collect_vars_in_operand(right));
+                vars
+            }
+
+            // t <- !X / cast(X) / len(X)
+            Instruction::Not { expr, .. }
+            | Instruction::Cast { expr, .. }
+            | Instruction::Len { expr, .. } => {
+                self.collect_vars_in_operand(expr)
+            }
+
+            // Method call arguments
+            Instruction::MethodCall { args, .. } => {
+                let mut vars = HashSet::new();
+                for op in args {
+                    vars.extend(self.collect_vars_in_operand(op));
+                }
+                vars
+            }
+
+            // Conditional jump depends on condition
+            Instruction::CJmp { condition, .. } => {
+                self.collect_vars_in_operand(condition)
+            }
+
+            // Return value
+            Instruction::Ret { value, .. } => {
+                if let Some(op) = value {
+                    self.collect_vars_in_operand(op)
+                } else {
+                    HashSet::new()
+                }
+            }
+
+            // LoadString reads from a source variable
+            Instruction::LoadString { src, .. } => {
+                self.collect_vars_in_operand(src)
+            }
+
+            // LoadConst, UJmp, Exit don't use vars
+            Instruction::LoadConst { .. }
+            | Instruction::UJmp { .. }
+            | Instruction::Exit { .. } => HashSet::new(),
+        }
+    }
+
+    /// Get the destination that an instruction writes to
+    pub fn get_def_var(&self) -> Option<String> {
+        match self {
+            Instruction::Assign { dest, .. }
+            | Instruction::Add { dest, .. }
+            | Instruction::Subtract { dest, .. }
+            | Instruction::Multiply { dest, .. }
+            | Instruction::Divide { dest, .. }
+            | Instruction::Modulo { dest, .. }
+            | Instruction::Cast { dest, .. }
+            | Instruction::Not { dest, .. }
+            | Instruction::Len { dest, .. }
+            | Instruction::Equal { dest, .. }
+            | Instruction::Less { dest, .. }
+            | Instruction::Greater { dest, .. }
+            | Instruction::LessEqual { dest, .. }
+            | Instruction::GreaterEqual { dest, .. }
+            | Instruction::NotEqual {dest, .. }
+            | Instruction::LoadString {dest, .. }
+            | Instruction::LoadConst {dest, .. } => {
+                Some(dest.to_string())
+            }
+
+            Instruction::MethodCall { dest, .. } =>{
+                if let Some(dest) = dest {
+                    Some(dest.to_string())
+                } else {
+                    None
+                }
+            }
+            _=> None
+        }
+    }
+}
+

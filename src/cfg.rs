@@ -5,7 +5,7 @@ Consists of basic blocks and directed edges
 between those basic blocks.
 **/
 
-use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*};
+use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*, x86::X86Operand};
 use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet}, rc::Rc};
 
 // #################################################
@@ -142,10 +142,47 @@ impl CFG {
         );
     }
 
+    // Gets an instruction at location block, instr_idx
+    pub fn get_instruction(&mut self, block_id: i32, instruction_index: i32) -> &mut Instruction {
+        let block = self.get_block_with_id(block_id);
+        block.instructions.get_mut(instruction_index as usize).unwrap_or_else(|| panic!("Instruction index out of bounds"))
+    }
+
     /// Get the stack offset of a temp var
     pub fn get_stack_offset(&self, temp: &String) -> i64 {
         self.locals.get(temp).unwrap().stack_offset
     }
+
+    // Get the block ids that are successors to a given block
+    pub fn successors(&self, block: i32) -> HashSet<i32> {
+        self.edges
+            .get(&block)
+            .map(|edges| edges.iter().map(|edge| edge.v).collect())
+            .unwrap_or_default()
+    }
+
+    // Get the block ids that are predecessors to a given block
+    pub fn predecessors(&self, block: i32) -> HashSet<i32> {
+        self.edges
+            .iter()
+            .filter_map(|(&from, edges)| {
+                if edges.iter().any(|edge| edge.v == block) {
+                    Some(from)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn op_to_str(&self, op: &Operand) -> String {
+        if let Some(reg) = op.get_reg() {
+            format!("{op}[*reg: {reg}*]")
+        } else {
+            format!("{op}")
+        }
+    }
+    
 
     // Used to get nice visualization of CFG
     pub fn to_dot(&self) -> String {
@@ -156,52 +193,68 @@ impl CFG {
         for (id, block) in &self.blocks {
             let label = block
                 .get_instructions()
-                .iter()
-                .map(|insn| {
+                .iter().enumerate()
+                .map(|(idx, insn)| {
                     let s = match insn {
-                        Instruction::Add { left, right, dest, .. } => format!("{dest} <- {left} + {right}"),
-                        Instruction::Assign { src, dest, .. } => format!("{dest} <- {src}"),
-                        Instruction::CJmp { name, condition, id } => format!("cjmp {condition}, {name}{id}"),
-                        Instruction::Cast { expr, dest, target_type } => {
-                            format!("{dest} <- {target_type}({expr})")
-                        }
-                        Instruction::Divide {left, right, dest, .. } => format!("{dest} <- {left} / {right}"),
-                        Instruction::Equal { left, right, dest } => format!("{dest} <- {left} == {right}"),
-                        Instruction::Greater { left, right, dest } => format!("{dest} <- {left} > {right}"),
-                        Instruction::GreaterEqual { left, right, dest } => format!("{dest} <- {left} >= {right}"),
-                        Instruction::Len {expr, dest, .. } => format!("{dest} <- len({expr})"),
-                        Instruction::Less { left, right, dest } => format!("{dest} <- {left} < {right}"),
-                        Instruction::LessEqual { left, right, dest } => format!("{dest} <- {left} <= {right}"),
-                        Instruction::MethodCall { name, args, dest, .. }=> {
-                            let args_str = args
-                                .iter()
-                                .map(|op| op.to_string())
-                                .collect::<Vec<_>>()
-                                .join(", ");
+                        Instruction::Add { left, right, dest, .. } => 
+                            format!("{} <- {} + {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Assign { src, dest, .. } => 
+                            format!("{} <- {}", self.op_to_str(dest), self.op_to_str(src)),
+                        Instruction::CJmp { name, condition, id } => 
+                            format!("cjmp {}, {}{}", self.op_to_str(condition), name, id),
+                        Instruction::Cast { expr, dest, target_type } => 
+                            format!("{} <- {}({})", self.op_to_str(dest), target_type, self.op_to_str(expr)),
+                        Instruction::Divide { left, right, dest, .. } => 
+                            format!("{} <- {} / {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Equal { left, right, dest } => 
+                            format!("{} <- {} == {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Greater { left, right, dest } => 
+                            format!("{} <- {} > {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::GreaterEqual { left, right, dest } => 
+                            format!("{} <- {} >= {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Len { expr, dest, .. } => 
+                            format!("{} <- len({})", self.op_to_str(dest), self.op_to_str(expr)),
+                        Instruction::Less { left, right, dest } => 
+                            format!("{} <- {} < {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::LessEqual { left, right, dest } => 
+                            format!("{} <- {} <= {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::MethodCall { name, args, dest, .. } => {
+                            let args_str = args.iter().map(|op| self.op_to_str(op)).collect::<Vec<_>>().join(", ");
                             if let Some(d) = dest {
-                                format!("{d} <- {name}({args_str})")
+                                format!("{} <- {}({})", self.op_to_str(d), name, args_str)
                             } else {
-                                format!("{name}({args_str})")
+                                format!("{}({})", name, args_str)
                             }
-                        }
-                        Instruction::Modulo {left, right, dest , ..}=> format!("{dest} <- {left} % {right}"),
-                        Instruction::Multiply {left, right, dest , ..} => format!("{dest} <- {left} * {right}"),
-                        Instruction::Not { expr, dest } => format!("{dest} <- !{expr}"),
-                        Instruction::NotEqual { left, right, dest } => format!("{dest} <- {left} != {right}"),
-                        Instruction::Ret {value, .. }=> {
+                        },
+                        Instruction::Modulo { left, right, dest, .. } => 
+                            format!("{} <- {} % {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Multiply { left, right, dest, .. } => 
+                            format!("{} <- {} * {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Not { expr, dest } => 
+                            format!("{} <- !{}", self.op_to_str(dest), self.op_to_str(expr)),
+                        Instruction::NotEqual { left, right, dest } => 
+                            format!("{} <- {} != {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::Ret { value, .. } => {
                             if let Some(v) = value {
-                                format!("ret {v}")
+                                format!("ret {}", self.op_to_str(v))
                             } else {
                                 "ret".to_string()
                             }
-                        }
-                        Instruction::Subtract { typ: _, left, right, dest }=> format!("{dest} <- {left} - {right}"),
-                        Instruction::UJmp { name, id } => format!("ujmp {name}{id}"),
-                        Instruction::LoadString { src, dest } => format!("{dest} <- {src:?}"),
-                        Instruction::Exit { exit_code } => format!("exit({})", exit_code),
-                        Instruction::LoadConst { src, dest, typ: _ } => format!("{dest} <- {src}"),
+                        },
+                        Instruction::Subtract { typ: _, left, right, dest } => 
+                            format!("{} <- {} - {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
+                        Instruction::UJmp { name, id } => 
+                            format!("ujmp {}{}", name, id),
+                        Instruction::LoadString { src, dest } => 
+                            format!("{} <- {:?}", self.op_to_str(dest), src),
+                        Instruction::Exit { exit_code } => 
+                            format!("exit({})", exit_code),
+                        Instruction::LoadConst { src, dest, typ: _ } => 
+                            format!("{} <- {}", self.op_to_str(dest), src),
                     };
-                    s.replace('\\', "\\\\").replace('"', "\\\"") // escape for DOT
+                    
+                    let numbered = format!("I{}: {}", idx, s); // 1-based index
+                    numbered.replace('\\', "\\\\").replace('"', "\\\"") // escape for DOT
                 })                           
                 .collect::<Vec<_>>()
                 .join("\\l"); // Graphviz line break
@@ -226,38 +279,38 @@ impl CFG {
         dot
     }
 
-        /// Generate SVG (or PNG) directly from the DOT representation
-        pub fn render_dot(&self, output_format: &str) -> Vec<u8> {
-            let dot_code = self.to_dot();
-    
-            let mut child = std::process::Command::new("dot")
-                .arg(format!("-T{}", output_format)) // example: -Tsvg or -Tpng
-                .stdin(std::process::Stdio::piped())
-                .stdout(std::process::Stdio::piped())
-                .spawn()
-                .expect("Failed to spawn dot command");
-    
-            {
-                let stdin = child.stdin.as_mut().expect("Failed to open stdin");
-                use std::io::Write;
-                stdin
-                    .write_all(dot_code.as_bytes())
-                    .expect("Failed to write DOT code to dot process");
-            }
-    
-            let output = child
-                .wait_with_output()
-                .expect("Failed to read dot output");
-    
-            if output.status.success() {
-                output.stdout
-            } else {
-                panic!(
-                    "Graphviz 'dot' command failed:\n{}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
-            }
+    /// Generate SVG (or PNG) directly from the DOT representation
+    pub fn render_dot(&self, output_format: &str) -> Vec<u8> {
+        let dot_code = self.to_dot();
+
+        let mut child = std::process::Command::new("dot")
+            .arg(format!("-T{}", output_format)) // example: -Tsvg or -Tpng
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .expect("Failed to spawn dot command");
+
+        {
+            let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+            use std::io::Write;
+            stdin
+                .write_all(dot_code.as_bytes())
+                .expect("Failed to write DOT code to dot process");
         }
+
+        let output = child
+            .wait_with_output()
+            .expect("Failed to read dot output");
+
+        if output.status.success() {
+            output.stdout
+        } else {
+            panic!(
+                "Graphviz 'dot' command failed:\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -268,21 +321,22 @@ pub struct CFGScope {
 
 impl CFGScope {
     /// Returns this global variable, or the temp variable associated to this local variable
-    pub fn lookup_var(&self, var: String, typ: Type) -> Operand {
+    pub fn lookup_var(&self, var: String, typ: Type, register: Option<X86Operand>) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&var) {
-            Operand::LocalVar(temp.to_string(), typ.clone())
+            Operand::LocalVar { name: temp.to_string(), typ: typ.clone(), reg: register }
         } else if let Some(parent) = &self.parent {
-            parent.lookup_var(var ,typ.clone())
+            parent.lookup_var(var ,typ.clone(), register)
         } else {
             // assume it is in the global CFGScope
-            Operand::GlobalVar(var, typ.clone())
+            //Operand::GlobalVar(var, typ.clone())
+            Operand::GlobalVar { name: var, typ: typ.clone(), reg: register }
         }
     }
 
     /// Returns this global array element, or the temp array element associated to this local array element
     pub fn lookup_arr(&self, arr: String, idx: Operand, sym_scope: &Rc<RefCell<Scope>>, typ: Type) -> Operand {
         if let Some(temp) = self.local_to_temp.get(&arr) {
-            Operand::LocalArrElement(temp.to_string(), Box::new(idx), typ.clone())
+            Operand::LocalArrElement { name: temp.to_string(), index: Box::new(idx), typ: typ.clone(), reg: None } // TODO: right now no array elements in registers
         } else if let Some(parent) = &self.parent {
             parent.lookup_arr(arr, idx, sym_scope, typ.clone())
         } else {
@@ -291,7 +345,8 @@ impl CFGScope {
             let TableEntry::Variable {  typ, .. } = table_entry else {
                 panic!("Expected a variable, found something else!");
             };
-            Operand::GlobalArrElement(arr, Box::new(idx), typ.clone())
+            // Operand::GlobalArrElement(arr, Box::new(idx), typ.clone())
+            Operand::GlobalArrElement { name: arr, index: Box::new(idx), typ: typ.clone(), reg: None }  // TODO: right now no array elements in registers
         }
     }
 
@@ -329,6 +384,7 @@ impl BasicBlock {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Global {
     pub name: String,
     pub length: Option<i32>, // if array
@@ -341,7 +397,7 @@ pub struct Local {
     pub length: Option<i64>, // if array
     pub typ: Type
 }
-
+#[derive(Debug, Clone)]
 pub struct Loop {
     pub break_to: i32,    // ID of basic block following the loop
     pub continue_to: i32, // ID of loop's header basic block

@@ -2,14 +2,18 @@ use crate::cfg::*;
 use crate::scope::*;
 use crate::symtable::*;
 use crate::tac::*;
+use crate::web::{Web, InterferenceGraph, InstructionMap};
+use crate::utils::visualizer::RegisterAllocationGraph;
+use crate::x86::X86Operand;
+
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::rc::Rc;
 use std::fs::File;
 use std::io::Write;
 
 /// Pretty-print the CFG
-pub fn print_cfg(method_cfgs: &HashMap<String, CFG>) {
+pub fn print_cfg(method_cfgs: &BTreeMap<String, CFG>) {
     println!("\n==================== CFG =======================");
 
     for (method_name, cfg) in method_cfgs {
@@ -232,7 +236,7 @@ fn print_scope(scope: &Rc<RefCell<Scope>>, indent: usize) {
 }
 
 
-pub fn html_cfgs(method_cfgs: &HashMap<String, CFG>, filename: String) {
+pub fn html_cfgs(method_cfgs: &BTreeMap<String, CFG>, filename: String) {
     let mut html = File::create(&filename).expect("Failed to create HTML file");
 
     writeln!(
@@ -249,6 +253,39 @@ pub fn html_cfgs(method_cfgs: &HashMap<String, CFG>, filename: String) {
     }
 
     writeln!(html, "</body></html>").unwrap();
-    println!("✅ Generated {} with inline CFG diagrams.", filename);
+    // println!("✅ Generated {} with inline CFG diagrams.", filename);
 }
+
+pub fn html_web_graphs(
+    web_data: &BTreeMap<String, (BTreeMap<i32, Web>, InterferenceGraph, InstructionMap)>,
+    register_data: &BTreeMap<String, BTreeMap<i32, Option<X86Operand>>>,
+    filename: String,
+) {
+    let mut html = File::create(&filename).expect("Failed to create HTML file");
+
+    writeln!(
+        html,
+        "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Register Allocation Viewer</title></head><body><h1>Register Allocation Graphs</h1>"
+    )
+    .unwrap();
+
+    for (method_name, (webs, interference, instr_map)) in web_data {
+        let graph = RegisterAllocationGraph {
+            webs: webs.clone(),
+            interference: interference.clone(),
+            instr_map: instr_map.clone(),
+        };
+
+        let register_assignments = register_data.get(method_name).unwrap();
+
+        let svg_data = graph.render_dot(register_assignments, "svg");
+        let svg_str = String::from_utf8(svg_data).expect("Invalid UTF-8 in SVG output");
+
+        writeln!(html, "<h2>{}</h2>{}<br><br>", method_name, svg_str).unwrap();
+    }
+
+    writeln!(html, "</body></html>").unwrap();
+    // println!("✅ Generated {} with inline register allocation diagrams.", filename);
+}
+
 

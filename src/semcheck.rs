@@ -1154,11 +1154,11 @@ pub fn semcheck(
     // Traverse tree, performing any remaining semantic checks
     traverse_ir(&sym_tree, writer, &mut context);
 
-    if verbose {
-        println!("Successfully built symbol table!");
-        println!("=================SYMBOL TABLE====================");
-        print_symtree(&sym_tree);
-    }
+    // if verbose {
+    //     println!("Successfully built symbol table!");
+    //     println!("=================SYMBOL TABLE====================");
+    //     print_symtree(&sym_tree);
+    // }
 
     // Panic if any semantic errors were found
     if context.error_found {

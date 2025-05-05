@@ -1,0 +1,21 @@
+import printf;
+int x[1000];
+int y[1000];
+void main ( ) {
+  int a, b;
+  int j;
+
+  // load arrays
+  for ( j = 0; j < 1000; j += 1 ) {
+    x[j] = j;
+    printf("%d\n", x[j]);
+    printf("eeee");
+  }
+  
+  for ( j = 0; j < 1000; j += 1 ) {
+    printf ( "%d ", y[j] );
+  }
+
+  printf("done");
+  printf ( "\n" );
+}

@@ -8,7 +8,7 @@
  * @author 6.1100 Staff, last updated January 2024
  */
 use clap::Parser;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 #[derive(Clone, clap::ValueEnum, Debug)]
 pub enum CompilerAction {
@@ -19,12 +19,13 @@ pub enum CompilerAction {
     Assembly,
 }
 
-#[derive(Clone, clap::ValueEnum, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, clap::ValueEnum, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Optimization {
     Cse,
     Cp, 
     Dce,
     All,
+    Regalloc,
 
     // "Negative" variants of optimizations
     #[clap(name = "-cse")]
@@ -33,6 +34,8 @@ pub enum Optimization {
     NoCp,
     #[clap(name = "-dce")]
     NoDce,
+    #[clap(name = "-regalloc")]
+    NoRegalloc
 }
 
 #[derive(Parser, Debug)]
@@ -65,10 +68,10 @@ pub struct Args {
 
 impl Args {
     // Resolve the CLI arguments into a hashset of desired optimizations
-    pub fn resolved_opts(&self) -> HashSet<Optimization> {
+    pub fn resolved_opts(&self) -> BTreeSet<Optimization> {
         use Optimization::*;
 
-        let mut opts: HashSet<Optimization> = self.opt.iter().cloned().collect();
+        let mut opts: BTreeSet<Optimization> = self.opt.iter().cloned().collect();
 
         // If 'all' is present, start with all
         if opts.contains(&All) {
@@ -76,6 +79,7 @@ impl Args {
             opts.insert(Cse);
             opts.insert(Dce);
             opts.insert(Cp);
+            opts.insert(Regalloc);
         }
 
         // Remove disabled opts
@@ -92,6 +96,12 @@ impl Args {
         if opts.contains(&NoDce) {
             opts.remove(&Dce);
             opts.remove(&NoDce);
+        }
+
+
+        if opts.contains(&NoRegalloc) {
+            opts.remove(&Regalloc);
+            opts.remove(&NoRegalloc);
         }
 
         opts
