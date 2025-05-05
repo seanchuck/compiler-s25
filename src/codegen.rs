@@ -634,7 +634,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
 }
 
 /// Emit x86 code corresponding to the given CFG
-/// Returns a vector of strings of x86 instructions.
+/// Returns a vector of x86 instructions.
 fn generate_method_x86(
     method_name: &String,
     method_cfg: &mut CFG,
@@ -691,12 +691,29 @@ fn generate_method_x86(
     }    
 
     let blocks = method_cfg.get_blocks();
+    let block_order = method_cfg.get_block_order();
 
-    for id in method_cfg.get_block_order() {
+    for i in 0..block_order.len() {
+        let id = &block_order[i];
         let block = &blocks[id];
         x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
 
-        for insn in block.get_instructions() {
+        let next_id = block_order.get(i + 1);
+        let block_instructions = block.get_instructions();
+
+        for (j, insn) in block_instructions.iter().enumerate() {
+            // skip unnecessary unconditional jumps
+            let is_last_insn = j == block_instructions.len() - 1;
+            if is_last_insn {
+                if let Instruction::UJmp { id, ..} = insn {
+                    if let Some(next) = next_id {
+                        if id == next  { // jump to the label right after this insn
+                            continue;
+                        }
+                    }
+                }
+            }
+
             add_instruction(method_cfg, &insn, &mut x86_instructions, globals);
         }
 
@@ -715,7 +732,11 @@ fn generate_method_x86(
             x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
 
             x86_instructions.push(X86Insn::Ret); // return to where function was called
+
+            continue;
         }
+
+
     }
 
     x86_instructions
