@@ -691,7 +691,7 @@ fn generate_method_x86(
     }    
 
     let blocks = method_cfg.get_blocks();
-    let block_order = method_cfg.get_block_order();
+    let block_order: Vec<i32> = blocks.keys().cloned().collect(); // method_cfg.get_block_order();
 
     for i in 0..block_order.len() {
         let id = &block_order[i];
