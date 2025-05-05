@@ -170,7 +170,8 @@ fn map_operand(
                         .typ
                         .clone();
         
-                    let saved_regs_size = 8 * 4; // R12, R13, R14, R15
+                    let num_regs_allocd = method_cfg.get_reg_allocs().len() as i64;
+                    let saved_regs_size = 8 * num_regs_allocd; // R12, R13, R14, R15
                     let offset = 16 + saved_regs_size + ((position - 6) as i64 * 8);
         
                     X86Operand::RegInt(Register::Rbp, offset, typ)
@@ -350,10 +351,13 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
                 Type::Long
             ));
 
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R15)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R14)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R13)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R12)));
+            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R15)));
+            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R14)));
+            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R13)));
+            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R12)));
+            for reg in method_cfg.get_reg_allocs().iter().rev() {
+                x86_instructions.push(X86Insn::Pop(reg.clone()));
+            }
             x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp)));
             x86_instructions.push(X86Insn::Ret);
         }
@@ -651,10 +655,13 @@ fn generate_method_x86(
 
     // method prologue
     x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rbp))); // push base pointer onto stack
-    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R12)));
-    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R13)));
-    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R14)));
-    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R15)));
+    // x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R12)));
+    // x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R13)));
+    // x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R14)));
+    // x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R15)));
+    for reg in method_cfg.get_reg_allocs().iter() {
+        x86_instructions.push(X86Insn::Push(reg.clone()));
+    }
 
     x86_instructions.push(X86Insn::Mov(
         X86Operand::Reg(Register::Rsp),
@@ -706,10 +713,13 @@ fn generate_method_x86(
                 Type::Long
             )); // move base pointer to stack pointer
 
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R15)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R14)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R13)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R12)));
+            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R15)));
+            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R14)));
+            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R13)));
+            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R12)));
+            for reg in method_cfg.get_reg_allocs().iter().rev() {
+                x86_instructions.push(X86Insn::Pop(reg.clone()));
+            }
             x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
 
             x86_instructions.push(X86Insn::Ret); // return to where function was called
