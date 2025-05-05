@@ -128,6 +128,50 @@ pub enum Register {
     Al,
 }
 
+impl Register {
+    pub fn reg_to_64(&self) -> Register {
+        match self {
+            Register::Rax
+            | Register::Rbx
+            | Register::Rcx
+            | Register::Rdx
+            | Register::Rsi
+            | Register::Rdi
+            | Register::Rbp
+            | Register::Rsp
+            | Register::R8
+            | Register::R9
+            | Register::R10
+            | Register::R11
+            | Register::R12
+            | Register::R13
+            | Register::R14
+            | Register::R15 => {
+                self.clone()
+            }
+
+            Register::Eax => Register::Rax,
+            Register::Ebx => Register::Rbx,
+            Register::Ecx => Register::Rcx,
+            Register::Edx => Register::Rdx,
+            Register::Esi => Register::Rsi,
+            Register::Edi => Register::Rdi,
+            Register::Ebp => Register::Rbp,
+            Register::Esp => Register::Rsp,
+            Register::R8d => Register::R8,
+            Register::R9d => Register::R9,
+            Register::R10d => Register::R10,
+            Register::R11d => Register::R11,
+            Register::R12d => Register::R12,
+            Register::R13d => Register::R13,
+            Register::R14d => Register::R14,
+            Register::R15d => Register::R15,
+            Register::Rip => Register::Rip,
+            Register::Al => Register::Al,
+        }
+    }
+}
+
 impl fmt::Display for Register {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

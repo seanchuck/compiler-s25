@@ -382,7 +382,7 @@ fn add_instruction(
                 None => X86Operand::Reg(Register::Rax),
             };
 
-            // Store value to stack before overwriting with method args
+            // // Store value to stack before overwriting with method args
             x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdi)));
             x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rsi)));
 
@@ -411,25 +411,20 @@ fn add_instruction(
             }
 
             // Arguments {7...n} go on stack, with last args going first; assume stack 16-aligned before call
-            let mut sp_offset = 0;
-            for arg in args.iter().skip(6) {
+            let stack_args: Vec<_> = args.iter().skip(6).collect();
+            for arg in stack_args.iter().rev() {
                 let arg_typ = arg.get_type();
 
                 let mut arg_val = map_operand(method_cfg, arg, x86_instructions, globals);
-                if arg_val == X86Operand::Reg(Register::Rdi) || arg_val ==  X86Operand::Reg(Register::Edi) {
-                    // read arg value from stack
-                    arg_val = X86Operand::RegInt(Register::Rsp, LONG_SIZE, arg.get_type());
+                if arg_val == X86Operand::Reg(Register::Rdi) || arg_val == X86Operand::Reg(Register::Edi) {
+                    // rdi is going to be clobbered — assume it's already saved and reload from memory
+                    arg_val = X86Operand::RegInt(Register::Rsp, 16 + 8 * stack_args.len() as i64, arg_typ);
+                }
+                if let X86Operand::Reg(reg) = arg_val {
+                    arg_val = X86Operand::Reg(reg.reg_to_64());
                 }
 
-                let reg = reg_for_type(Register::Rax, &arg_typ);
-                x86_instructions.push(X86Insn::Mov(arg_val.clone(), X86Operand::Reg(reg), arg_typ));
-                x86_instructions.push(X86Insn::Mov(
-                    X86Operand::Reg(Register::Rax),
-                    X86Operand::RegInt(Register::Rsp, sp_offset, Type::Long),
-                    Type::Long,
-                ));
-
-                sp_offset += 8;
+                x86_instructions.push(X86Insn::Push(arg_val));
             }
 
             // Zero rax before call
@@ -442,9 +437,11 @@ fn add_instruction(
             // Make the call
             x86_instructions.push(X86Insn::Call(name.to_string()));
 
-            let return_reg = reg_for_type(Register::Rax, return_type);
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rsi)));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdi)));
 
-            // Move the result into `dest` if necessary
+            let return_reg = reg_for_type(Register::Rax, return_type);
+            // Move the result into dest if necessary
             match dest_op {
                 X86Operand::Reg(Register::Rax) => {}
                 _ => x86_instructions.push(X86Insn::Mov(
@@ -453,10 +450,8 @@ fn add_instruction(
                     return_type.clone(),
                 )),
             }
-
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rsi)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdi)));
         }
+        
         Instruction::Ret { value, typ } => {
             // TODO: uncomment
             let return_reg = reg_for_type(Register::Rax, &typ);
