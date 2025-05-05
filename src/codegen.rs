@@ -691,7 +691,10 @@ fn generate_method_x86(
         }
     }    
 
-    for (id, block) in method_cfg.get_blocks() {
+    let blocks = method_cfg.get_blocks();
+
+    for id in method_cfg.get_block_order() {
+        let block = &blocks[id];
         x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
 
         for insn in block.get_instructions() {
