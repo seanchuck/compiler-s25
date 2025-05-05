@@ -73,6 +73,10 @@ impl CFG {
         &self.blocks
     }  
 
+    pub fn get_mut_blocks(&mut self) -> &mut BTreeMap<i32, BasicBlock> {
+        &mut self.blocks
+    }  
+
     /// Get basic block with ID
     fn get_block_with_id(&mut self, id: i32) -> &mut BasicBlock {
         let block = self.blocks.get_mut(&id);
@@ -389,6 +393,10 @@ impl BasicBlock {
 
     pub fn get_instructions(&self) -> &Vec<Instruction> {
         &self.instructions
+    }
+
+    pub fn get_mut_instructions(&mut self) -> &mut Vec<Instruction> {
+        &mut self.instructions
     }
     
     fn add_instruction(&mut self, instruction: Instruction) {

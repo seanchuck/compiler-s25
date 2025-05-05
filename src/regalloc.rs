@@ -703,7 +703,7 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<Str
         // X86Operand::Reg(Register::Rcx),  // 4th argument, also shift count, loop counter
         // X86Operand::Reg(Register::Rdx),  // 3rd argument, also used in division
         // X86Operand::Reg(Register::Rsi),  // 2nd argument
-        // X86Operand::Reg(Register::Rdi),  // 1st argument
+        X86Operand::Reg(Register::Rdi),  // 1st argument
         // X86Operand::Reg(Register::R8),   // 5th argument
         // X86Operand::Reg(Register::R9),   // 6th argument
         // X86Operand::Reg(Register::R10),  // Scratch (caller-saved temp), rarely reserved by ABI
