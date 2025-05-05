@@ -380,5 +380,72 @@ impl Instruction {
             _=> None
         }
     }
+
+    pub fn get_operands(&self) -> Vec<&Operand> {
+        let mut operands = vec![];
+        match self {
+            Instruction::Add { left, right, dest, .. }
+            | Instruction::Subtract { left, right, dest, .. }
+            | Instruction::Multiply { left, right, dest, .. }
+            | Instruction::Divide { left, right, dest, .. }
+            | Instruction::Greater { left, right, dest, .. }
+            | Instruction::LessEqual { left, right, dest, .. }
+            | Instruction::GreaterEqual { left, right, dest, .. }
+            | Instruction::Equal { left, right, dest, .. }
+            | Instruction::NotEqual { left, right, dest, .. }
+            | Instruction::Less { left, right, dest, .. }
+            | Instruction::Modulo { left, right, dest, .. } => {
+                operands = vec![left, right, dest];
+            }
+
+            Instruction::Not { expr, dest }
+            | Instruction::Cast { expr, dest, .. }
+            | Instruction::Len { expr, dest, .. } => {
+                operands = vec![expr, dest];
+            }
+
+            Instruction::MethodCall { args, dest, .. } => {
+                operands = args.iter().collect();
+                if let Some(dest_op) = dest {
+                    operands.push(dest_op);
+                }
+            }
+            Instruction::CJmp { condition, .. } => {
+                operands = vec![condition];
+            }
+
+            Instruction::Ret { value, .. } => {
+                if let Some(val_op) = value {
+                    operands = vec![val_op];
+                }
+            }
+
+            Instruction::Assign { src, dest, .. }
+            | Instruction::LoadString { src, dest } => {
+                operands = vec![src, dest];
+            }
+
+            Instruction::LoadConst { dest, .. } => {
+                operands = vec![dest];
+            }
+
+            Instruction::Exit { .. }
+            | Instruction::UJmp { .. } => {
+                // Nothing, these instructions have no operands
+            }
+        }
+        operands
+    }
+
+    pub fn get_reg_allocs(&self) -> Vec<X86Operand> {
+        let mut reg_allocs = vec![];
+        let operands = self.get_operands();
+        for op in operands {
+            if let Some(reg) = op.get_reg() {
+                reg_allocs.push(reg);
+            }
+        }
+        reg_allocs
+    }
 }
 
