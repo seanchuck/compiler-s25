@@ -212,8 +212,10 @@ impl CFG {
                             format!("{} <- {} + {}", self.op_to_str(dest), self.op_to_str(left), self.op_to_str(right)),
                         Instruction::Assign { src, dest, .. } => 
                             format!("{} <- {}", self.op_to_str(dest), self.op_to_str(src)),
-                        Instruction::CJmp { name, condition, id } => 
-                            format!("cjmp {}, {}{}", self.op_to_str(condition), name, id),
+                        Instruction::TJmp { name, condition, id } => 
+                            format!("tjmp {}, {}{}", self.op_to_str(condition), name, id),
+                        Instruction::FJmp { name, condition, id } => 
+                            format!("fjmp {}, {}{}", self.op_to_str(condition), name, id),
                         Instruction::Cast { expr, dest, target_type } => 
                             format!("{} <- {}({})", self.op_to_str(dest), target_type, self.op_to_str(expr)),
                         Instruction::Divide { left, right, dest, .. } => 

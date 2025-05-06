@@ -79,7 +79,10 @@ fn compute_def_use_sets(method_cfg: &CFG) -> BTreeMap<i32, DefUse> {
                         add_def(&mut def_set, d);
                     }
                 }
-                Instruction::CJmp { condition, .. } => {
+                Instruction::TJmp { condition, .. } => {
+                    add_use(&mut use_set, &def_set, condition);
+                }
+                Instruction::FJmp { condition, .. } => {
                     add_use(&mut use_set, &def_set, condition);
                 }
                 Instruction::Ret { value, .. } => {
@@ -575,7 +578,8 @@ fn add_def_reg(instruction: &mut Instruction, register: &Option<X86Operand>) {
             }
         }
         Instruction::UJmp { .. }
-        | Instruction::CJmp { .. }
+        | Instruction::TJmp { .. }
+        | Instruction::FJmp { .. }
         | Instruction::Ret { .. }
         | Instruction::Exit { .. } => {
             panic!("Should not be adding register to non_compatible instruction");
@@ -633,7 +637,11 @@ fn add_use_reg(instruction: &mut Instruction, register: &Option<X86Operand>, var
             try_set(src, register, variable);
         }
 
-        Instruction::CJmp { condition, .. } => {
+        Instruction::TJmp { condition, .. } => {
+            try_set(condition, register, variable);
+        }
+
+        Instruction::FJmp { condition, .. } => {
             try_set(condition, register, variable);
         }
 

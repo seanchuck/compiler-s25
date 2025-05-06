@@ -146,7 +146,8 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
             let has_side_effect = match instr {
                 Instruction::MethodCall { .. }
                 | Instruction::Ret { .. }
-                | Instruction::CJmp { .. }
+                | Instruction::TJmp { .. }
+                | Instruction::FJmp { .. }
                 | Instruction::UJmp { .. }
                 | Instruction::Exit { .. } => true,
 
@@ -485,7 +486,8 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
                 }
                 Instruction::UJmp { .. }
-                | Instruction::CJmp { .. }
+                | Instruction::TJmp { .. }
+                | Instruction::FJmp { .. }
                 | Instruction::Ret { .. }
                 | Instruction::Exit { .. } => {
                     if let Some(dest_name) = instr.get_def_var() {

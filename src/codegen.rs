@@ -599,7 +599,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             let label = format!("{}{}", name, id);
             x86_instructions.push(X86Insn::Jmp(label));
         }
-        Instruction::CJmp {
+        Instruction::TJmp {
             name,
             condition,
             id,
@@ -621,6 +621,29 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
                 Type::Bool
             ));
             x86_instructions.push(X86Insn::Jne(label)); // jump if condition != 0
+        }
+        Instruction::FJmp {
+            name,
+            condition,
+            id,
+        } => {
+            let label = format!("{}{}", name, id);
+            let mut cond_op = map_operand(method_cfg, condition, x86_instructions, globals);
+
+            // Resize cond_op to compare with Eax
+            cond_op = match &cond_op {
+                X86Operand::Reg(reg) => X86Operand::Reg(reg_for_type(reg.clone(), &Type::Int)),
+                _ => cond_op,
+            };
+
+            // cmp condition; jump if condition is false
+            x86_instructions.push(X86Insn::Mov(cond_op, X86Operand::Reg(Register::Eax), Type::Int));
+            x86_instructions.push(X86Insn::Cmp(
+                X86Operand::Constant(0),
+                X86Operand::Reg(Register::Eax),
+                Type::Bool
+            ));
+            x86_instructions.push(X86Insn::Je(label)); // jump if condition = 0
         }
         Instruction::Exit { exit_code } => {
             x86_instructions.push(X86Insn::Mov(

@@ -1,4 +1,3 @@
-use core::hash;
 /**
 Data structures for x86 code generation.
 **/
@@ -30,6 +29,7 @@ pub enum X86Insn {
     Lea(X86Operand, X86Operand),
     Cmp(X86Operand, X86Operand, Type),
     Jne(String),
+    Je(String),
     Sete(X86Operand),
     Setg(X86Operand),
     Setge(X86Operand),
@@ -199,6 +199,7 @@ impl fmt::Display for X86Insn {
             X86Insn::Lea(src, dst) => write!(f, "    leaq {}, {}", src, dst),
             X86Insn::Cmp(left, right, typ) => write!(f, "    cmp{} {}, {}", suffix(typ), left, right),
             X86Insn::Jne(label) => writeln!(f, "    jne {}", label),
+            X86Insn::Je(label) => writeln!(f, "    je {}", label),
             X86Insn::Sete(dst) => write!(f, "    sete {}", dst),
             X86Insn::Setg(dst) => write!(f, "    setg {}", dst),
             X86Insn::Setge(dst) => write!(f, "    setge {}", dst),

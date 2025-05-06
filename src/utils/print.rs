@@ -30,12 +30,19 @@ pub fn print_cfg(method_cfgs: &BTreeMap<String, CFG>) {
                     Instruction::Assign { src, dest, typ } => {
                         println!("        {dest}({typ}) <- {src}");
                     }
-                    Instruction::CJmp {
+                    Instruction::TJmp {
                         name,
                         condition,
                         id,
                     } => {
-                        println!("        cjmp {condition}, {name}{id}");
+                        println!("        tjmp {condition}, {name}{id}");
+                    }
+                    Instruction::FJmp {
+                        name,
+                        condition,
+                        id,
+                    } => {
+                        println!("        fjmp {condition}, {name}{id}");
                     }
                     Instruction::Cast {
                         expr,
