@@ -11,6 +11,7 @@ use crate::{
     tac::*,
     token::{Literal, Span},
     traverse::infer_expr_type,
+    codegen::ARGUMENT_REGISTERS,
 };
 use std::{collections::BTreeMap, io};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
@@ -1622,8 +1623,11 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
         }
     }
     if max_stack_args > 0 {
-        method_cfg.stack_size += max_stack_args as i64 * 8;
+        method_cfg.stack_size += max_stack_args as i64 * LONG_SIZE;
     }
+
+    // Allocate space on stack to store the caller saved registers
+    method_cfg.stack_size += ARGUMENT_REGISTERS.len() as i64 * LONG_SIZE;
 
     method_cfg.exit = cur_block_id;
 

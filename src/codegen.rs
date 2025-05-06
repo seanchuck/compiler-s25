@@ -13,6 +13,10 @@ use crate::{buildcfg::build_cfg, cfg::CFG};
 use core::panic;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
+pub const ARGUMENT_REGISTERS: [X86Operand; 6] = [X86Operand::Reg(Register::Rdi), X86Operand::Reg(Register::Rsi), 
+                                                X86Operand::Reg(Register::Rdx), X86Operand::Reg(Register::Rcx),
+                                                X86Operand::Reg(Register::R8), X86Operand::Reg(Register::R9)];
+
 fn is_immediate_operand(op: &X86Operand) -> bool {
     matches!(op, X86Operand::Constant(_))
 }
@@ -370,87 +374,106 @@ fn add_instruction(
             ));
         }
 
-        Instruction::MethodCall {
-            name,
-            args,
-            dest,
-            return_type,
-        } => {
+        Instruction::MethodCall { name, args, dest, return_type } => {
             // Determine the destination operand
             let dest_op = match dest {
                 Some(d) => map_operand(method_cfg, d, x86_instructions, globals),
                 None => X86Operand::Reg(Register::Rax),
             };
 
-            // // Store value to stack before overwriting with method args
-            x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdi)));
-            x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rsi)));
+            // 1) Spill extra args to [rsp + 0 ... rsp + 8*(extra_args-1)]
+            let mut sp_offset = 0;
+            for arg in args.iter().skip(6) {
+                let arg_typ = arg.get_type();
+                let arg_val = map_operand(method_cfg, arg, x86_instructions, globals);
+                let tmp_reg = reg_for_type(Register::Rax, &arg_typ);
+                // move the argument into RAX
+                x86_instructions.push(X86Insn::Mov(
+                    arg_val.clone(),
+                    X86Operand::Reg(tmp_reg.clone()),
+                    arg_typ.clone(),
+                ));
 
-            // Setup arguments
+                // store all 8 bytes of RAX into our [rsp+sp_offset] slot
+                x86_instructions.push(X86Insn::Mov(
+                    X86Operand::Reg(Register::Rax),
+                    X86Operand::RegInt(Register::Rsp, sp_offset, Type::Long),
+                    Type::Long,
+                ));
+                sp_offset += 8;
+            }
+
+            // 2) Save caller‑saved ARGUMENT_REGISTERS into the *next* slots:
+            //    slot_base = 8 * (number of extra args)
+            //    then each register gets its own 8‑byte slot in order.
+            let mut reg_to_slot: HashMap<Register, i64> = HashMap::new();
+            let mut saved = Vec::new();
+            let slot_base = sp_offset;
+            for (i, reg_op) in ARGUMENT_REGISTERS.iter().enumerate() {
+                if method_cfg.get_reg_allocs().contains(reg_op) {
+                    if let X86Operand::Reg(r) = reg_op {
+                        let slot = slot_base + (i as i64)*LONG_SIZE;
+                        // movq r -> [rsp + slot]
+                        x86_instructions.push(X86Insn::Mov(
+                            X86Operand::Reg(r.clone()),
+                            X86Operand::RegInt(Register::Rsp, slot, Type::Long),
+                            Type::Long,
+                        ));
+                        reg_to_slot.insert(r.clone(), slot);
+                        saved.push((r.clone(), slot));
+                    }
+                }
+            }
+
+            // -- 3) Setup arguments
             // First 6 args go in registers
             for (i, arg) in args.iter().take(6).enumerate() {
                 let arg_typ = arg.get_type();
-                let arg_reg = map_operand(
-                    method_cfg,
-                    &Operand::Argument {
-                        position: i as i32,
-                        typ: arg_typ.clone(),
-                        reg: None,
-                    },
-                    x86_instructions,
-                    globals,
-                );
-
+                let arg_reg = 
+                    map_operand(method_cfg, &Operand::Argument { position: i as i32, typ: arg_typ.clone(), reg: None }, x86_instructions, globals);
                 let mut arg_val = map_operand(method_cfg, arg, x86_instructions, globals);
-                if arg_val == X86Operand::Reg(Register::Rdi) || arg_val ==  X86Operand::Reg(Register::Edi) {
-                    // read arg value from stack
-                    arg_val = X86Operand::RegInt(Register::Rsp, LONG_SIZE, arg.get_type());
+
+                // If the argument is usually in reg saved on stack, use its location is the stack location instead
+                if let X86Operand::Reg(reg) = arg_val.clone() {
+                    if let Some(slot) = reg_to_slot.get(&reg.reg_to_64()) {
+                        arg_val = X86Operand::RegInt(Register::Rsp, *slot, arg_typ.clone());
+                    }
                 }
 
                 x86_instructions.push(X86Insn::Mov(arg_val, arg_reg, arg_typ));
             }
 
-            // Arguments {7...n} go on stack, with last args going first; assume stack 16-aligned before call
-            let stack_args: Vec<_> = args.iter().skip(6).collect();
-            for arg in stack_args.iter().rev() {
-                let arg_typ = arg.get_type();
-
-                let mut arg_val = map_operand(method_cfg, arg, x86_instructions, globals);
-                if arg_val == X86Operand::Reg(Register::Rdi) || arg_val == X86Operand::Reg(Register::Edi) {
-                    // rdi is going to be clobbered — assume it's already saved and reload from memory
-                    arg_val = X86Operand::RegInt(Register::Rsp, 16 + 8 * stack_args.len() as i64, arg_typ);
-                }
-                if let X86Operand::Reg(reg) = arg_val {
-                    arg_val = X86Operand::Reg(reg.reg_to_64());
-                }
-
-                x86_instructions.push(X86Insn::Push(arg_val));
-            }
-
-            // Zero rax before call
-            x86_instructions.push(X86Insn::Mov(
-                X86Operand::Constant(0),
+            // -- 4) Zero RAX before call (varargs ABI requirement) --
+            x86_instructions.push(X86Insn::Xor(
                 X86Operand::Reg(Register::Rax),
-                Type::Long,
+                X86Operand::Reg(Register::Rax),
             ));
 
-            // Make the call
+            // -- 5) Call! --
             x86_instructions.push(X86Insn::Call(name.to_string()));
 
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rsi)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdi)));
+            // -- 6) Restore saved registers from their stack slots --
+            for (r, slot) in saved.iter() {
+                // movq [rsp + slot] -> r
+                x86_instructions.push(X86Insn::Mov(
+                    X86Operand::RegInt(Register::Rsp, *slot, Type::Long),
+                    X86Operand::Reg(r.clone()),
+                    Type::Long,
+                ));
+            }
 
+            // -- 7) Move return value into dest if needed --
             let return_reg = reg_for_type(Register::Rax, return_type);
-            // Move the result into dest if necessary
             match dest_op {
-                X86Operand::Reg(Register::Rax) => {}
+                X86Operand::Reg(Register::Rax) => { /* already there */ }
                 _ => x86_instructions.push(X86Insn::Mov(
-                    X86Operand::Reg(return_reg),
-                    dest_op,
-                    return_type.clone(),
+                        X86Operand::Reg(return_reg),
+                        dest_op,
+                        return_type.clone()
                 )),
             }
         }
+
         
         Instruction::Ret { value, typ } => {
             // TODO: uncomment
@@ -714,22 +737,32 @@ fn add_instruction(
         }
 
         Instruction::Len { expr, dest, .. } => {
-            let expr_typ = expr.get_type();
-            let dest_typ = dest.get_type();
+            // let expr_typ = expr.get_type();
+            // let dest_typ = dest.get_type();
 
-            let expr_reg = reg_for_type(Register::Rax, &expr_typ);
-            let dest_reg = reg_for_type(Register::Rax, &dest_typ);
+            // let expr_reg = reg_for_type(Register::Rax, &expr_typ);
+            // let dest_reg = reg_for_type(Register::Rax, &dest_typ);
 
-            let expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
+            let mut expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
 
-            // First move is dependent on entry sizes for the array. second will always produce an integer
-            x86_instructions.push(X86Insn::Mov(
-                expr_op,
-                X86Operand::Reg(expr_reg),
-                expr_typ.clone(),
-            ));
-            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(dest_reg), dest_op, dest_typ));
+            // Case where the expr op could be a Long array, we want type to technically be int here for getting int length
+            if let X86Operand::Reg(reg) = expr_op{
+                expr_op = X86Operand::Reg(reg_for_type(reg, &Type::Int));
+            }
+
+            // // First move is dependent on entry sizes for the array. second will always produce an integer
+            // x86_instructions.push(X86Insn::Mov(
+            //     expr_op,
+            //     X86Operand::Reg(expr_reg),
+            //     expr_typ.clone(),
+            // ));
+            // x86_instructions.push(X86Insn::Mov(X86Operand::Reg(dest_reg), dest_op, dest_typ));
+            
+
+            // Len will always be of type int
+            x86_instructions.push(X86Insn::Mov(expr_op, X86Operand::Reg(Register::Eax), Type::Int));
+            x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Eax), dest_op, Type::Int));
         }
         Instruction::Greater { left, right, dest }
         | Instruction::Less { left, right, dest }
@@ -861,7 +894,7 @@ fn add_instruction(
         Instruction::Exit { exit_code } => {
             x86_instructions.push(X86Insn::Mov(
                 X86Operand::Constant(*exit_code),
-                X86Operand::Reg(Register::Rax),
+                X86Operand::Reg(Register::Rdi),
                 Type::Long,
             ));
             x86_instructions.push(X86Insn::Exit);

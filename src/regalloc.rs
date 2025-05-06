@@ -1,4 +1,5 @@
 use crate::{cfg::{Global, CFG}, tac::{Instruction, Operand}, utils::print::html_web_graphs, web::*, x86::{Register, X86Operand}};
+use crate::codegen::ARGUMENT_REGISTERS;
 use std::{cell::RefCell, collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque}};
 use crate::state::*;
 
@@ -485,6 +486,7 @@ pub fn assign_registers(
     interference: &InterferenceGraph,
     registers: &BTreeSet<X86Operand>,
     method_webs: &BTreeMap<i32, Web>,
+    precolored: &HashMap<i32, X86Operand>,
 ) -> BTreeMap<Web, Option<X86Operand>> {
     let mut stack: Vec<i32> = Vec::new();
     let mut removed: BTreeSet<i32> = BTreeSet::new();
@@ -527,6 +529,9 @@ pub fn assign_registers(
     let mut coloring: BTreeMap<Web, Option<X86Operand>> = BTreeMap::new();
 
     while let Some(node) = stack.pop() {
+        if precolored.contains_key(&node) {
+            continue;
+        }
         let mut used_colors = BTreeSet::new();
 
         if let Some(neighbors) = interference.neighbors(&node) {
@@ -700,12 +705,13 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<Str
     let usable_registers: BTreeSet<X86Operand> = vec![
         // Caller saved (volatile) — can be freely used, but caller must save if needed across calls
         // X86Operand::Reg(Register::Rax),  // Return value
-        // X86Operand::Reg(Register::Rcx),  // 4th argument, also shift count, loop counter
-        // X86Operand::Reg(Register::Rdx),  // 3rd argument, also used in division
-        // X86Operand::Reg(Register::Rsi),  // 2nd argument
         X86Operand::Reg(Register::Rdi),  // 1st argument
-        // X86Operand::Reg(Register::R8),   // 5th argument
-        // X86Operand::Reg(Register::R9),   // 6th argument
+        X86Operand::Reg(Register::Rsi),  // 2nd argument
+        // X86Operand::Reg(Register::Rdx),  // 3rd argument, also used in division
+        X86Operand::Reg(Register::Rcx),  // 4th argument, also shift count, loop counter
+        X86Operand::Reg(Register::R8),   // 5th argument
+        X86Operand::Reg(Register::R9),   // 6th argument
+
         // X86Operand::Reg(Register::R10),  // Scratch (caller-saved temp), rarely reserved by ABI
         // X86Operand::Reg(Register::R11),  // Scratch (caller-saved temp), rarely reserved by ABI
 
@@ -745,8 +751,24 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<Str
         web_data.insert(method_name.clone(), (method_webs.clone(), interference.clone(), instr_map.clone()));
 
 
+        // Precolor all of the arguments to stay in their registers so they dont clobber eachother
+        // TODO what if the arguments arent that important to be in register for later
+        let mut precolored: HashMap<i32, X86Operand> = HashMap::new();
+        for (&pos, temp) in &method_cfg.param_to_temp {
+            if pos < 6 {
+                let var = &temp.name;
+                // find the web whose `variable == var`
+                if let Some((&web_id, _)) = method_webs
+                    .iter()
+                    .find(|(_, w)| &w.variable == var)
+                {
+                    precolored.insert(web_id, ARGUMENT_REGISTERS[pos as usize].clone());
+                }
+            }
+        }
+
         // Assign registers
-        let register_assignments = assign_registers(&interference, &usable_registers, &method_webs);
+        let register_assignments = assign_registers(&interference, &usable_registers, &method_webs, &precolored);
         if debug {
             for (web, reg) in &register_assignments {
                 println!("assigning web {:#?} to register {:#?}", web, reg);
