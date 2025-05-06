@@ -714,188 +714,6 @@ fn build_cond(
     }
 }
 
-/// Build the CFG for a conditional expression starting at cur_block.
-/// Implements short-circuiting.
-/// next_true_block is the block to jump to if the condition is true
-/// next_false_block is the block to jump to if the condition is false
-/// Falls through to next_true_block
-fn build_cond_loop(
-    cfg: &mut CFG,
-    expr: &SymExpr,
-    mut cur_block_id: i32,
-    next_true_block_id: i32,
-    next_false_block_id: i32,
-    cfg_scope: &CFGScope,
-    sym_scope: &Rc<RefCell<Scope>>,
-    strings: &mut Vec<String>,
-) {
-    match expr {
-        SymExpr::BinaryExpr {
-            op, left, right, ..
-        } => {
-            match op {
-                BinaryOp::And => {
-                    let left_true_block_id = next_bblock_id();
-                    let left_true_block = BasicBlock::new(left_true_block_id);
-                    cfg.add_block(&left_true_block);
-                    build_cond_loop(
-                        cfg,
-                        left,
-                        cur_block_id,
-                        left_true_block_id,
-                        next_false_block_id,
-                        cfg_scope,
-                        sym_scope,
-                        strings,
-                    );
-                    cfg.add_block_order(left_true_block_id); // add this block after the left condition blocks are added, but before the right
-                    // RHS is only evaluated if LHS is true
-                    build_cond_loop(
-                        cfg,
-                        right,
-                        left_true_block_id,
-                        next_true_block_id,
-                        next_false_block_id,
-                        cfg_scope,
-                        sym_scope,
-                        strings,
-                    );
-                }
-
-                BinaryOp::Or => {
-                    let left_false_block_id = next_bblock_id();
-                    let left_false_block = BasicBlock::new(left_false_block_id);
-                    cfg.add_block(&left_false_block);
-                    build_cond_loop(
-                        cfg,
-                        left,
-                        cur_block_id,
-                        next_true_block_id,
-                        left_false_block_id,
-                        cfg_scope,
-                        sym_scope,
-                        strings,
-                    );
-                    cfg.add_block_order(left_false_block_id); // add this block after the left condition blocks are added, but before the right
-                    // RHS is only evaluated if LHS is false
-                    build_cond_loop(
-                        cfg,
-                        right,
-                        left_false_block_id,
-                        next_true_block_id,
-                        next_false_block_id,
-                        cfg_scope,
-                        sym_scope,
-                        strings,
-                    );
-                }
-
-                // No short-circuiting necessary
-                _ => {
-                    let dest: Operand;
-                    (cur_block_id, dest) =
-                        destruct_expr(cfg, expr, cur_block_id, cfg_scope, sym_scope, strings);
-
-                    cfg.add_instruction_to_block(
-                        cur_block_id,
-                        Instruction::FJmp {
-                            name: cfg.name.clone(),
-                            condition: dest,
-                            id: next_false_block_id, // jump to false block if condition is false
-                        },
-                    );
-                    cfg.add_edge(
-                        cur_block_id,
-                        next_true_block_id,
-                        EdgeType::True,
-                    );
-
-                    cfg.add_instruction_to_block(
-                        cur_block_id,
-                        Instruction::UJmp {
-                            name: cfg.name.clone(),
-                            id: next_true_block_id, // fall through to true block
-                        },
-                    );
-                    cfg.add_edge(
-                        cur_block_id,
-                        next_false_block_id,
-                        EdgeType::False,
-                    );
-                }
-            }
-        }
-
-        SymExpr::UnaryExpr { op, expr, .. } => {
-            match op {
-                UnaryOp::Not => {
-                    // just swap the true and false blocks
-                    build_cond_loop(
-                        cfg,
-                        expr,
-                        cur_block_id,
-                        next_false_block_id,
-                        next_true_block_id,
-                        cfg_scope,
-                        sym_scope,
-                        strings,
-                    );
-                }
-
-                _ => {
-                    let dest: Operand;
-                    (cur_block_id, dest) =
-                        destruct_expr(cfg, expr, cur_block_id, cfg_scope, sym_scope, strings);
-
-                    cfg.add_instruction_to_block(
-                        cur_block_id,
-                        Instruction::FJmp {
-                            name: cfg.name.clone(),
-                            condition: dest,
-                            id: next_false_block_id, // jump to false block if condition is false
-                        },
-                    );
-                    cfg.add_edge(cur_block_id, next_true_block_id, EdgeType::True);
-
-                    cfg.add_instruction_to_block(
-                        cur_block_id,
-                        Instruction::UJmp {
-                            name: cfg.name.clone(),
-                            id: next_true_block_id, // fall through to true block
-                        },
-                    );
-                    cfg.add_edge(cur_block_id, next_false_block_id, EdgeType::False);
-                }
-            }
-        }
-
-        _ => {
-            let dest: Operand;
-            (cur_block_id, dest) =
-                destruct_expr(cfg, expr, cur_block_id, cfg_scope, sym_scope, strings);
-
-            cfg.add_instruction_to_block(
-                cur_block_id,
-                Instruction::FJmp {
-                    name: cfg.name.clone(),
-                    condition: dest,
-                    id: next_false_block_id, // jump to false block if condition is false
-                },
-            );
-            cfg.add_edge(cur_block_id, next_true_block_id, EdgeType::True);  
-
-            cfg.add_instruction_to_block(
-                cur_block_id,
-                Instruction::UJmp {
-                    name: cfg.name.clone(),
-                    id: next_true_block_id, // fall through to true block
-                },
-            );
-            cfg.add_edge(cur_block_id, next_false_block_id, EdgeType::False);
-        }
-    }
-}
-
 /// Destruct a statement starting at cur_block into basic blocks and add them to the method CFG.
 /// Returns the basic block at the end of the statement.
 fn destruct_statement(
@@ -1445,7 +1263,7 @@ fn destruct_statement(
 
             cfg.add_block_order(header_id); // add this block before the condition blocks
 
-            build_cond_loop(
+            build_cond(
                 cfg,
                 condition,
                 header_id,
@@ -1550,7 +1368,7 @@ fn destruct_statement(
             cfg.add_edge(cur_block_id, header_id, EdgeType::Unconditional);
         
             // build condition check
-            build_cond_loop(
+            build_cond(
                 cfg,
                 condition,
                 header_id,
