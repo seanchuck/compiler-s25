@@ -293,6 +293,18 @@ fn add_instruction(
             let right_op = map_operand(method_cfg, right, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
 
+            if let Some(_) = dest.get_reg() {
+                if dest_op != right_op {
+                    x86_instructions.push(X86Insn::Mov(left_op.clone(), dest_op.clone(), typ.clone()));
+                    x86_instructions.push(X86Insn::Add(right_op.clone(), dest_op.clone(), typ.clone()));
+                    return;
+                } else if dest_op != left_op {
+                    x86_instructions.push(X86Insn::Mov(right_op.clone(), dest_op.clone(), typ.clone()));
+                    x86_instructions.push(X86Insn::Add(left_op.clone(), dest_op.clone(), typ.clone()));
+                    return;
+                }
+            }
+
             let reg = reg_for_type(Register::Rax, &typ);
             x86_instructions.push(X86Insn::Mov(
                 left_op,
@@ -320,6 +332,14 @@ fn add_instruction(
             let left_op = map_operand(method_cfg, left, x86_instructions, globals);
             let right_op = map_operand(method_cfg, right, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
+            if let Some(_) = dest.get_reg() {
+                if dest_op != right_op {
+                    x86_instructions.push(X86Insn::Mov(left_op.clone(), dest_op.clone(), typ.clone()));
+                    x86_instructions.push(X86Insn::Sub(right_op.clone(), dest_op.clone(), typ.clone()));
+                    return;
+                }
+            }
 
             let reg = reg_for_type(Register::Rax, &typ);
             x86_instructions.push(X86Insn::Mov(
@@ -359,6 +379,13 @@ fn add_instruction(
 
             let src_reg = reg_for_type(Register::Rax, &src_typ);
             let dst_reg = reg_for_type(Register::Rax, &dest_typ);
+
+            // If either src or dest is a register, just do the move 
+            if src.get_reg().is_some() || dest.get_reg().is_some() {
+                println!("did smart assign");
+                x86_instructions.push(X86Insn::Mov(src_op.clone(), dest_op.clone(), dest_typ.clone()));
+                return;
+            }
 
             x86_instructions.push(X86Insn::Mov(
                 src_op,
@@ -487,7 +514,6 @@ fn add_instruction(
 
         
         Instruction::Ret { value, typ } => {
-            // TODO: uncomment
             let return_reg = reg_for_type(Register::Rax, &typ);
             // let return_reg = Register::Rax;
             if let Some(value) = value {
@@ -523,6 +549,18 @@ fn add_instruction(
             let left_op = map_operand(method_cfg, left, x86_instructions, globals);
             let right_op = map_operand(method_cfg, right, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
+            if let Some(_) = dest.get_reg() {
+                if dest_op != right_op {
+                    x86_instructions.push(X86Insn::Mov(left_op.clone(), dest_op.clone(), typ.clone()));
+                    x86_instructions.push(X86Insn::Mul(right_op.clone(), dest_op.clone()));
+                    return;
+                } else if dest_op != left_op {
+                    x86_instructions.push(X86Insn::Mov(right_op.clone(), dest_op.clone(), typ.clone()));
+                    x86_instructions.push(X86Insn::Mul(left_op.clone(), dest_op.clone()));
+                    return;
+                }
+            }
 
             let reg = reg_for_type(Register::Rax, &typ);
             x86_instructions.push(X86Insn::Mov(
