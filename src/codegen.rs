@@ -11,7 +11,7 @@ use crate::utils::print::{html_cfgs, print_cfg};
 use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use core::panic;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub const CALLEE_SAVED_REGISTERS: [Register; 5] = [Register::Rbx, Register::R12, Register::R13, Register::R14, Register::R15];
 
@@ -340,6 +340,12 @@ fn add_instruction(
         }
 
         Instruction::Assign { src, dest, .. } => {
+            if let Operand::Argument { position, .. } = src {
+                if *position <= 5 {
+                    return;     // Do not waste time moving args in if they are the first 6 bc of precolor
+                }
+            }
+
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let src_op = map_operand(method_cfg, src, x86_instructions, globals);
 
