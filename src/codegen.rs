@@ -743,6 +743,29 @@ fn generate_method_x86(
     x86_instructions
 }
 
+/// peephole optimization; eliminate chains of moves such as:
+/// move a, b
+/// move b, c
+/// move c, d
+fn optimize_mov_chains(insns: &mut Vec<X86Insn>) {
+    let mut i = 0;
+    while i < insns.len()-1 {
+        if let (
+            X86Insn::Mov(src1, dst1, ty1),
+            X86Insn::Mov(src2, dst2, ty2),
+        ) = (&insns[i], &insns[i + 1])
+        {
+            if dst1 == src2 && ty1 == ty2 {
+                // replace the two instructions with one
+                insns.splice(i..i + 2, [X86Insn::Mov(src1.clone(), dst2.clone(), ty1.clone())]);
+                // continue from same index to allow longer chains
+                continue;
+            }
+        }
+        i += 1;
+    }
+}
+
 /// Generate x86 assembly code from the CFG/
 pub fn generate_assembly(file: &str, filename: &str, optimizations: BTreeSet<Optimization>, writer: &mut dyn std::io::Write, debug: bool) {
     // Generate the method CFGS
@@ -803,7 +826,8 @@ pub fn generate_assembly(file: &str, filename: &str, optimizations: BTreeSet<Opt
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, method_cfg) in &method_cfgs {
         let mut method_cfg = method_cfg.clone();
-        let method_code = generate_method_x86(method_name, &mut method_cfg, &globals);
+        let mut method_code = generate_method_x86(method_name, &mut method_cfg, &globals);
+        optimize_mov_chains(&mut method_code);
         code.insert(method_name.clone(), method_code);
     }
 
