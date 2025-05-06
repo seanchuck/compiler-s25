@@ -525,17 +525,23 @@ pub fn assign_registers(
         }
     }
 
-    // Step 3: Assign colors
+    // Step 2.5, insert the precoloring
     let mut coloring: BTreeMap<Web, Option<X86Operand>> = BTreeMap::new();
+    // Step 2.5: Record all precolored webs in coloring
+    for (&node, reg) in precolored {
+        if let Some(web) = method_webs.get(&node) {
+            coloring.insert(web.clone(), Some(reg.clone()));
+        }
+    }
+
+    // Step 3: Assign colors
 
     while let Some(node) = stack.pop() {
-        // if this web was pre‑colored, record its color and skip the normal logic
-        if let Some(arg_reg) = precolored.get(&node) {
-            let web = method_webs.get(&node)
-                                        .expect("Should have found precolored web");
-            coloring.insert(web.clone(), Some(arg_reg.clone()));
+        // skip if already precolored
+        if precolored.contains_key(&node) {
             continue;
         }
+
         let mut used_colors = BTreeSet::new();
 
         if let Some(neighbors) = interference.neighbors(&node) {
@@ -772,12 +778,14 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<Str
         }
 
         // Assign registers
+        println!("Assigning Regs");
         let register_assignments = assign_registers(&interference, &usable_registers, &method_webs, &precolored);
         if debug {
-            for (web, reg) in &register_assignments {
-                println!("assigning web {:#?} to register {:#?}", web, reg);
-            }
+            // for (web, reg) in &register_assignments {
+            //     println!("assigning web {:#?} to register {:#?}", web, reg);
+            // }
         }
+        println!("Finish Assigning");
 
         // register information for visualization
         register_data.insert(method_name.clone(), register_assignments
@@ -789,7 +797,7 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<Str
     }
 
     // Generate visual HTML for all methods
-    html_web_graphs(&web_data, &register_data, "reg_alloc.html".to_string());
+    // html_web_graphs(&web_data, &register_data, "reg_alloc.html".to_string());
 
 }
 

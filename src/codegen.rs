@@ -13,6 +13,8 @@ use crate::{buildcfg::build_cfg, cfg::CFG};
 use core::panic;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
+pub const CALLEE_SAVED_REGISTERS: [Register; 5] = [Register::Rbx, Register::R12, Register::R13, Register::R14, Register::R15];
+
 pub const ARGUMENT_REGISTERS: [X86Operand; 6] = [X86Operand::Reg(Register::Rdi), X86Operand::Reg(Register::Rsi), 
                                                 X86Operand::Reg(Register::Rdx), X86Operand::Reg(Register::Rcx),
                                                 X86Operand::Reg(Register::R8), X86Operand::Reg(Register::R9)];
@@ -214,8 +216,11 @@ fn map_operand(
                         .typ
                         .clone();
 
-                    let num_regs_allocd = method_cfg.get_reg_allocs().len() as i64;
-                    let saved_regs_size = 8 * num_regs_allocd; // R12, R13, R14, R15
+                    let num_callee_saved_used = CALLEE_SAVED_REGISTERS
+                                                    .iter()
+                                                    .filter(|r| method_cfg.get_reg_allocs().contains(&X86Operand::Reg((**r).clone())) )
+                                                    .count() as i64;
+                    let saved_regs_size = 8 * num_callee_saved_used;
                     let offset = 16 + saved_regs_size + ((position - 6) as i64 * 8);
 
                     X86Operand::RegInt(Register::Rbp, offset, typ)
@@ -495,14 +500,12 @@ fn add_instruction(
                 Type::Long,
             ));
 
-            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R15)));
-            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R14)));
-            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R13)));
-            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R12)));
-            for reg in method_cfg.get_reg_allocs().iter().rev() {
-                x86_instructions.push(X86Insn::Pop(reg.clone()));
-            }
             x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp)));
+            for reg in CALLEE_SAVED_REGISTERS.iter().rev() {
+                if method_cfg.get_reg_allocs().contains(&X86Operand::Reg(reg.clone())) {
+                    x86_instructions.push(X86Insn::Pop(X86Operand::Reg(reg.clone())));
+                }
+            }
             x86_instructions.push(X86Insn::Ret);
         }
         Instruction::Multiply {
@@ -917,39 +920,55 @@ fn generate_method_x86(
 
     x86_instructions.push(X86Insn::Label(method_name.to_string()));
 
-    // method prologue
-    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rbp))); // push base pointer onto stack
-                                                                          // x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R12)));
-                                                                          // x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R13)));
-                                                                          // x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R14)));
-                                                                          // x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::R15)));
-    for reg in method_cfg.get_reg_allocs().iter() {
-        x86_instructions.push(X86Insn::Push(reg.clone()));
+    // === Method Prologue ===
+
+    // Track pushed callee-saved registers
+    let mut pushed_callee_saved: Vec<Register> = vec![];
+
+    for reg in CALLEE_SAVED_REGISTERS {
+        if method_cfg.get_reg_allocs().contains(&X86Operand::Reg(reg.clone())) {
+            x86_instructions.push(X86Insn::Push(X86Operand::Reg(reg.clone())));
+            pushed_callee_saved.push(reg);
+        }
     }
 
+    // Set up new frame and push RBP
+    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rbp)));
     x86_instructions.push(X86Insn::Mov(
         X86Operand::Reg(Register::Rsp),
         X86Operand::Reg(Register::Rbp),
         Type::Long,
-    )); // copy stack pointer to base pointer
+    ));
 
-    // Round up to the next 16-byte alignment
-    let aligned_stack_size = (method_cfg.stack_size + 15) / 16 * 16;
+    let stack_words = pushed_callee_saved.len();    //Add one for rbp maybe!!
+    let total_stack_size = method_cfg.stack_size;
 
-    // round up method_cfg.stack_size to be 16-byte aligned
-    x86_instructions.push(X86Insn::Sub(
-        X86Operand::Constant(aligned_stack_size),
-        X86Operand::Reg(Register::Rsp),
-        Type::Long,
-    )); // decrease stack pointer to allocate space on the stack
+    // Compute necessary padding for 16-byte alignment
+    // After pushes, RSP is 8 * stack_words below the original
+    let current_offset = (stack_words * 8) as i64;
+    let misalignment = (current_offset + total_stack_size) % 16;
 
-    // global array lengths
+    let aligned_stack_size = if misalignment == 0 {
+        total_stack_size
+    } else {
+        total_stack_size + (16 - misalignment)
+    };
+
+    // Allocate aligned local stack space
+    if aligned_stack_size > 0 {
+        x86_instructions.push(X86Insn::Sub(
+            X86Operand::Constant(aligned_stack_size),
+            X86Operand::Reg(Register::Rsp),
+            Type::Long,
+        ));
+    }
+
+    // === Main Function Array Length Setup ===
     if method_name == "main" {
         for global in globals.values() {
-            if global.length.is_some() {
-                // rax as working register
+            if let Some(len) = global.length {
                 x86_instructions.push(X86Insn::Mov(
-                    X86Operand::Constant(i64::from(global.length.unwrap())),
+                    X86Operand::Constant(len as i64),
                     X86Operand::Reg(Register::Rax),
                     Type::Long,
                 ));
@@ -962,31 +981,32 @@ fn generate_method_x86(
         }
     }
 
+    // === Method Body ===
     for (id, block) in method_cfg.get_blocks() {
-        x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
+        x86_instructions.push(X86Insn::Label(format!("{}{}", method_name, id)));
 
         for insn in block.get_instructions() {
             add_instruction(method_cfg, &insn, &mut x86_instructions, globals);
         }
 
         if *id == method_cfg.exit {
-            // method epilogue
+            // === Method Epilogue ===
+
+            // Restore RSP from RBP
             x86_instructions.push(X86Insn::Mov(
                 X86Operand::Reg(Register::Rbp),
                 X86Operand::Reg(Register::Rsp),
                 Type::Long,
-            )); // move base pointer to stack pointer
+            ));
 
-            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R15)));
-            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R14)));
-            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R13)));
-            // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R12)));
-            for reg in method_cfg.get_reg_allocs().iter().rev() {
-                x86_instructions.push(X86Insn::Pop(reg.clone()));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp)));
+
+            // Pop callee-saved in reverse
+            for reg in pushed_callee_saved.iter().rev() {
+                x86_instructions.push(X86Insn::Pop(X86Operand::Reg(reg.clone())));
             }
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
 
-            x86_instructions.push(X86Insn::Ret); // return to where function was called
+            x86_instructions.push(X86Insn::Ret);
         }
     }
 
