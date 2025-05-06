@@ -43,13 +43,16 @@ impl RegisterAllocationGraph {
                 }
 
                 let web = &self.webs[&current];
-                let register = register_assignments.get(&current).cloned().unwrap();
-                let reg_string;
-                if register.is_some() {
-                    reg_string = format!("{}", register.unwrap());
+                let register = register_assignments.get(&current).cloned();
+                let reg_string = if let Some(reg) = register {
+                    if let Some(actual_reg) = reg {
+                        format!("{}", actual_reg)
+                    } else {
+                        "unassigned".to_string()
+                    }
                 } else {
-                    reg_string = "unassigned".to_string();
-                }
+                    "unassigned".to_string()
+                };
 
                 let defs = web
                     .defs
