@@ -7,7 +7,7 @@ use crate::utils::visualizer::RegisterAllocationGraph;
 use crate::x86::X86Operand;
 
 use std::cell::RefCell;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::fs::File;
 use std::io::Write;
@@ -30,19 +30,12 @@ pub fn print_cfg(method_cfgs: &BTreeMap<String, CFG>) {
                     Instruction::Assign { src, dest, typ } => {
                         println!("        {dest}({typ}) <- {src}");
                     }
-                    Instruction::TJmp {
+                    Instruction::CJmp {
                         name,
                         condition,
                         id,
                     } => {
-                        println!("        tjmp {condition}, {name}{id}");
-                    }
-                    Instruction::FJmp {
-                        name,
-                        condition,
-                        id,
-                    } => {
-                        println!("        fjmp {condition}, {name}{id}");
+                        println!("        cjmp {condition}, {name}{id}");
                     }
                     Instruction::Cast {
                         expr,

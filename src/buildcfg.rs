@@ -616,7 +616,7 @@ fn build_cond(
 
                     cfg.add_instruction_to_block(
                         cur_block_id,
-                        Instruction::TJmp {
+                        Instruction::CJmp {
                             name: cfg.name.clone(),
                             condition: dest,
                             id: next_true_block_id
@@ -667,7 +667,7 @@ fn build_cond(
 
                     cfg.add_instruction_to_block(
                         cur_block_id,
-                        Instruction::TJmp {
+                        Instruction::CJmp {
                             name: cfg.name.clone(),
                             condition: dest,
                             id: next_true_block_id
@@ -694,7 +694,7 @@ fn build_cond(
 
             cfg.add_instruction_to_block(
                 cur_block_id,
-                Instruction::TJmp {
+                Instruction::CJmp {
                     name: cfg.name.clone(),
                     condition: dest,
                     id: next_true_block_id

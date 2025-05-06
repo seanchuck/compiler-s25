@@ -146,8 +146,7 @@ fn dead_code_elimination(method_cfg: &mut CFG, debug: bool) -> bool {
             let has_side_effect = match instr {
                 Instruction::MethodCall { .. }
                 | Instruction::Ret { .. }
-                | Instruction::TJmp { .. }
-                | Instruction::FJmp { .. }
+                | Instruction::CJmp { .. }
                 | Instruction::UJmp { .. }
                 | Instruction::Exit { .. } => true,
 
@@ -247,8 +246,7 @@ fn get_root_source(
 /// Returns true iff a mutation occurred.
 fn substitute_operand(op: &mut Operand, copy_to_src: &BTreeMap<String, String>, update_occurred: &mut bool, debug: bool) {
     match op {
-        //Operand::LocalVar(name, typ) => {
-        Operand::LocalVar { name, typ, reg }=> {
+        Operand::LocalVar { name, typ, .. }=> {
             // Substitute with the original source
             let root_src = get_root_source(name, copy_to_src);
             // Check whether an udpate occurred
@@ -486,8 +484,7 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                     invalidate(&dest.to_string(), &mut copy_to_src, &mut src_to_copies);
                 }
                 Instruction::UJmp { .. }
-                | Instruction::TJmp { .. }
-                | Instruction::FJmp { .. }
+                | Instruction::CJmp { .. }
                 | Instruction::Ret { .. }
                 | Instruction::Exit { .. } => {
                     if let Some(dest_name) = instr.get_def_var() {

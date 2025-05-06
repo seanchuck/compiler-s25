@@ -27,7 +27,6 @@ use crate::symtable::*;
 use crate::token::Literal;
 use crate::token::Span;
 use crate::traverse::traverse_ir;
-use crate::utils::print::*;
 
 // #################################################
 // HELPERS (these are vital, since so many rules are typechecking)

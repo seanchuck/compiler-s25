@@ -218,17 +218,11 @@ pub enum Instruction {
         name: String, // Name of the method containing the Bblock
         id: i32,      // ID of basic block to jump to
     },
-    TJmp {
+    CJmp {
         // conditional jump; jump if condition is TRUE
         name: String, // Name of the method containing the Bblock
         condition: Operand,
         id: i32, // ID of basic block to jump to if condition is true
-    },
-    FJmp {
-        // conditional jump; jump if condition is FALSE
-        name: String, // Name of the method containing the Bblock
-        condition: Operand,
-        id: i32, // ID of basic block to jump to if condition is false
     },
     Ret {
         typ: Type,
@@ -328,10 +322,7 @@ impl Instruction {
             }
 
             // Conditional jump depends on condition
-            Instruction::TJmp { condition, .. } => {
-                self.collect_vars_in_operand(condition)
-            }
-            Instruction::FJmp { condition, .. } => {
+            Instruction::CJmp { condition, .. } => {
                 self.collect_vars_in_operand(condition)
             }
 

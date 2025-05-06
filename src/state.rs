@@ -1,7 +1,7 @@
 /*
 Data structures for dataflow analysis.
 */
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use crate::cfg::*;
 use std::fmt;
 
@@ -9,8 +9,6 @@ use std::fmt;
 pub type CopyMap = BTreeMap<String, String>;
 
 pub type AvailableExpressions = BTreeMap<Expression, String>; // maps expression to variable
-
-pub type LiveVariables = BTreeSet<String>; // names of live local variables
 
 #[derive(Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum Expression {
