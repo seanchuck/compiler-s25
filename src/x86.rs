@@ -1,4 +1,3 @@
-use core::hash;
 /**
 Data structures for x86 code generation.
 **/

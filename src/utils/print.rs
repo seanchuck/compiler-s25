@@ -7,7 +7,7 @@ use crate::utils::visualizer::RegisterAllocationGraph;
 use crate::x86::X86Operand;
 
 use std::cell::RefCell;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::fs::File;
 use std::io::Write;

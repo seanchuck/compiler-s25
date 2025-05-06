@@ -44,6 +44,7 @@ pub struct CFG {
     // entry block has ID 0
     pub name: String,                      // Name of the method for the CFG
     pub blocks: BTreeMap<i32, BasicBlock>, // Maps the ID of basic block to its representation
+    pub block_order: Vec<i32>, // order to lay out basic blocks
     // no need to store edges because basic blocks end with a jump/branch instruction
 
     pub edges: BTreeMap<i32, HashSet<BlockEdge>>,
@@ -65,13 +66,19 @@ impl CFG {
             locals: BTreeMap::new(),
             param_to_temp: BTreeMap::new(),
             exit: 0, // index of the last basic block
+            block_order: Vec::new()
         }
     }
 
     /// Get all basic blocks
     pub fn get_blocks(&self) -> &BTreeMap<i32, BasicBlock> {
         &self.blocks
-    }  
+    }
+
+    /// get order of basic block IDs
+    pub fn get_block_order(&self) -> &Vec<i32> {
+        &self.block_order
+    }
 
     /// Get basic block with ID
     fn get_block_with_id(&mut self, id: i32) -> &mut BasicBlock {
@@ -84,7 +91,12 @@ impl CFG {
 
     /// Add a basic block with a given ID
     pub fn add_block(&mut self, block: &BasicBlock) {
-        self.blocks.insert(block.get_id(), block.clone());
+        self.blocks.insert(block.id, block.clone());
+    }
+
+    /// add the basic block with the given ID next in the order
+    pub fn add_block_order(&mut self, id: i32) {
+        self.block_order.push(id);
     }
 
     // Adds an edge to the CFG
@@ -369,10 +381,6 @@ impl BasicBlock {
             instructions: Vec::new(),
             id,
         }
-    }
-
-    pub fn get_id(&self) -> i32 {
-        self.id
     }
 
     pub fn get_instructions(&self) -> &Vec<Instruction> {

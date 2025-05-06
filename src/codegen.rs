@@ -1,17 +1,17 @@
 /**
  Generate x86 code from the Control flow graph.
  **/
-use crate::cfg::{Global, Local};
+use crate::cfg::Global;
 use crate::cfg::{INT_SIZE, LONG_SIZE};
 use crate::ast::Type;
 use crate::dataflow::optimize_dataflow;
-use crate::{tac::*};
+use crate::tac::*;
 use crate::utils::cli::Optimization;
 use crate::utils::print::{html_cfgs, print_cfg};
 use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use core::panic;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 
 fn is_immediate_operand(op: &X86Operand) -> bool {
@@ -70,7 +70,7 @@ fn map_operand(
     match operand {
         Operand::Const { value, .. } => X86Operand::Constant(*value),
 
-        Operand::LocalVar { name, typ, reg } => {
+        Operand::LocalVar { name, .. } => {
             let typ = method_cfg.locals.get(name).expect("missing temp in scope").typ.clone();
             X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(name), typ)
             // X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), Type::Long)
@@ -78,7 +78,7 @@ fn map_operand(
 
         Operand::GlobalVar { name, .. } => X86Operand::Global(name.to_string()),
 
-        Operand::LocalArrElement { name, index, typ, reg } => {
+        Operand::LocalArrElement { name, index, .. } => {
             let array_typ: Type = method_cfg.locals.get(name).expect("expected array entry").typ.clone();
             // println!("Matching operand for {:?}", index);
             let idx_op = map_operand(method_cfg, index, x86_instructions, globals);
@@ -114,7 +114,7 @@ fn map_operand(
 
         }
 
-        Operand::GlobalArrElement { name, index, typ, reg } => {
+        Operand::GlobalArrElement { name, index, typ, .. } => {
             let array_typ: Type = globals.get(name).expect("Global array not defined!").typ.clone();
             let idx_op = map_operand(method_cfg, index, x86_instructions, globals);
 
@@ -137,7 +137,7 @@ fn map_operand(
             X86Operand::Address(Some(name.to_string()), None, Register::R10, element_size, typ.clone())
         }
 
-        Operand::Argument { position, typ, reg } => {
+        Operand::Argument { position, typ, .. } => {
             match position {
                 0 => X86Operand::Reg(reg_for_type(Register::Rdi, typ)),
                 1 => X86Operand::Reg(reg_for_type(Register::Rsi, typ)),
@@ -614,8 +614,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
                 _ => cond_op,
             };
 
-
-            // cmp condition, 0 → is condition true?
+            // cmp condition; jump if condition is true
             x86_instructions.push(X86Insn::Mov(cond_op, X86Operand::Reg(Register::Eax), Type::Int));
             x86_instructions.push(X86Insn::Cmp(
                 X86Operand::Constant(0),
@@ -636,7 +635,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
 }
 
 /// Emit x86 code corresponding to the given CFG
-/// Returns a vector of strings of x86 instructions.
+/// Returns a vector of x86 instructions.
 fn generate_method_x86(
     method_name: &String,
     method_cfg: &mut CFG,
@@ -692,10 +691,30 @@ fn generate_method_x86(
         }
     }    
 
-    for (id, block) in method_cfg.get_blocks() {
+    let blocks = method_cfg.get_blocks();
+    let block_order = method_cfg.get_block_order();
+
+    for i in 0..block_order.len() {
+        let id = &block_order[i];
+        let block = &blocks[id];
         x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
 
-        for insn in block.get_instructions() {
+        let next_id = block_order.get(i + 1);
+        let block_instructions = block.get_instructions();
+
+        for (j, insn) in block_instructions.iter().enumerate() {
+            // skip unnecessary unconditional jumps
+            let is_last_insn = j == block_instructions.len() - 1;
+            if is_last_insn {
+                if let Instruction::UJmp { id, ..} = insn {
+                    if let Some(next) = next_id {
+                        if id == next  { // jump to the label right after this insn
+                            continue;
+                        }
+                    }
+                }
+            }
+
             add_instruction(method_cfg, &insn, &mut x86_instructions, globals);
         }
 
@@ -714,7 +733,11 @@ fn generate_method_x86(
             x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
 
             x86_instructions.push(X86Insn::Ret); // return to where function was called
+
+            continue;
         }
+
+
     }
 
     x86_instructions

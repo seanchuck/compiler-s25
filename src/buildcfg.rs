@@ -266,9 +266,12 @@ fn destruct_expr(
                     let temp = fresh_temp();
                     let dest = Operand::LocalVar { name: temp.to_string(), typ: Type::Bool, reg: None };
                     cfg.add_temp_var(temp, Type::Bool, None);
-                    let next_true_block = BasicBlock::new(next_bblock_id());
-                    let next_false_block = BasicBlock::new(next_bblock_id());
-                    let next_block = BasicBlock::new(next_bblock_id());
+                    let next_true_block_id = next_bblock_id();
+                    let next_true_block = BasicBlock::new(next_true_block_id);
+                    let next_false_block_id = next_bblock_id();
+                    let next_false_block = BasicBlock::new(next_false_block_id);
+                    let next_block_id = next_bblock_id();
+                    let next_block: BasicBlock = BasicBlock::new(next_block_id);
 
                     cfg.add_block(&next_true_block);
                     cfg.add_block(&next_false_block);
@@ -276,7 +279,7 @@ fn destruct_expr(
 
                     // if condition is true, set dest = 1 and jump to next_block
                     cfg.add_instruction_to_block(
-                        next_true_block.get_id(),
+                        next_true_block_id,
                         Instruction::Assign {
                             typ: Type::Bool,
                             src: Operand::Const { value: 1, typ: Type::Bool, reg: None },
@@ -284,16 +287,16 @@ fn destruct_expr(
                         },
                     );
                     cfg.add_instruction_to_block(
-                        next_true_block.get_id(),
+                        next_true_block_id,
                         Instruction::UJmp {
                             name: cfg.name.clone(),
-                            id: next_block.get_id(),
+                            id: next_block_id,
                         },
                     );
 
                     // if condition is false, set dest = 0 and jump to next_block
                     cfg.add_instruction_to_block(
-                        next_false_block.get_id(),
+                        next_false_block_id,
                         Instruction::Assign {
                             typ: Type::Bool,
                             src: Operand::Const { value: 0, typ: Type::Bool, reg: None },
@@ -301,10 +304,10 @@ fn destruct_expr(
                         },
                     );
                     cfg.add_instruction_to_block(
-                        next_false_block.get_id(),
+                        next_false_block_id,
                         Instruction::UJmp {
                             name: cfg.name.clone(),
-                            id: next_block.get_id(),
+                            id: next_block_id,
                         },
                     );
 
@@ -312,17 +315,22 @@ fn destruct_expr(
                         cfg,
                         expr,
                         cur_block_id,
-                        next_true_block.get_id(),
-                        next_false_block.get_id(),
+                        next_true_block_id,
+                        next_false_block_id,
                         cfg_scope,
                         sym_scope,
                         strings,
                     );
 
-                    cfg.add_edge(next_true_block.get_id(), next_block.get_id(), EdgeType::Unconditional);
-                    cfg.add_edge(next_false_block.get_id(), next_block.get_id(), EdgeType::Unconditional);
+                    // add these blocks after the condition blocks are added
+                    cfg.add_block_order(next_true_block_id);
+                    cfg.add_block_order(next_false_block_id);
+                    cfg.add_block_order(next_block_id);
 
-                    return (next_block.get_id(), dest);
+                    cfg.add_edge(next_true_block_id, next_block_id, EdgeType::Unconditional);
+                    cfg.add_edge(next_false_block_id, next_block_id, EdgeType::Unconditional);
+
+                    return (next_block_id, dest);
                 }
                 _ => {
                     let left_operand: Operand;
@@ -545,23 +553,25 @@ fn build_cond(
         } => {
             match op {
                 BinaryOp::And => {
-                    let left_true_block = BasicBlock::new(next_bblock_id());
+                    let left_true_block_id = next_bblock_id();
+                    let left_true_block = BasicBlock::new(left_true_block_id);
                     cfg.add_block(&left_true_block);
                     build_cond(
                         cfg,
                         left,
                         cur_block_id,
-                        left_true_block.get_id(),
+                        left_true_block_id,
                         next_false_block_id,
                         cfg_scope,
                         sym_scope,
                         strings,
                     );
+                    cfg.add_block_order(left_true_block_id); // add this block after the left condition blocks are added, but before the right
                     // RHS is only evaluated if LHS is true
                     build_cond(
                         cfg,
                         right,
-                        left_true_block.get_id(),
+                        left_true_block_id,
                         next_true_block_id,
                         next_false_block_id,
                         cfg_scope,
@@ -571,23 +581,25 @@ fn build_cond(
                 }
 
                 BinaryOp::Or => {
-                    let left_false_block = BasicBlock::new(next_bblock_id());
+                    let left_false_block_id = next_bblock_id();
+                    let left_false_block = BasicBlock::new(left_false_block_id);
                     cfg.add_block(&left_false_block);
                     build_cond(
                         cfg,
                         left,
                         cur_block_id,
                         next_true_block_id,
-                        left_false_block.get_id(),
+                        left_false_block_id,
                         cfg_scope,
                         sym_scope,
                         strings,
                     );
+                    cfg.add_block_order(left_false_block_id); // add this block after the left condition blocks are added, but before the right
                     // RHS is only evaluated if LHS is false
                     build_cond(
                         cfg,
                         right,
-                        left_false_block.get_id(),
+                        left_false_block_id,
                         next_true_block_id,
                         next_false_block_id,
                         cfg_scope,
@@ -607,7 +619,7 @@ fn build_cond(
                         Instruction::CJmp {
                             name: cfg.name.clone(),
                             condition: dest,
-                            id: next_true_block_id,
+                            id: next_true_block_id
                         },
                     );
                     cfg.add_edge(
@@ -620,7 +632,7 @@ fn build_cond(
                         cur_block_id,
                         Instruction::UJmp {
                             name: cfg.name.clone(),
-                            id: next_false_block_id,
+                            id: next_false_block_id
                         },
                     );
                     cfg.add_edge(
@@ -658,7 +670,7 @@ fn build_cond(
                         Instruction::CJmp {
                             name: cfg.name.clone(),
                             condition: dest,
-                            id: next_true_block_id,
+                            id: next_true_block_id
                         },
                     );
                     cfg.add_edge(cur_block_id, next_true_block_id, EdgeType::True);
@@ -667,7 +679,7 @@ fn build_cond(
                         cur_block_id,
                         Instruction::UJmp {
                             name: cfg.name.clone(),
-                            id: next_false_block_id,
+                            id: next_false_block_id
                         },
                     );
                     cfg.add_edge(cur_block_id, next_false_block_id, EdgeType::False);
@@ -685,7 +697,7 @@ fn build_cond(
                 Instruction::CJmp {
                     name: cfg.name.clone(),
                     condition: dest,
-                    id: next_true_block_id,
+                    id: next_true_block_id
                 },
             );
             cfg.add_edge(cur_block_id, next_true_block_id, EdgeType::True);  
@@ -694,7 +706,7 @@ fn build_cond(
                 cur_block_id,
                 Instruction::UJmp {
                     name: cfg.name.clone(),
-                    id: next_false_block_id,
+                    id: next_false_block_id
                 },
             );
             cfg.add_edge(cur_block_id, next_false_block_id, EdgeType::False);
@@ -1093,9 +1105,12 @@ fn destruct_statement(
             else_block,
             ..
         } => {
-            let body_block = &BasicBlock::new(next_bblock_id()); // the block that starts the body
-            let mut body_block_id = body_block.get_id();
+            let mut body_block_id = next_bblock_id();
+            let body_block = &BasicBlock::new(body_block_id); // the block that starts the body
+            
             cfg.add_block(&body_block);
+
+            let next_block_id: i32;
             let next_block: BasicBlock; // the block after the whole if
 
             let mut if_scope = CFGScope {
@@ -1104,11 +1119,13 @@ fn destruct_statement(
             };
 
             if else_block.is_some() {
-                let else_body_block = &BasicBlock::new(next_bblock_id());
-                let mut else_body_block_id = else_body_block.get_id();
+                let else_id = next_bblock_id();
+                let else_body_block = &BasicBlock::new(else_id);
+                let mut else_body_block_id = else_id;
                 cfg.add_block(&else_body_block);
 
-                next_block = BasicBlock::new(next_bblock_id());
+                next_block_id = next_bblock_id();
+                next_block = BasicBlock::new(next_block_id);
 
                 let mut else_scope = CFGScope {
                     parent: Some(Box::new(cfg_scope.clone())),
@@ -1125,6 +1142,8 @@ fn destruct_statement(
                     sym_scope,
                     strings,
                 );
+
+                cfg.add_block_order(body_block_id); // add this block after the condition blocks
 
                 // Note: use then_block sym_scope
                 for statement in &then_block.statements {
@@ -1144,9 +1163,11 @@ fn destruct_statement(
                     body_block_id,
                     Instruction::UJmp {
                         name: cfg.name.clone(),
-                        id: next_block.get_id(),
+                        id: next_block_id,
                     },
                 );
+
+                cfg.add_block_order(else_body_block_id); // add this block after blocks from statements in the if body
 
                 // same for else body if we have one
                 for statement in &else_block.clone().unwrap().statements {
@@ -1164,25 +1185,30 @@ fn destruct_statement(
                     else_body_block_id,
                     Instruction::UJmp {
                         name: cfg.name.clone(),
-                        id: next_block.get_id(),
+                        id: next_block_id,
                     },
                 );
 
-                cfg.add_edge(body_block_id, next_block.get_id(), EdgeType::Unconditional);
-                cfg.add_edge(else_body_block_id, next_block.get_id(), EdgeType::Unconditional);
-            } else {
-                next_block = BasicBlock::new(next_bblock_id());
+                cfg.add_block_order(next_block_id); // add this block after blocks from statements in the else body
+
+                cfg.add_edge(body_block_id, next_block_id, EdgeType::Unconditional);
+                cfg.add_edge(else_body_block_id, next_block_id, EdgeType::Unconditional);
+            } else { // no else block
+                next_block_id = next_bblock_id();
+                next_block = BasicBlock::new(next_block_id);
 
                 build_cond(
                     cfg,
                     condition,
                     cur_block_id,
                     body_block_id,
-                    next_block.get_id(),
+                    next_block_id,
                     cfg_scope,
                     sym_scope,
                     strings,
                 );
+
+                cfg.add_block_order(body_block_id); // add this block after the condition blocks
 
                 for statement in &then_block.statements {
                     body_block_id = destruct_statement(
@@ -1201,14 +1227,16 @@ fn destruct_statement(
                     body_block_id,
                     Instruction::UJmp {
                         name: cfg.name.clone(),
-                        id: next_block.get_id(),
+                        id: next_block_id,
                     },
                 );
-                cfg.add_edge(body_block_id, next_block.get_id(), EdgeType::Unconditional);
+                cfg.add_block_order(next_block_id); // add this block after blocks from statements in the if body
+
+                cfg.add_edge(body_block_id, next_block_id, EdgeType::Unconditional);
             }
 
             cfg.add_block(&next_block);
-            next_block.get_id()
+            next_block_id
         }
         SymStatement::While {
             condition, block, ..
@@ -1217,7 +1245,8 @@ fn destruct_statement(
             let header_block = BasicBlock::new(header_id); // the block that evaluates the loop condition
             let mut body_id = next_bblock_id();
             let body_block = &BasicBlock::new(body_id); // the block that starts the body
-            let next_block = BasicBlock::new(next_bblock_id()); // the block after the whole loop
+            let next_id = next_bblock_id();
+            let next_block = BasicBlock::new(next_id); // the block after the whole loop
             cfg.add_block(&header_block);
             cfg.add_block(&body_block);
             cfg.add_block(&next_block);
@@ -1227,24 +1256,26 @@ fn destruct_statement(
                 cur_block_id,
                 Instruction::UJmp {
                     name: cfg.name.clone(),
-                    id: header_block.get_id(),
+                    id: header_id,
                 },
             );
             cfg.add_edge(cur_block_id, header_id, EdgeType::Unconditional);
+
+            cfg.add_block_order(header_id); // add this block before the condition blocks
 
             build_cond(
                 cfg,
                 condition,
                 header_id,
                 body_id,
-                next_block.get_id(),
+                next_id,
                 cfg_scope,
                 sym_scope,
                 strings,
             );
 
             let next_loop = Loop {
-                break_to: next_block.get_id(),
+                break_to: next_id,
                 continue_to: header_id,
             };
 
@@ -1252,6 +1283,8 @@ fn destruct_statement(
                 parent: Some(Box::new(cfg_scope.clone())),
                 local_to_temp: HashMap::new(),
             };
+
+            cfg.add_block_order(body_id); // add this block before the blocks from statements in the loop body
 
             for statement in &block.statements {
                 body_id = destruct_statement(
@@ -1273,9 +1306,12 @@ fn destruct_statement(
                     id: header_id,
                 },
             );
+
+            cfg.add_block_order(next_id); // add this block after the blocks from statements in the loop body
+
             cfg.add_edge(body_id, header_id, EdgeType::Unconditional);
 
-            next_block.get_id()
+            next_id
         }
         SymStatement::For {
             var,
@@ -1291,7 +1327,8 @@ fn destruct_statement(
             let body_block = &BasicBlock::new(body_id); // body of the loop
             let update_block_id = next_bblock_id();
             let update_block = BasicBlock::new(update_block_id); // update block
-            let next_block = BasicBlock::new(next_bblock_id()); // block after loop
+            let next_id = next_bblock_id();
+            let next_block = BasicBlock::new(next_id); // block after loop
 
             cfg.add_block(&header_block);
             cfg.add_block(&body_block);
@@ -1305,10 +1342,6 @@ fn destruct_statement(
                 panic!("Expected a variable, found something else!");
             };
 
-            // assert_eq!(var_typ, var_typ2, "vars should be equal: {:#?}, {:#}", var_typ, var_typ2);
-
-            //TODO SEAN FIGURE OUT WHY TEH ABOVE CODE DOESNT WORK I have the workaround but its inelligant
-
             let lhs = cfg_scope.lookup_var(var.to_string(), var_typ.clone(), None);
             let rhs: Operand;
             (cur_block_id, rhs) =
@@ -1321,6 +1354,8 @@ fn destruct_statement(
                     dest: lhs,
                 },
             );
+
+            cfg.add_block_order(header_id); // add this block after the init, before the condition
 
             // jump to loop condition check
             cfg.add_instruction_to_block(
@@ -1338,15 +1373,17 @@ fn destruct_statement(
                 condition,
                 header_id,
                 body_id,
-                next_block.get_id(),
+                next_id,
                 cfg_scope,
                 sym_scope,
                 strings,
             );
 
+            cfg.add_block_order(body_id); // add this block after the condition
+
             // loop struct
             let next_loop = Loop {
-                break_to: next_block.get_id(),
+                break_to: next_id,
                 continue_to: update_block_id, // ← fix: continue should go to update
             };
 
@@ -1378,6 +1415,8 @@ fn destruct_statement(
                 },
             );
             cfg.add_edge(body_id, update_block_id, EdgeType::Unconditional);
+
+            cfg.add_block_order(update_block_id); // add this block before destructing the update
         
             // update block executes update expression
             let mut update_id = update_block_id;
@@ -1400,8 +1439,10 @@ fn destruct_statement(
                 },
             );
             cfg.add_edge(update_id, header_id, EdgeType::Unconditional);
+
+            cfg.add_block_order(next_id); // add this after all for loop blocks
         
-            next_block.get_id()
+            next_id
         }
 
         SymStatement::Break { .. } => {
@@ -1535,6 +1576,7 @@ fn destruct_method(method: &Rc<SymMethod>, strings: &mut Vec<String>) -> CFG {
     let mut cur_block_id = next_bblock_id(); // should be 0
     let entry_block = BasicBlock::new(cur_block_id);
     method_cfg.add_block(&entry_block);
+    method_cfg.add_block_order(cur_block_id);
 
     // add parameters to method scope
     for (pos, (typ, param_name, ..)) in method.params.iter().enumerate() {

@@ -35,6 +35,12 @@ for file in "$BASE_DIR/$ERROR_DIR"/err*; do
             continue
         fi
 
+        # ==== NEW: Dump assembly ====
+        echo -e "\n--- Assembly Output ---" | tee -a "$OUTPUT_FILE"
+        cat "$assembly_file" | tee -a "$OUTPUT_FILE"
+        echo -e "--- End Assembly ---\n" | tee -a "$OUTPUT_FILE"
+        # ===========================
+
         # If it compiles, try to assemble and link
         gcc -O0 -no-pie "$assembly_file" -o "$executable_file"
         if [[ $? -ne 0 ]]; then

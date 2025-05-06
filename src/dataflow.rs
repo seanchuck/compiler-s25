@@ -246,8 +246,7 @@ fn get_root_source(
 /// Returns true iff a mutation occurred.
 fn substitute_operand(op: &mut Operand, copy_to_src: &BTreeMap<String, String>, update_occurred: &mut bool, debug: bool) {
     match op {
-        //Operand::LocalVar(name, typ) => {
-        Operand::LocalVar { name, typ, reg }=> {
+        Operand::LocalVar { name, typ, .. }=> {
             // Substitute with the original source
             let root_src = get_root_source(name, copy_to_src);
             // Check whether an udpate occurred

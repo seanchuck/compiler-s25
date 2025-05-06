@@ -8,7 +8,7 @@
  * @author 6.1100 Staff, last updated January 2024
  */
 use clap::Parser;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 
 #[derive(Clone, clap::ValueEnum, Debug)]
 pub enum CompilerAction {

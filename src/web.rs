@@ -1,6 +1,6 @@
 use crate::tac::Instruction;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet},
     hash::Hash,
 };
 

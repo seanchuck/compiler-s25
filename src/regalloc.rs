@@ -28,104 +28,6 @@ fn compute_instr_map(method_cfg: &CFG) -> InstructionMap {
     InstructionMap(map)
 }
 
-
-// only consider local variables for now (no array elements)
-fn compute_def_use_sets(method_cfg: &CFG) -> BTreeMap<i32, DefUse> {
-    let mut block_def_use = BTreeMap::new();
-
-    for (block_id, _) in method_cfg.blocks.iter() {
-        let mut def_set = BTreeSet::new();
-        let mut use_set = BTreeSet::new();
-
-        for instr in method_cfg
-            .blocks
-            .get(block_id)
-            .unwrap()
-            .instructions
-            .iter()
-        {
-            match instr {
-                Instruction::Assign { src, dest, .. } => {
-                    add_use(&mut use_set, &def_set, src);
-                    add_def(&mut def_set, dest);
-                }
-                Instruction::Add { left, right, dest, .. }
-                | Instruction::Subtract { left, right, dest, .. }
-                | Instruction::Multiply { left, right, dest, .. }
-                | Instruction::Divide { left, right, dest, .. }
-                | Instruction::Modulo { left, right, dest, .. }
-                | Instruction::Greater { left, right, dest }
-                | Instruction::Less { left, right, dest }
-                | Instruction::LessEqual { left, right, dest }
-                | Instruction::GreaterEqual { left, right, dest }
-                | Instruction::Equal { left, right, dest }
-                | Instruction::NotEqual { left, right, dest } => {
-                    add_use(&mut use_set, &def_set, left);
-                    add_use(&mut use_set, &def_set, right);
-                    add_def(&mut def_set, dest);
-                }
-                Instruction::Not { expr, dest }
-                | Instruction::Cast { expr, dest, .. }
-                | Instruction::Len { expr, dest, .. }
-                | Instruction::LoadString { src: expr, dest } => {
-                    add_use(&mut use_set, &def_set, expr);
-                    add_def(&mut def_set, dest);
-                }
-                Instruction::MethodCall { args, dest, .. } => {
-                    for arg in args {
-                        add_use(&mut use_set, &def_set, arg);
-                    }
-                    if let Some(d) = dest {
-                        add_def(&mut def_set, d);
-                    }
-                }
-                Instruction::CJmp { condition, .. } => {
-                    add_use(&mut use_set, &def_set, condition);
-                }
-                Instruction::Ret { value, .. } => {
-                    if let Some(v) = value {
-                        add_use(&mut use_set, &def_set, v);
-                    }
-                }
-                Instruction::LoadConst { dest, .. } => {
-                    add_def(&mut def_set, dest);
-                }
-                Instruction::Exit { .. } 
-                | Instruction::UJmp { .. } => {
-                    // no defs or uses
-                }
-            }
-        }
-
-        block_def_use.insert(block_id.clone(), DefUse { defs: def_set, uses: use_set });
-    }
-
-    block_def_use
-}
-
-
-fn add_use(use_set: &mut BTreeSet<String>, def_set: &BTreeSet<String>, operand: &Operand) {
-    if let Some(name) = get_local_var_name(operand) {
-        // don't include uses of variables that were defined within this basic block
-        if !def_set.contains(&name) {
-            use_set.insert(name);
-        }
-    }
-}
-
-fn add_def(def_set: &mut BTreeSet<String>, operand: &Operand) {
-    if let Some(name) = get_local_var_name(operand) {
-        def_set.insert(name);
-    }
-}
-
-fn get_local_var_name(operand: &Operand) -> Option<String> {
-    match operand {
-        Operand::LocalVar { name, .. } => Some(name.clone()),
-        _ => None
-    }
-}
-
 fn instr_defs_var(inst: &Instruction, var: &str) -> bool {
     if let Some(def) = inst.get_def_var() {
         if def == var {
@@ -188,18 +90,6 @@ fn uses_from_def(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet
 
     uses
 }
-
-
-
-fn add_new_use(use_set: &mut BTreeSet<String>, def_set: &BTreeSet<String>, operand: &Operand) {
-    if let Some(name) = get_local_var_name(operand) {
-        // don't include uses of variables that were defined within this basic block
-        if !def_set.contains(&name) {
-            use_set.insert(name);
-        }
-    }
-}
-
 
 fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet<InstructionIndex> {
     let mut defs = BTreeSet::new();
@@ -675,12 +565,12 @@ fn apply_reg_assignments(method_cfg: &mut CFG, assignments: BTreeMap<Web, Option
         // }
         for web_def in web.defs.iter() {
             // Replace def instruction so def operand has register: reg_opt
-            let mut instruction = method_cfg.get_instruction(web_def.block_id, web_def.instr_index);
+            let instruction = method_cfg.get_instruction(web_def.block_id, web_def.instr_index);
             add_def_reg(instruction, reg_opt);
         }
         for web_use in web.uses.iter() {
             // Replace use instruction so use operand has register: reg_opt
-            let mut instruction = method_cfg.get_instruction(web_use.block_id, web_use.instr_index);
+            let instruction = method_cfg.get_instruction(web_use.block_id, web_use.instr_index);
             add_use_reg(instruction, reg_opt, &web.variable);
         }
     }
