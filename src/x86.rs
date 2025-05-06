@@ -18,7 +18,7 @@ pub enum X86Insn {
     Div(X86Operand, Type),
     Cdq,
     Cqto,
-    Xor(X86Operand, X86Operand),
+    Xor(X86Operand, X86Operand, Type),
     Or(X86Operand, X86Operand),
     Shl(X86Operand, X86Operand),
     Call(String),
@@ -189,7 +189,7 @@ impl fmt::Display for X86Insn {
             X86Insn::Div(divisor, _typ) => {write!(f, "    idiv {}", divisor)}
             X86Insn::Cdq => write!(f, "    cdq"),
             X86Insn::Cqto => write!(f, "    cqto"),
-            X86Insn::Xor(src, dst) => write!(f, "    xor {}, {}", src, dst),
+            X86Insn::Xor(src, dst, typ) => write!(f, "    xor{} {}, {}", suffix(typ), src, dst),
             X86Insn::Call(label) => write!(f, "    call {}", label),
             X86Insn::Label(name) => write!(f, "{}:", name),
             X86Insn::Jmp(label) => write!(f, "    jmp {}", label),

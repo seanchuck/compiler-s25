@@ -317,8 +317,8 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             }
 
             // Zero rax before call
-            x86_instructions.push(X86Insn::Mov(
-                X86Operand::Constant(0),
+            x86_instructions.push(X86Insn::Xor(
+                X86Operand::Reg(Register::Rax),
                 X86Operand::Reg(Register::Rax),
                 Type::Long
             ));
@@ -430,6 +430,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
             x86_instructions.push(X86Insn::Xor(
                 X86Operand::Constant(1),
                 X86Operand::Reg(reg.clone()),
+                Type::Bool
             ));
             x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), dest_op, Type::Bool));
         }
@@ -626,7 +627,7 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
         Instruction::Exit { exit_code } => {
             x86_instructions.push(X86Insn::Mov(
                 X86Operand::Constant(*exit_code),
-                X86Operand::Reg(Register::Rax),
+                X86Operand::Reg(Register::Rdi), // exit code goes in RDI
                 Type::Long
             ));
             x86_instructions.push(X86Insn::Exit);
