@@ -529,7 +529,11 @@ pub fn assign_registers(
     let mut coloring: BTreeMap<Web, Option<X86Operand>> = BTreeMap::new();
 
     while let Some(node) = stack.pop() {
-        if precolored.contains_key(&node) {
+        // if this web was pre‑colored, record its color and skip the normal logic
+        if let Some(arg_reg) = precolored.get(&node) {
+            let web = method_webs.get(&node)
+                                        .expect("Should have found precolored web");
+            coloring.insert(web.clone(), Some(arg_reg.clone()));
             continue;
         }
         let mut used_colors = BTreeSet::new();

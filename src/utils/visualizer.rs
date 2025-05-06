@@ -69,15 +69,16 @@ impl RegisterAllocationGraph {
 
                 let label = format!(
                     "<<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">\n\
-                        <TR><TD COLSPAN=\"2\"><B>Web {}</B></TD></TR>\n\
+                        <TR><TD COLSPAN=\"2\"><B>Web {} → {}</B></TD></TR>\n\
                         <TR><TD><I>Var</I></TD><TD>{}</TD></TR>\n\
                         <TR><TD><I>Register</I></TD><TD>{}</TD></TR>\n\
                         <TR><TD><I>Defs</I></TD><TD ALIGN=\"LEFT\">{}</TD></TR>\n\
                         <TR><TD><I>Uses</I></TD><TD ALIGN=\"LEFT\">{}</TD></TR>\n\
-                        </TABLE>>",
+                    </TABLE>>",
                     web.id,
+                    reg_string,           // ← show allocation in the title
                     web.variable,
-                    reg_string,
+                    reg_string,           // still show under “Register”
                     defs.replace("\\l", "<BR ALIGN=\"LEFT\"/>"),
                     uses.replace("\\l", "<BR ALIGN=\"LEFT\"/>"),
                 );

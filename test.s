@@ -8,6 +8,274 @@ str1:
     .string "memoized: %d\n"
 str2:
     .string "iterative: %d\n"
+fib_recursive:
+    pushq %rbp
+    pushq %rcx
+    pushq %rsi
+    pushq %rdi
+    movq %rsp, %rbp
+    subq $112, %rsp
+fib_recursive0:
+    movl %edi, %eax
+    movl %eax, %edi
+    movl $0, %ecx
+    cmpl %ecx, %edi
+    sete %al
+    movzbq %al, %rax
+    movl %eax, %ecx
+    movl %ecx, %eax
+    cmpl $0, %eax
+    jne fib_recursive1
+
+    jmp fib_recursive4
+fib_recursive1:
+    movl %edi, %r10d
+    addl $1, %r10d
+    movl base_cases(, %r10, 4), %eax
+    movl %eax, -24(%rbp)
+    movl -24(%rbp), %eax
+    movq %rbp, %rsp
+    popq %rdi
+    popq %rsi
+    popq %rcx
+    popq %rbp
+    ret
+fib_recursive2:
+    movl $1, %ecx
+    movl %edi, %eax
+    subl %ecx, %eax
+    movl %eax, %ecx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movl 24(%rsp), %edi
+    xor %rax, %rax
+    call fib_recursive
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movl %eax, %esi
+    movl $2, %ecx
+    movl %edi, %eax
+    subl %ecx, %eax
+    movl %eax, %ecx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movl 24(%rsp), %edi
+    xor %rax, %rax
+    call fib_recursive
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movl %eax, %ecx
+    movl %esi, %eax
+    addl %ecx, %eax
+    movl %eax, -60(%rbp)
+    movl -60(%rbp), %eax
+    movq %rbp, %rsp
+    popq %rdi
+    popq %rsi
+    popq %rcx
+    popq %rbp
+    ret
+fib_recursive3:
+    movq $-1, %rdi
+    call exit
+    movq %rbp, %rsp
+    popq %rdi
+    popq %rsi
+    popq %rcx
+    popq %rbp
+    ret
+fib_recursive4:
+    movl $1, %ecx
+    cmpl %ecx, %edi
+    sete %al
+    movzbq %al, %rax
+    movl %eax, %ecx
+    movl %ecx, %eax
+    cmpl $0, %eax
+    jne fib_recursive1
+
+    jmp fib_recursive2
+
+fib_iterative:
+    pushq %rbp
+    pushq %rcx
+    pushq %rsi
+    pushq %rdi
+    pushq %r8
+    pushq %r9
+    movq %rsp, %rbp
+    subq $96, %rsp
+fib_iterative0:
+    movl %edi, %eax
+    movl %eax, %edi
+    movl $0, %ecx
+    movl %ecx, %eax
+    movl %eax, %r9d
+    movl $1, %ecx
+    movl %ecx, %eax
+    movl %eax, %r8d
+    movl $2, %ecx
+    movl %ecx, %eax
+    movl %eax, %esi
+    jmp fib_iterative1
+fib_iterative1:
+    cmpl %edi, %esi
+    setle %al
+    movzbq %al, %rax
+    movl %eax, %ecx
+    movl %ecx, %eax
+    cmpl $0, %eax
+    jne fib_iterative2
+
+    jmp fib_iterative4
+fib_iterative2:
+    movl %r9d, %eax
+    addl %r8d, %eax
+    movl %eax, %ecx
+    movl %r8d, %eax
+    movl %eax, %r9d
+    movl %ecx, %eax
+    movl %eax, %r8d
+    jmp fib_iterative3
+fib_iterative3:
+    movl $1, %ecx
+    movl %esi, %eax
+    addl %ecx, %eax
+    movl %eax, %esi
+    jmp fib_iterative1
+fib_iterative4:
+    movl %r8d, %eax
+    movq %rbp, %rsp
+    popq %r9
+    popq %r8
+    popq %rdi
+    popq %rsi
+    popq %rcx
+    popq %rbp
+    ret
+
+fib_memoized:
+    pushq %rbp
+    pushq %rcx
+    pushq %rsi
+    pushq %rdi
+    movq %rsp, %rbp
+    subq $128, %rsp
+fib_memoized0:
+    movl %edi, %eax
+    movl %eax, %edi
+    movl %edi, %r10d
+    addl $1, %r10d
+    movl is_memoized(, %r10, 4), %eax
+    movl %eax, %ecx
+    movl %ecx, %eax
+    cmpl $0, %eax
+    jne fib_memoized1
+
+    jmp fib_memoized2
+fib_memoized1:
+    movl %edi, %r10d
+    addl $1, %r10d
+    movl memoization(, %r10, 4), %eax
+    movl %eax, -12(%rbp)
+    movl -12(%rbp), %eax
+    movq %rbp, %rsp
+    popq %rdi
+    popq %rsi
+    popq %rcx
+    popq %rbp
+    ret
+fib_memoized2:
+    movl $0, %ecx
+    cmpl %ecx, %edi
+    sete %al
+    movzbq %al, %rax
+    movl %eax, %ecx
+    movl %ecx, %eax
+    cmpl $0, %eax
+    jne fib_memoized4
+
+    jmp fib_memoized7
+fib_memoized3:
+    movq $-1, %rdi
+    call exit
+    movq %rbp, %rsp
+    popq %rdi
+    popq %rsi
+    popq %rcx
+    popq %rbp
+    ret
+fib_memoized4:
+    movl %edi, %eax
+    movl %eax, %ecx
+    jmp fib_memoized6
+fib_memoized5:
+    movl $1, %ecx
+    movl %edi, %eax
+    subl %ecx, %eax
+    movl %eax, %ecx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movl 24(%rsp), %edi
+    xor %rax, %rax
+    call fib_memoized
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movl %eax, %esi
+    movl $2, %ecx
+    movl %edi, %eax
+    subl %ecx, %eax
+    movl %eax, %ecx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movl 24(%rsp), %edi
+    xor %rax, %rax
+    call fib_memoized
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movl %eax, %ecx
+    movl %esi, %eax
+    addl %ecx, %eax
+    movl %eax, %ecx
+    movl %ecx, %eax
+    movl %eax, %ecx
+    jmp fib_memoized6
+fib_memoized6:
+    movl %edi, %r10d
+    addl $1, %r10d
+    movl %ecx, %eax
+    movl %eax, memoization(, %r10, 4)
+    movl %edi, %r10d
+    addl $1, %r10d
+    movl $1, %eax
+    movl %eax, is_memoized(, %r10, 4)
+    movl %ecx, %eax
+    movq %rbp, %rsp
+    popq %rdi
+    popq %rsi
+    popq %rcx
+    popq %rbp
+    ret
+fib_memoized7:
+    movl $1, %ecx
+    cmpl %ecx, %edi
+    sete %al
+    movzbq %al, %rax
+    movl %eax, %ecx
+    movl %ecx, %eax
+    cmpl $0, %eax
+    jne fib_memoized4
+
+    jmp fib_memoized5
+
 .globl main
 main:
     pushq %rbp
@@ -110,254 +378,4 @@ main0:
     popq %rcx
     popq %rbp
     ret
-
-fib_iterative:
-    pushq %rbp
-    pushq %rcx
-    pushq %rsi
-    pushq %rdi
-    pushq %r8
-    movq %rsp, %rbp
-    subq $96, %rsp
-fib_iterative0:
-    movl %edi, %eax
-    movl %eax, -4(%rbp)
-    movl $0, %ecx
-    movl %ecx, %eax
-    movl %eax, %r8d
-    movl $1, %ecx
-    movl %ecx, %eax
-    movl %eax, %edi
-    movl $2, %ecx
-    movl %ecx, %eax
-    movl %eax, %esi
-    jmp fib_iterative1
-fib_iterative1:
-    cmpl -4(%rbp), %esi
-    setle %al
-    movzbq %al, %rax
-    movl %eax, %ecx
-    movl %ecx, %eax
-    cmpl $0, %eax
-    jne fib_iterative2
-
-    jmp fib_iterative4
-fib_iterative2:
-    movl %r8d, %eax
-    addl %edi, %eax
-    movl %eax, %ecx
-    movl %edi, %eax
-    movl %eax, %r8d
-    movl %ecx, %eax
-    movl %eax, %edi
-    jmp fib_iterative3
-fib_iterative3:
-    movl $1, %ecx
-    movl %esi, %eax
-    addl %ecx, %eax
-    movl %eax, %esi
-    jmp fib_iterative1
-fib_iterative4:
-    movl %edi, %eax
-    movq %rbp, %rsp
-    popq %r8
-    popq %rdi
-    popq %rsi
-    popq %rcx
-    popq %rbp
-    ret
-
-fib_memoized:
-    pushq %rbp
-    pushq %rcx
-    pushq %rsi
-    movq %rsp, %rbp
-    subq $128, %rsp
-fib_memoized0:
-    movl %edi, %eax
-    movl %eax, -4(%rbp)
-    movl -4(%rbp), %r10d
-    addl $1, %r10d
-    movl is_memoized(, %r10, 4), %eax
-    movl %eax, %ecx
-    movl %ecx, %eax
-    cmpl $0, %eax
-    jne fib_memoized1
-
-    jmp fib_memoized2
-fib_memoized1:
-    movl -4(%rbp), %r10d
-    addl $1, %r10d
-    movl memoization(, %r10, 4), %eax
-    movl %eax, -12(%rbp)
-    movl -12(%rbp), %eax
-    movq %rbp, %rsp
-    popq %rsi
-    popq %rcx
-    popq %rbp
-    ret
-fib_memoized2:
-    movl $0, %ecx
-    cmpl %ecx, -4(%rbp)
-    sete %al
-    movzbq %al, %rax
-    movl %eax, %ecx
-    movl %ecx, %eax
-    cmpl $0, %eax
-    jne fib_memoized4
-
-    jmp fib_memoized7
-fib_memoized3:
-    movq $-1, %rdi
-    call exit
-    movq %rbp, %rsp
-    popq %rsi
-    popq %rcx
-    popq %rbp
-    ret
-fib_memoized4:
-    movl -4(%rbp), %eax
-    movl %eax, %ecx
-    jmp fib_memoized6
-fib_memoized5:
-    movl $1, %ecx
-    movl -4(%rbp), %eax
-    subl %ecx, %eax
-    movl %eax, %ecx
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movl 24(%rsp), %edi
-    xor %rax, %rax
-    call fib_memoized
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movl %eax, %esi
-    movl $2, %ecx
-    movl -4(%rbp), %eax
-    subl %ecx, %eax
-    movl %eax, %ecx
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movl 24(%rsp), %edi
-    xor %rax, %rax
-    call fib_memoized
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movl %eax, %ecx
-    movl %esi, %eax
-    addl %ecx, %eax
-    movl %eax, %ecx
-    movl %ecx, %eax
-    movl %eax, %ecx
-    jmp fib_memoized6
-fib_memoized6:
-    movl -4(%rbp), %r10d
-    addl $1, %r10d
-    movl %ecx, %eax
-    movl %eax, memoization(, %r10, 4)
-    movl -4(%rbp), %r10d
-    addl $1, %r10d
-    movl $1, %eax
-    movl %eax, is_memoized(, %r10, 4)
-    movl %ecx, %eax
-    movq %rbp, %rsp
-    popq %rsi
-    popq %rcx
-    popq %rbp
-    ret
-fib_memoized7:
-    movl $1, %ecx
-    cmpl %ecx, -4(%rbp)
-    sete %al
-    movzbq %al, %rax
-    movl %eax, %ecx
-    movl %ecx, %eax
-    cmpl $0, %eax
-    jne fib_memoized4
-
-    jmp fib_memoized5
-
-fib_recursive:
-    pushq %rbp
-    pushq %rcx
-    pushq %rsi
-    movq %rsp, %rbp
-    subq $112, %rsp
-fib_recursive0:
-    movl %edi, %eax
-    movl %eax, -4(%rbp)
-    movl $0, %ecx
-    cmpl %ecx, -4(%rbp)
-    sete %al
-    movzbq %al, %rax
-    movl %eax, %ecx
-    movl %ecx, %eax
-    cmpl $0, %eax
-    jne fib_recursive1
-
-    jmp fib_recursive4
-fib_recursive1:
-    movl -4(%rbp), %r10d
-    addl $1, %r10d
-    movl base_cases(, %r10, 4), %eax
-    movl %eax, -24(%rbp)
-    movl -24(%rbp), %eax
-    movq %rbp, %rsp
-    popq %rsi
-    popq %rcx
-    popq %rbp
-    ret
-fib_recursive2:
-    movl $1, %ecx
-    movl -4(%rbp), %eax
-    subl %ecx, %eax
-    movl %eax, %ecx
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movl 24(%rsp), %edi
-    xor %rax, %rax
-    call fib_recursive
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movl %eax, %esi
-    movl $2, %ecx
-    movl -4(%rbp), %eax
-    subl %ecx, %eax
-    movl %eax, %ecx
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movl 24(%rsp), %edi
-    xor %rax, %rax
-    call fib_recursive
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movl %eax, %ecx
-    movl %esi, %eax
-    addl %ecx, %eax
-    movl %eax, -60(%rbp)
-    movl -60(%rbp), %eax
-    movq %rbp, %rsp
-    popq %rsi
-    popq %rcx
-    popq %rbp
-    ret
-fib_recursive3:
-    movq $-1, %rdi
-    call exit
-    movq %rbp, %rsp
-    popq %rsi
-    popq %rcx
-    popq %rbp
-    ret
-fib_recursive4:
-    movl $1, %ecx
-    cmpl %ecx, -4(%rbp)
-    sete %al
-    movzbq %al, %rax
-    movl %eax, %ecx
-    movl %ecx, %eax
-    cmpl $0, %eax
-    jne fib_recursive1
-
-    jmp fib_recursive2
 
