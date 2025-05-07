@@ -702,7 +702,7 @@ fn generate_x86_blocks(method_cfg: &CFG, globals: &BTreeMap<String, Global>) -> 
 fn generate_method_x86(
     method_name: &String,
     method_cfg: &CFG,
-    x86_blocks: HashMap<i32, Vec<X86Insn>>,
+    x86_blocks: &HashMap<i32, Vec<X86Insn>>,
     globals: &BTreeMap<String, Global>
 ) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
@@ -825,8 +825,8 @@ pub fn generate_assembly(file: &str, filename: &str, optimizations: BTreeSet<Opt
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, method_cfg) in &method_cfgs {
         let mut x86_blocks = generate_x86_blocks(method_cfg, &globals);
-        peephole(method_cfg, &mut x86_blocks);
-        let method_code = generate_method_x86(method_name, method_cfg, x86_blocks, &globals);
+        peephole(method_cfg, &mut x86_blocks, debug);
+        let method_code = generate_method_x86(method_name, method_cfg, &x86_blocks, &globals);
         code.insert(method_name.clone(), method_code);
     }
 
