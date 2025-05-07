@@ -778,12 +778,6 @@ pub fn generate_assembly(file: &str, filename: &str, optimizations: BTreeSet<Opt
 
     // Perform dataflow optimizations (includes register allocation)
     optimize_dataflow(&mut method_cfgs, &optimizations, &globals, debug);
-    
-    if debug {
-        print_cfg(&method_cfgs);
-        html_cfgs(&method_cfgs, "opt.html".to_string());
-        println!("\n========== X86 Code ==========\n");
-    }
 
 
     let mut global_code: Vec<X86Insn> = Vec::new();
@@ -828,6 +822,12 @@ pub fn generate_assembly(file: &str, filename: &str, optimizations: BTreeSet<Opt
         peephole(method_cfg, &mut x86_blocks, debug);
         let method_code = generate_method_x86(method_name, method_cfg, &x86_blocks, &globals);
         code.insert(method_name.clone(), method_code);
+    }
+
+    if debug {
+        print_cfg(&method_cfgs);
+        html_cfgs(&method_cfgs, "opt.html".to_string());
+        println!("\n========== X86 Code ==========\n");
     }
 
     // Emit the final code

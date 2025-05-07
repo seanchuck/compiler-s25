@@ -195,8 +195,13 @@ fn optimize_mov_chains(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86In
             {
                 if dst1 == src2 && ty1 == ty2 {
                     if !insn_liveness.contains(dst1) { // operand is dead after second instruction
+                        let new_insn = X86Insn::Mov(src1.clone(), dst2.clone(), ty1.clone());
+                        if debug {
+                            println!("replacing {}; {} with {}", &insns[i], &insns[i + 1], new_insn);
+                        }
+
                         // replace the two instructions with one
-                        insns.splice(i..i + 2, [X86Insn::Mov(src1.clone(), dst2.clone(), ty1.clone())]);
+                        insns.splice(i..i + 2, [new_insn]);
                         // continue from same index to allow longer chains
                         continue;
                     }
@@ -209,5 +214,9 @@ fn optimize_mov_chains(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86In
 
 /// perform peephole optimizations on the x86 basic blocks within a method
 pub fn peephole(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
+    if debug {
+        println!("\n========== Peephole Optimizations ==========\n");
+    }
+
     optimize_mov_chains(method_cfg, x86_blocks, debug);
 }
