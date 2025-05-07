@@ -372,7 +372,7 @@ impl CFGScope {
 pub struct BasicBlock {
     // Basic block is just a vector of instructions
     pub instructions: Vec<Instruction>,
-    id: i32, // TODO: can add meaningful labels to each BB instead of referring to them by ID
+    id: i32
 }
 
 impl BasicBlock {

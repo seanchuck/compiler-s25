@@ -54,9 +54,3 @@ pub struct InstructionIndex {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct InstructionMap(pub BTreeMap<InstructionIndex, Instruction>);
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct DefUse {
-    pub defs: BTreeSet<String>, // all variables that are defined in this basic block
-    pub uses: BTreeSet<String>, // all variables that are used in this basic block
-}

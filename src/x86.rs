@@ -2,8 +2,14 @@
 Data structures for x86 code generation.
 **/
 
-use std::fmt;
+use std::{collections::HashSet, fmt};
 use crate::ast::Type;
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct DefUse {
+    pub defs: HashSet<X86Operand>, // all operands that are assigned to in this basic block
+    pub uses: HashSet<X86Operand>, // all operands that are used in this basic block (but weren't defined in the same block)
+}
 
 #[derive(Debug, Clone)]
 pub enum X86Insn {

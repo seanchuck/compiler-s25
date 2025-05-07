@@ -1,7 +1,8 @@
 /**
  Generate x86 code from the Control flow graph.
- **/
+**/
 use crate::cfg::Global;
+use crate::cfg::BasicBlock;
 use crate::cfg::{INT_SIZE, LONG_SIZE};
 use crate::ast::Type;
 use crate::dataflow::optimize_dataflow;
@@ -12,7 +13,7 @@ use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use core::panic;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-
+use crate::peephole::peephole;
 
 fn is_immediate_operand(op: &X86Operand) -> bool {
     matches!(op, X86Operand::Constant(_))
@@ -121,7 +122,7 @@ fn map_operand(
             let index_reg: Register = reg_for_type(Register::R10, &Type::Int);
 
             x86_instructions.push(X86Insn::Mov(idx_op, X86Operand::Reg(index_reg.clone()), Type::Int)); // store index in r10d
-           
+        
             x86_instructions.push(X86Insn::Add(
                 X86Operand::Constant(1),
                 X86Operand::Reg(index_reg.clone()),
@@ -183,7 +184,7 @@ fn map_operand(
 
 
 // Adds the x86 instructions corresponding to insn to x86_instructions
-fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut Vec<X86Insn>, globals: &BTreeMap<String, Global>) {
+fn add_instruction(method_cfg: &CFG, insn: &Instruction, x86_instructions: &mut Vec<X86Insn>, globals: &BTreeMap<String, Global>) {
     // println!("Adding instruction: {:?}", insn);
     match insn {
         Instruction::LoadConst { src, dest, typ } => {
@@ -634,11 +635,74 @@ fn add_instruction(method_cfg: &CFG,  insn: &Instruction, x86_instructions: &mut
     }
 }
 
+/// returns x86 instructions corresponding to the instructions in the basic block
+fn generate_x86_block(method_cfg: &CFG, id: &i32, block: &BasicBlock, next_id: Option<&i32>, globals: &BTreeMap<String, Global>) -> Vec<X86Insn> {
+    let mut x86_instructions: Vec<X86Insn> = Vec::new();
+    let method_name = &method_cfg.name;
+
+    x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
+
+    let block_instructions = block.get_instructions();
+
+    for (j, insn) in block_instructions.iter().enumerate() {
+        // skip unnecessary unconditional jumps
+        let is_last_insn = j == block_instructions.len() - 1;
+        if is_last_insn {
+            if let Instruction::UJmp { id, ..} = insn {
+                if let Some(next) = next_id {
+                    if id == next  { // jump to the label right after this insn
+                        continue;
+                    }
+                }
+            }
+        }
+
+        add_instruction(method_cfg, &insn, &mut x86_instructions, globals);
+    }
+
+    if *id == method_cfg.exit {
+        // method epilogue
+        x86_instructions.push(X86Insn::Mov(
+            X86Operand::Reg(Register::Rbp),
+            X86Operand::Reg(Register::Rsp),
+            Type::Long
+        )); // move base pointer to stack pointer
+
+        x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R15)));
+        x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R14)));
+        x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R13)));
+        x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R12)));
+        x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
+
+        x86_instructions.push(X86Insn::Ret); // return to where function was called
+    }
+
+    x86_instructions
+}
+
+/// returns a map from ID of basic block to a vector of x86 instructions representing it
+fn generate_x86_blocks(method_cfg: &CFG, globals: &BTreeMap<String, Global>) -> HashMap<i32, Vec<X86Insn>> {
+    let mut output_map = HashMap::new();
+
+    let blocks = method_cfg.get_blocks();
+    let block_order = method_cfg.get_block_order();
+
+    for i in 0..block_order.len() {
+        let id = &block_order[i];
+        let block = &blocks[id];
+        let next_id = block_order.get(i + 1);
+        output_map.insert(*id, generate_x86_block(method_cfg, id, block, next_id, globals));
+    }
+
+    output_map
+}
+
 /// Emit x86 code corresponding to the given CFG
 /// Returns a vector of x86 instructions.
 fn generate_method_x86(
     method_name: &String,
-    method_cfg: &mut CFG,
+    method_cfg: &CFG,
+    x86_blocks: HashMap<i32, Vec<X86Insn>>,
     globals: &BTreeMap<String, Global>
 ) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
@@ -691,79 +755,13 @@ fn generate_method_x86(
         }
     }    
 
-    let blocks = method_cfg.get_blocks();
     let block_order = method_cfg.get_block_order();
 
     for i in 0..block_order.len() {
-        let id = &block_order[i];
-        let block = &blocks[id];
-        x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
-
-        let next_id = block_order.get(i + 1);
-        let block_instructions = block.get_instructions();
-
-        for (j, insn) in block_instructions.iter().enumerate() {
-            // skip unnecessary unconditional jumps
-            let is_last_insn = j == block_instructions.len() - 1;
-            if is_last_insn {
-                if let Instruction::UJmp { id, ..} = insn {
-                    if let Some(next) = next_id {
-                        if id == next  { // jump to the label right after this insn
-                            continue;
-                        }
-                    }
-                }
-            }
-
-            add_instruction(method_cfg, &insn, &mut x86_instructions, globals);
-        }
-
-        if *id == method_cfg.exit {
-            // method epilogue
-            x86_instructions.push(X86Insn::Mov(
-                X86Operand::Reg(Register::Rbp),
-                X86Operand::Reg(Register::Rsp),
-                Type::Long
-            )); // move base pointer to stack pointer
-
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R15)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R14)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R13)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::R12)));
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
-
-            x86_instructions.push(X86Insn::Ret); // return to where function was called
-
-            continue;
-        }
-
-
+        x86_instructions.extend(x86_blocks[&(i as i32)].clone());
     }
 
     x86_instructions
-}
-
-/// peephole optimization; eliminate chains of moves such as:
-/// move a, b
-/// move b, c
-/// move c, d
-fn optimize_mov_chains(insns: &mut Vec<X86Insn>) {
-    let mut i = 0;
-    while i < insns.len()-1 {
-        if let (
-            X86Insn::Mov(src1, dst1, ty1),
-            X86Insn::Mov(src2, dst2, ty2),
-        ) = (&insns[i], &insns[i + 1])
-        {
-            if dst1 == src2 && ty1 == ty2 {
-                // replace the two instructions with one
-                insns.splice(i..i + 2, [X86Insn::Mov(src1.clone(), dst2.clone(), ty1.clone())]);
-                // continue from same index to allow longer chains
-                continue;
-            }
-        }
-        i += 1;
-    }
 }
 
 /// Generate x86 assembly code from the CFG/
@@ -825,9 +823,10 @@ pub fn generate_assembly(file: &str, filename: &str, optimizations: BTreeSet<Opt
     // Generate a vector of x86 for each method
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, method_cfg) in &method_cfgs {
-        let mut method_cfg = method_cfg.clone();
-        let mut method_code = generate_method_x86(method_name, &mut method_cfg, &globals);
-        optimize_mov_chains(&mut method_code);
+        let method_cfg = method_cfg.clone();
+        let mut x86_blocks = generate_x86_blocks(&method_cfg, &globals);
+        peephole(&method_cfg, &mut x86_blocks);
+        let method_code = generate_method_x86(method_name, &method_cfg, x86_blocks, &globals);
         code.insert(method_name.clone(), method_code);
     }
 
