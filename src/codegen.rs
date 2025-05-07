@@ -244,32 +244,13 @@ fn add_instruction(
                     ));
                 }
                 Type::Long => {
-                    // Must load uppper and lower 32 bits separately since assembler doesn't
-                    // support loading a 64-bit constant directly
-                    x86_instructions.push(X86Insn::Mov(
-                        X86Operand::Constant(((src.clone() as u64) & 0xFFFFFFFF) as i64),
-                        X86Operand::Reg(Register::R10),
-                        Type::Long,
-                    )); // lower 32 bits
-                    x86_instructions.push(X86Insn::Mov(
-                        X86Operand::Constant(((src.clone() as u64) >> 32) as i64),
-                        X86Operand::Reg(Register::Rax),
-                        Type::Long,
-                    )); // upper 32 bits
-                    x86_instructions.push(X86Insn::Shl(
-                        X86Operand::Constant(32),
-                        X86Operand::Reg(Register::Rax),
-                    ));
-                    x86_instructions.push(X86Insn::Or(
-                        X86Operand::Reg(Register::Rax),
-                        X86Operand::Reg(Register::R10),
-                    ));
                     let dest_location = map_operand(method_cfg, dest, x86_instructions, globals);
-                    x86_instructions.push(X86Insn::Mov(
-                        X86Operand::Reg(Register::R10),
-                        dest_location,
-                        Type::Long,
-                    ));
+                    if dest.get_reg().is_some() {
+                        x86_instructions.push(X86Insn::Loadlong(*src, dest_location));
+                    } else {
+                        x86_instructions.push(X86Insn::Loadlong(*src, X86Operand::Reg(Register::Rax)));
+                        x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_location, Type::Long));
+                    }
                 }
                 _ => panic!("Load const only defined for numeric types"),
             }
@@ -401,7 +382,6 @@ fn add_instruction(
 
             // If either src or dest is a register, just do the move
             if src.get_reg().is_some() || dest.get_reg().is_some() {
-                println!("did smart assign");
                 x86_instructions.push(X86Insn::Mov(
                     src_op.clone(),
                     dest_op.clone(),

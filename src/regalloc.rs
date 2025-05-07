@@ -643,8 +643,8 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<Str
         let interference = build_interference_graph_from_spans(&live_spans);
 
         if debug {
-            println!("webs for {method_name} is {:#?}", method_webs);
-            println!("interference graph for {method_name} is {:#?}", interference);
+            // println!("webs for {method_name} is {:#?}", method_webs);
+            // println!("interference graph for {method_name} is {:#?}", interference);
         }
 
         // Save data for visualization
@@ -668,14 +668,14 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<Str
         }
 
         // Assign registers
-        println!("Assigning Regs");
+        // println!("Assigning Regs");
         let register_assignments = assign_registers(&interference, &usable_registers, &method_webs, &precolored);
         if debug {
             // for (web, reg) in &register_assignments {
             //     println!("assigning web {:#?} to register {:#?}", web, reg);
             // }
         }
-        println!("Finish Assigning");
+        // println!("Finish Assigning");
 
         // register information for visualization
         register_data.insert(method_name.clone(), register_assignments

@@ -38,6 +38,7 @@ pub enum X86Insn {
     Comm(String, i64, i64), // name, size, alignment
     String(String),
     Global(String),
+    Loadlong(i64, X86Operand),
     Exit
 }
 
@@ -254,6 +255,7 @@ impl fmt::Display for X86Insn {
             X86Insn::Global(val) => write!(f, ".globl {val}"),
             X86Insn::Or(src, dst) => write!(f, "    orq {src}, {dst}"),
             X86Insn::Shl(src, dst) => write!(f, "    shlq {src}, {dst}"),
+            X86Insn::Loadlong(constant, dst) => write!(f, "    movabs ${constant}, {dst}"),
         }
     }
 }
