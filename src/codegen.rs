@@ -272,7 +272,7 @@ fn add_instruction(
                     // support loading a 64-bit constant directly
                     x86_instructions.push(X86Insn::Mov(
                         X86Operand::Constant(((src.clone() as u64) & 0xFFFFFFFF) as i64),
-                        X86Operand::Reg(Register::Rbx),
+                        X86Operand::Reg(Register::R10),
                         Type::Long,
                     )); // lower 32 bits
                     x86_instructions.push(X86Insn::Mov(
@@ -286,11 +286,11 @@ fn add_instruction(
                     ));
                     x86_instructions.push(X86Insn::Or(
                         X86Operand::Reg(Register::Rax),
-                        X86Operand::Reg(Register::Rbx),
+                        X86Operand::Reg(Register::R10),
                     ));
                     let dest_location = map_operand(method_cfg, dest, x86_instructions, globals);
                     x86_instructions.push(X86Insn::Mov(
-                        X86Operand::Reg(Register::Rbx),
+                        X86Operand::Reg(Register::R10),
                         dest_location,
                         Type::Long,
                     ));

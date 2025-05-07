@@ -726,7 +726,7 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<Str
         // X86Operand::Reg(Register::R11),  // Scratch (caller-saved temp), rarely reserved by ABI
 
         // // Callee saved (non-volatile) — must be preserved by callee across calls
-        // X86Operand::Reg(Register::Rbx),  // Callee saved (general-purpose)
+        X86Operand::Reg(Register::Rbx),  // Callee saved (general-purpose)
         // X86Operand::Reg(Register::Rbp),  // Frame/base pointer
         // X86Operand::Reg(Register::Rsp),  // Stack pointer (NEVER allocate)
         X86Operand::Reg(Register::R12),  // Callee saved (you’re using this for allocation)
