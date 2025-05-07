@@ -195,7 +195,7 @@ void perform_sort_and_print(long arr_ptr, int array_size) {
 void write_array() {
   int i;
 
-  num_open_file_write("output/mergesort.txt");
+  num_open_file_write("tests/phase5/output/mergesort.txt");
   for (i = 0; i < 250; i++) {
     num_write_num_int(SAMPLED_INTS[i]);
   }
