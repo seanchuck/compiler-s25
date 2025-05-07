@@ -2,119 +2,147 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h>
-#include <time.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <errno.h>
 
-// ========== FILE I/O ==========
-static FILE *output_file = NULL;
+// ——————————————————————————————————————————
+// globals for ptr_* functions
+// ——————————————————————————————————————————
+static void *last_allocated = NULL;
 
-void num_open_file_write(const char *filename) {
-    char pathbuf[512];
-    // Prepend tests/phase5/ to the user‐supplied filename
-    snprintf(pathbuf, sizeof(pathbuf), "tests/phase5/%s", filename);
-
-    output_file = fopen(pathbuf, "w");
-    if (!output_file) {
-        perror("Failed to open file");
+void ptr_alloc(long size)
+{
+    last_allocated = malloc((size_t)size);
+    if (!last_allocated)
+    {
+        perror("malloc");
         exit(1);
     }
 }
 
-void num_write_num(int num) {
-    if (output_file) {
-        fprintf(output_file, "%d\n", num);
-    }
+long ptr_add_int(long base, int offset)
+{
+    return (long)((uintptr_t)base + offset);
 }
 
-void num_write_num_int(int num) {
-    if (output_file) {
-        fprintf(output_file, "%d\n", num);
-    }
+void ptr_write_int(long addr, int value)
+{
+    int *p = (int *)(uintptr_t)addr;
+    *p = value;
 }
 
-void num_close_file() {
-    if (output_file) {
-        fclose(output_file);
-        output_file = NULL;
-    }
+int ptr_read_int(long addr)
+{
+    int *p = (int *)(uintptr_t)addr;
+    return *p;
 }
 
-// ========== MEMORY MODEL ==========
-#define MEM_SIZE (1 << 27)  // 128 MB
-static uint8_t *memory = NULL;
-static uintptr_t next_free = 0;
-static uintptr_t last_base = 0;
+int ptr_get_lower(void)
+{
+    uintptr_t p = (uintptr_t)last_allocated;
+    return (int)(p & 0xFFFFFFFF);
+}
 
-void ptr_alloc(long size) {
-    if (!memory) {
-        memory = malloc(MEM_SIZE);
-        if (!memory) {
-            perror("malloc failed");
-            exit(1);
-        }
-        next_free = 0;
-    }
-    if (next_free + (uintptr_t)size > MEM_SIZE) {
-        fprintf(stderr, "Out of memory in ptr_alloc\n");
+int ptr_get_upper(void)
+{
+    uintptr_t p = (uintptr_t)last_allocated;
+    return (int)((p >> 32) & 0xFFFFFFFF);
+}
+
+void ptr_free(long addr)
+{
+    void *p = (void *)(uintptr_t)addr;
+    free(p);
+}
+
+// ——————————————————————————————————————————
+// globals for num_* file I/O
+// ——————————————————————————————————————————
+static FILE *out_file = NULL;
+
+void num_open_file_write(const char *filename)
+{
+    // ensure the test harness directory exists
+    if (mkdir("tests/phase5/output", 0755) && errno != EEXIST)
+    {
+        perror("mkdir tests/phase5/output");
         exit(1);
     }
-    last_base = next_free;
-    next_free += (uintptr_t)size;
-}
 
-int ptr_get_lower() {
-    return (int)(last_base & 0xFFFFFFFFU);
-}
-
-int ptr_get_upper() {
-    return (int)(last_base >> 32);
-}
-
-void ptr_free(long addr) {
-    (void)addr;
-}
-
-int ptr_read_int(long addr) {
-    if (addr < 0 || (uintptr_t)addr + sizeof(int) > MEM_SIZE) {
-        fprintf(stderr, "Invalid read at %ld\n", addr);
+    out_file = fopen(filename, "w");
+    if (!out_file)
+    {
+        perror("fopen");
         exit(1);
     }
-    int v;
-    memcpy(&v, memory + addr, sizeof(v));
-    return v;
 }
 
-void ptr_write_int(long addr, int value) {
-    if (addr < 0 || (uintptr_t)addr + sizeof(int) > MEM_SIZE) {
-        fprintf(stderr, "Invalid write at %ld\n", addr);
+void num_write_num(double x)
+{
+    if (!out_file)
+    {
+        fputs("File not open\n", stderr);
         exit(1);
     }
-    memcpy(memory + addr, &value, sizeof(value));
+    fprintf(out_file, "%f\n", x);
 }
 
-long ptr_add_int(long ptr, int offset) {
-    return ptr + (long)offset * 4L;
-}
-
-// ========== TIMER ==========
-static clock_t start_time, end_time;
-
-void start_timer() {
-    start_time = clock();
-}
-
-void end_timer() {
-    end_time = clock();
-}
-
-void timer_print() {
-    double duration = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-    printf("Execution time: %.4f seconds\n", duration);
-}
-
-void timer_write() {
-    if (output_file) {
-        double duration = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-        fprintf(output_file, "Execution time: %.4f seconds\n", duration);
+void num_write_num_int(int x)
+{
+    if (!out_file)
+    {
+        fputs("File not open\n", stderr);
+        exit(1);
     }
+    fprintf(out_file, "%d\n", x);
+}
+
+void num_close_file(void)
+{
+    if (out_file)
+    {
+        fclose(out_file);
+        out_file = NULL;
+    }
+}
+
+// ——————————————————————————————————————————
+// timer_* functions
+// ——————————————————————————————————————————
+static struct timeval tv_start, tv_end;
+static double elapsed_time;
+
+void start_timer(void)
+{
+    gettimeofday(&tv_start, NULL);
+}
+
+void end_timer(void)
+{
+    gettimeofday(&tv_end, NULL);
+    elapsed_time = (tv_end.tv_sec - tv_start.tv_sec) + (tv_end.tv_usec - tv_start.tv_usec) / 1e6;
+}
+
+void timer_print(void)
+{
+    printf("Elapsed time: %f seconds\n", elapsed_time);
+}
+
+void timer_write(void)
+{
+    // write timing out alongside mergesort output if you like:
+    if (mkdir("tests/phase5/output", 0755) && errno != EEXIST)
+    {
+        perror("mkdir tests/phase5/output");
+        exit(1);
+    }
+    FILE *tf = fopen("tests/phase5/output/timer.txt", "w");
+    if (!tf)
+    {
+        perror("fopen timer");
+        exit(1);
+    }
+    fprintf(tf, "%f\n", elapsed_time);
+    fclose(tf);
 }

@@ -25,9 +25,9 @@ try:
     print("Output: ================================================")
     for i in range(len(numbers) - 1):
         print(numbers[i])
-        # if numbers[i] > numbers[i + 1]:
-        #     print(f"Error: Numbers not sorted at index {i} ({numbers[i]} > {numbers[i+1]})")
-        #     sys.exit(1)
+        if numbers[i] > numbers[i + 1]:
+            print(f"Error: Numbers not sorted at index {i} ({numbers[i]} > {numbers[i+1]})")
+            sys.exit(1)
     print("Output: ================================================")
 
     print("Output verification passed: numbers are sorted.")
