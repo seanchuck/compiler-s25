@@ -648,9 +648,9 @@ fn generate_x86_block(method_cfg: &CFG, id: &i32, block: &BasicBlock, next_id: O
         // skip unnecessary unconditional jumps
         let is_last_insn = j == block_instructions.len() - 1;
         if is_last_insn {
-            if let Instruction::UJmp { id, ..} = insn {
+            if let Instruction::UJmp { id: jump_to, ..} = insn {
                 if let Some(next) = next_id {
-                    if id == next  { // jump to the label right after this insn
+                    if jump_to == next  { // jump to the label right after this insn
                         continue;
                     }
                 }
@@ -758,7 +758,8 @@ fn generate_method_x86(
     let block_order = method_cfg.get_block_order();
 
     for i in 0..block_order.len() {
-        x86_instructions.extend(x86_blocks[&(i as i32)].clone());
+        let id = &block_order[i];
+        x86_instructions.extend(x86_blocks[id].clone());
     }
 
     x86_instructions
@@ -823,10 +824,9 @@ pub fn generate_assembly(file: &str, filename: &str, optimizations: BTreeSet<Opt
     // Generate a vector of x86 for each method
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, method_cfg) in &method_cfgs {
-        let method_cfg = method_cfg.clone();
-        let mut x86_blocks = generate_x86_blocks(&method_cfg, &globals);
-        peephole(&method_cfg, &mut x86_blocks);
-        let method_code = generate_method_x86(method_name, &method_cfg, x86_blocks, &globals);
+        let mut x86_blocks = generate_x86_blocks(method_cfg, &globals);
+        peephole(method_cfg, &mut x86_blocks);
+        let method_code = generate_method_x86(method_name, method_cfg, x86_blocks, &globals);
         code.insert(method_name.clone(), method_code);
     }
 
