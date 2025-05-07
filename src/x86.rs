@@ -19,7 +19,7 @@ pub enum X86Insn {
     Cqto,
     Xor(X86Operand, X86Operand, Type),
     Or(X86Operand, X86Operand),
-    Shl(X86Operand, X86Operand),
+    Shl(X86Operand, X86Operand, Type),
     Call(String),
     Label(String),
     Jmp(String),
@@ -39,6 +39,7 @@ pub enum X86Insn {
     String(String),
     Global(String),
     Loadlong(i64, X86Operand),
+    SarImm(u32, X86Operand),
     Exit
 }
 
@@ -254,8 +255,10 @@ impl fmt::Display for X86Insn {
             X86Insn::String(val) => write!(f, "    .string \"{val}\""),
             X86Insn::Global(val) => write!(f, ".globl {val}"),
             X86Insn::Or(src, dst) => write!(f, "    orq {src}, {dst}"),
-            X86Insn::Shl(src, dst) => write!(f, "    shlq {src}, {dst}"),
+            X86Insn::Shl(src, dst, typ) => write!(f, "    shl{} {}, {}", suffix(typ), src, dst),
             X86Insn::Loadlong(constant, dst) => write!(f, "    movabs ${constant}, {dst}"),
+            X86Insn::SarImm(shift, dst) => write!(f, "    sar ${}, {}", shift, dst),
+
         }
     }
 }
