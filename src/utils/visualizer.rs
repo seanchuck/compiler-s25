@@ -43,13 +43,16 @@ impl RegisterAllocationGraph {
                 }
 
                 let web = &self.webs[&current];
-                let register = register_assignments.get(&current).cloned().unwrap();
-                let reg_string;
-                if register.is_some() {
-                    reg_string = format!("{}", register.unwrap());
+                let register = register_assignments.get(&current).cloned();
+                let reg_string = if let Some(reg) = register {
+                    if let Some(actual_reg) = reg {
+                        format!("{}", actual_reg)
+                    } else {
+                        "unassigned".to_string()
+                    }
                 } else {
-                    reg_string = "unassigned".to_string();
-                }
+                    "unassigned".to_string()
+                };
 
                 let defs = web
                     .defs
@@ -66,15 +69,16 @@ impl RegisterAllocationGraph {
 
                 let label = format!(
                     "<<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">\n\
-                        <TR><TD COLSPAN=\"2\"><B>Web {}</B></TD></TR>\n\
+                        <TR><TD COLSPAN=\"2\"><B>Web {} → {}</B></TD></TR>\n\
                         <TR><TD><I>Var</I></TD><TD>{}</TD></TR>\n\
                         <TR><TD><I>Register</I></TD><TD>{}</TD></TR>\n\
                         <TR><TD><I>Defs</I></TD><TD ALIGN=\"LEFT\">{}</TD></TR>\n\
                         <TR><TD><I>Uses</I></TD><TD ALIGN=\"LEFT\">{}</TD></TR>\n\
-                        </TABLE>>",
+                    </TABLE>>",
                     web.id,
+                    reg_string,           // ← show allocation in the title
                     web.variable,
-                    reg_string,
+                    reg_string,           // still show under “Register”
                     defs.replace("\\l", "<BR ALIGN=\"LEFT\"/>"),
                     uses.replace("\\l", "<BR ALIGN=\"LEFT\"/>"),
                 );

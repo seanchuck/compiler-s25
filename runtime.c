@@ -69,6 +69,7 @@ void num_open_file_write(const char *filename)
         perror("mkdir tests/phase5/output");
         exit(1);
     }
+
     out_file = fopen(filename, "w");
     if (!out_file)
     {
