@@ -230,7 +230,7 @@ impl fmt::Display for X86Insn {
             X86Insn::Add(src, dst, typ) => {write!(f, "    add{} {}, {}", suffix(typ), src, dst) }
             X86Insn::Sub(src, dst, typ) => {write!(f, "    sub{} {}, {}", suffix(typ), src, dst) }
             X86Insn::Mul(src, dst, ..) => {write!(f, "    imul {}, {}", src, dst) } // `imul` has same mnemonic for int/long 
-            X86Insn::Div(divisor, _typ) => {write!(f, "    idiv {}", divisor)}
+            X86Insn::Div(divisor, typ) => {write!(f, "    idiv{} {}", suffix(typ), divisor)}
             X86Insn::Cdq => write!(f, "    cdq"),
             X86Insn::Cqto => write!(f, "    cqto"),
             X86Insn::Xor(src, dst) => write!(f, "    xor {}, {}", src, dst),

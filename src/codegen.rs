@@ -237,6 +237,7 @@ fn add_instruction(
     insn: &Instruction,
     x86_instructions: &mut Vec<X86Insn>,
     globals: &BTreeMap<String, Global>,
+    reg_alloc: bool
 ) {
     // println!("Adding instruction: {:?}", insn);
     match insn {
@@ -360,9 +361,12 @@ fn add_instruction(
         }
 
         Instruction::Assign { src, dest, .. } => {
-            if let Operand::Argument { position, .. } = src {
-                if *position <= 5 {
-                    return;     // Do not waste time moving args in if they are the first 6 bc of precolor
+            // Do not waste time moving args in if they are the first 6 bc of precolor for regalloc
+            if reg_alloc {
+                if let Operand::Argument { position, .. } = src {
+                    if *position <= 5 {
+                        return;
+                    }
                 }
             }
 
@@ -955,6 +959,7 @@ fn generate_method_x86(
     method_name: &String,
     method_cfg: &mut CFG,
     globals: &BTreeMap<String, Global>,
+    reg_alloc: bool
 ) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
@@ -1030,7 +1035,7 @@ fn generate_method_x86(
         x86_instructions.push(X86Insn::Label(format!("{}{}", method_name, id)));
 
         for insn in block.get_instructions() {
-            add_instruction(method_cfg, &insn, &mut x86_instructions, globals);
+            add_instruction(method_cfg, &insn, &mut x86_instructions, globals,reg_alloc);
         }
 
         if *id == method_cfg.exit {
@@ -1118,7 +1123,7 @@ pub fn generate_assembly(
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, method_cfg) in &method_cfgs {
         let mut method_cfg = method_cfg.clone();
-        let method_code = generate_method_x86(method_name, &mut method_cfg, &globals);
+        let method_code = generate_method_x86(method_name, &mut method_cfg, &globals, optimizations.contains(&Optimization::Regalloc));
         code.insert(method_name.clone(), method_code);
     }
 
