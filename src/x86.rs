@@ -15,6 +15,7 @@ pub enum X86Insn {
     Sub(X86Operand, X86Operand, Type),
     Mul(X86Operand, X86Operand),
     Div(X86Operand, Type),
+    Neg(X86Operand),
     Cdq,
     Cqto,
     Xor(X86Operand, X86Operand, Type),
@@ -230,8 +231,8 @@ impl fmt::Display for X86Insn {
             X86Insn::Movsxd(src, dst) => write!(f, "    movsxd {}, {}", src, dst),
             X86Insn::Add(src, dst, typ) => {write!(f, "    add{} {}, {}", suffix(typ), src, dst) }
             X86Insn::Sub(src, dst, typ) => {write!(f, "    sub{} {}, {}", suffix(typ), src, dst) }
-            X86Insn::Mul(src, dst, ..) => {write!(f, "    imul {}, {}", src, dst) } // `imul` has same mnemonic for int/long 
-            X86Insn::Div(divisor, typ) => {write!(f, "    idiv{} {}", suffix(typ), divisor)}
+            X86Insn::Mul(src, dst, ..) => {write!(f, "    imul {}, {}", src, dst) }
+                        X86Insn::Div(divisor, typ) => {write!(f, "    idiv{} {}", suffix(typ), divisor)}
             X86Insn::Cdq => write!(f, "    cdq"),
             X86Insn::Cqto => write!(f, "    cqto"),
             X86Insn::Xor(src, dst, typ) => write!(f, "    xor{} {}, {}", suffix(typ), src, dst),
@@ -258,7 +259,7 @@ impl fmt::Display for X86Insn {
             X86Insn::Shl(src, dst, typ) => write!(f, "    shl{} {}, {}", suffix(typ), src, dst),
             X86Insn::Loadlong(constant, dst) => write!(f, "    movabs ${constant}, {dst}"),
             X86Insn::SarImm(shift, dst) => write!(f, "    sar ${}, {}", shift, dst),
-
+            X86Insn::Neg(x86_operand) => write!(f, "    neg {}", x86_operand)
         }
     }
 }

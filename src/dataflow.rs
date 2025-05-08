@@ -599,7 +599,7 @@ fn constant_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
         let mut consts = in_maps.get(&block_id).cloned().unwrap_or_default();
         let mut block_isn_ct = 0;
         for instr in block.get_mut_instructions() {
-            println!("Looking at instruction: {:?}", instr);
+            // println!("Looking at instruction: {:?}", instr);
             block_isn_ct += 1;
             let mut update = |op: &mut Operand| {
                 if let Operand::LocalVar { name, typ, reg } = op {
@@ -616,7 +616,7 @@ fn constant_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                     }
                 }
             };
-            println!("Consts before instruction: {:?}", consts);
+            // println!("Consts before instruction: {:?}", consts);
 
             match instr {
                 Instruction::Assign { src, .. } => {
@@ -652,7 +652,7 @@ fn constant_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
                 _ => {}
             }
         }
-        println!("BLOCK INSTR COUNT: {:?}", block_isn_ct);
+        // println!("BLOCK INSTR COUNT: {:?}", block_isn_ct);
     }
 
     changed
@@ -981,16 +981,14 @@ pub fn optimize_dataflow(method_cfgs: &mut BTreeMap<String, CFG>, optimizations:
         }
 
         if optimizations.contains(&Optimization::Constprop) {
-            println!("Trying const prop");
+            // println!("Trying const prop");
             for (method, cfg) in method_cfgs.iter_mut() {
                 if constant_propagation(cfg, debug) {
-                    println!("Yippeee");
+                    // println!("Yippeee");
                     fixed_point = false;
                     if debug {
                         println!("Constant propagation changed {}", method);
                     }
-                } else {
-                    println!("sad");
                 }
             }
         }

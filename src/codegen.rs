@@ -223,42 +223,59 @@ fn map_operand(
 }
 
 fn magic_number_signed(divisor: i64, is_64: bool) -> (i64, u8) {
-    assert!(divisor != 0 && divisor != 1 && divisor != -1, "Invalid divisor");
+    let w: u32 = if is_64 { 64 } else { 32 };
+    // 2^(w-1)
+    let two_w_1: u128 = 1u128 << (w - 1);
+    let ad: u128 = divisor.abs() as u128;
+    // sign_bit = 1 if divisor < 0, else 0
+    let sign_bit: u128 = ((divisor as u128) >> (w - 1)) & 1;
+    // t = 2^(w-1) + sign_bit
+    let t: u128 = two_w_1 + sign_bit;
+    // anc = t - 1 - (t mod ad)
+    let anc: u128 = t - 1 - (t % ad);
 
-    let bits = if is_64 { 64 } else { 32 };
-    let l = bits - 1;
-    let ad = divisor.abs() as u64;
-    let t = 1u128 << l; // 2^(bits-1)
+    // initialize p, q1/r1 for |nc|, and q2/r2 for |d|
+    let mut p: u32 = w - 1;
+    let mut q1: u128 = two_w_1 / anc;
+    let mut r1: u128 = two_w_1 - q1 * anc;
+    let mut q2: u128 = two_w_1 / ad;
+    let mut r2: u128 = two_w_1 - q2 * ad;
 
-    let mut anc = t + (divisor as i128 >> l) as u128;
-    let mut q1 = anc / ad as u128;
-    let mut r1 = anc % ad as u128;
-
-    let mut delta = 0;
-    let mut done = false;
-    let mut p = bits as u8;
-
-    while !done {
-        delta += 1;
+    // loop until q1 ≥ (ad - r2), with the extra check for equality/r1==0
+    loop {
         p += 1;
-
+        // update quotient/remainder for |nc|
         q1 <<= 1;
         r1 <<= 1;
-        if r1 >= ad as u128 {
+        if r1 >= anc {
             q1 += 1;
-            r1 -= ad as u128;
+            r1 -= anc;
+        }
+        // update quotient/remainder for |d|
+        q2 <<= 1;
+        r2 <<= 1;
+        if r2 >= ad {
+            q2 += 1;
+            r2 -= ad;
         }
 
-        // Stop if the high bit of q1 is set
-        if q1 >= (1u128 << bits) {
-            done = true;
+        let delta = ad - r2;
+        // break when q1 > delta or (q1==delta && r1!=0)
+        if q1 > delta || (q1 == delta && r1 != 0) {
+            break;
         }
     }
 
-    let magic = q1 as i64;
-    let shift = delta as u8;
-    (magic, shift)
+    // magic = q2 + 1, with sign adjustment
+    let mut m = (q2 + 1) as i128;
+    if divisor < 0 {
+        m = -m;
+    }
+    // s = p - w
+    let s = (p - w) as u8;
+    (m as i64, s)
 }
+
 
 
 // Adds the x86 instructions corresponding to insn to x86_instructions
@@ -653,13 +670,19 @@ fn add_instruction(
             if let Operand::Const { value, .. } = right {
                 // Optimization only applies to constants ≠ 0 and ≠ 1
                 let divisor: i64 = *value;
+                let abs_divisor = divisor.abs() as u64;
+
                 if divisor == 0 {
                     panic!("Division by zero");
-                } else if (divisor as u64).is_power_of_two() {          //SUS
+                } else if abs_divisor.is_power_of_two() {  //SUS
+                    // Division by power of 2
                     // Use arithmetic shift for signed divide by power of two
-                    let shift = divisor.trailing_zeros();
+                    let shift = abs_divisor.trailing_zeros();                // always positive
                     x86_instructions.push(X86Insn::Mov(left_op.clone(), dest_op.clone(), typ.clone()));
                     x86_instructions.push(X86Insn::SarImm(shift, dest_op.clone()));
+                    if divisor < 0 {
+                        x86_instructions.push(X86Insn::Neg(dest_op.clone()));
+                    }
                     return;
                 } else {
                     // Use magic number division (signed)
@@ -669,14 +692,14 @@ fn add_instruction(
                         _ => panic!("Divide only supported for int or long"),
                     };
         
-                    // rax = (left * magic) >> shift
                     let reg = match typ {
                         Type::Int => Register::Eax,
                         Type::Long => Register::Rax,
                         _ => unreachable!(),
                     };
-        
-                    x86_instructions.push(X86Insn::Mov(left_op.clone(), X86Operand::Reg(reg.clone()), typ.clone()));
+                    
+                    // left / right = (left * magic) >> shift
+                    x86_instructions.push(X86Insn::Mov(left_op.clone(), X86Operand::Reg(reg.clone()),typ.clone()));
                     x86_instructions.push(X86Insn::Mul(X86Operand::Constant(magic), X86Operand::Reg(reg.clone())));
                     x86_instructions.push(X86Insn::SarImm(shift as u32, X86Operand::Reg(reg.clone())));
                     x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), dest_op.clone(), typ.clone()));
