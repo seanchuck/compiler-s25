@@ -390,8 +390,66 @@ fn push_pop(x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
     }
 }
 
+/// peephole optimization; delete instructions like
+///     move x, x
+fn delete_self_moves(x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
+    for (_, insns) in x86_blocks {
+        let mut i = 0;
+        while i < insns.len() {
+            let insn = &insns[i];
+
+            if let X86Insn::Mov(src, dst, _) = insn {
+                if src == dst {
+                    insns.remove(i);
+                    continue
+                }
+            }
+
+            i += 1;
+        }
+    }
+}
+
+/// peephole optimization; only keep the last instruction in sequences such as
+///     move a, x
+///     move b, x
+///     move c, x
+fn consecutive_movs_to_dst(x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
+    for (_, insns) in x86_blocks {
+        let mut i = 0;
+        while i < insns.len() - 1 {
+            let insn1 = &insns[i];
+            let insn2 = &insns[i + 1];
+
+            // only look for consecutive mov instructions
+            let (
+                X86Insn::Mov(_, dst1, _) | X86Insn::Movsxd(_, dst1) | X86Insn::Movzbq(_, dst1),
+                X86Insn::Mov(_, dst2, _) | X86Insn::Movzbq(_, dst2)
+            ) = (insn1, insn2) else {
+                i += 1;
+                continue;
+            };
+
+            // check if destinations are the same
+            if get_basic_operand(dst1) != get_basic_operand(dst2) {
+                i += 1;
+                continue;
+            }
+
+            // delete the first instruction
+            if debug {
+                println!("removing the first instruction in {}; {}", insn1, insn2);
+            }
+            insns.remove(i);
+            // keep i the same to start from the second instruction
+        }
+    }
+}
+
 /// perform peephole optimizations on the x86 basic blocks within a method
 pub fn peephole(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
     optimize_mov_chains(method_cfg, x86_blocks, debug);
     push_pop(x86_blocks, debug);
+    delete_self_moves(x86_blocks, debug);
+    consecutive_movs_to_dst(x86_blocks, debug);
 }
