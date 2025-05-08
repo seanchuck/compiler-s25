@@ -223,31 +223,43 @@ fn map_operand(
 }
 
 fn magic_number_signed(divisor: i64, is_64: bool) -> (i64, u8) {
-    assert!(divisor != 0 && divisor != 1 && divisor != -1, "Invalid magic number divisor");
+    assert!(divisor != 0 && divisor != 1 && divisor != -1, "Invalid divisor");
 
-    let l = if is_64 { 63 } else { 31 };
+    let bits = if is_64 { 64 } else { 32 };
+    let l = bits - 1;
     let ad = divisor.abs() as u64;
-    let t = 1u128 << l;
-    let anc = t + ((divisor as i128) >> l) as u128; // sign-extended high bit
+    let t = 1u128 << l; // 2^(bits-1)
+
+    let mut anc = t + (divisor as i128 >> l) as u128;
     let mut q1 = anc / ad as u128;
     let mut r1 = anc % ad as u128;
-    let mut q2 = (t - 1) / ad as u128;
-    let mut r2 = (t - 1) % ad as u128;
 
     let mut delta = 0;
-    while q1 < q2 || (q1 == q2 && r1 < r2) {
+    let mut done = false;
+    let mut p = bits as u8;
+
+    while !done {
+        delta += 1;
+        p += 1;
+
         q1 <<= 1;
         r1 <<= 1;
         if r1 >= ad as u128 {
             q1 += 1;
             r1 -= ad as u128;
         }
-        delta += 1;
+
+        // Stop if the high bit of q1 is set
+        if q1 >= (1u128 << bits) {
+            done = true;
+        }
     }
 
-    let magic = (q2 + 1) as i64;
-    (magic, delta)
+    let magic = q1 as i64;
+    let shift = delta as u8;
+    (magic, shift)
 }
+
 
 // Adds the x86 instructions corresponding to insn to x86_instructions
 fn add_instruction(
@@ -643,7 +655,7 @@ fn add_instruction(
                 let divisor: i64 = *value;
                 if divisor == 0 {
                     panic!("Division by zero");
-                } else if (divisor as u64).is_power_of_two() {
+                } else if (divisor as u64).is_power_of_two() {          //SUS
                     // Use arithmetic shift for signed divide by power of two
                     let shift = divisor.trailing_zeros();
                     x86_instructions.push(X86Insn::Mov(left_op.clone(), dest_op.clone(), typ.clone()));
