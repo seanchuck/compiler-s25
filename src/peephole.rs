@@ -299,6 +299,26 @@ fn optimize_mov_chains(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86In
                         insn1, insn2
                     );
                 }
+                // replace a mem-reg move with a reg-reg move if possible
+                if is_mem(&src2) && !is_mem(&src1) {
+                    if debug {
+                        println!(
+                            "avoiding memory access in {}",
+                            insn2
+                        );
+                    }
+
+                    // skip move x, x
+                    if src1 == dst2 {
+                        insns.remove(i+1);
+                        j += 1;
+                        continue;
+                    }
+
+                    // otherwise replace
+                    let new_insn = X86Insn::Mov(src1.clone(), dst2.clone(), ty2.clone());
+                    insns[i + 1] = new_insn;
+                }
                 i += 1;
                 j += 1;
                 continue;
