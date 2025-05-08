@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::{cfg::CFG, state::{compute_predecessors, compute_successors}, x86::{DefUse, Register, X86Insn, X86Operand}};
+use crate::{ast::Type, cfg::CFG, state::{compute_predecessors, compute_successors}, x86::{DefUse, Register, X86Insn, X86Operand}};
 
 fn add_use(use_set: &mut HashSet<X86Operand>, def_set: Option<&HashSet<X86Operand>>, operand: &X86Operand) {
     let basic_op = get_basic_operand(operand);
@@ -36,7 +36,6 @@ fn get_insn_defs_uses(insn: &X86Insn, block_def_set: Option<&HashSet<X86Operand>
             add_def(&mut def_set, &op2);
         }
         X86Insn::Div(op, _)
-        | X86Insn::Pop(op)
         | X86Insn::Push(op) => {
             add_use(&mut use_set, block_def_set, &op);
         }
@@ -49,7 +48,8 @@ fn get_insn_defs_uses(insn: &X86Insn, block_def_set: Option<&HashSet<X86Operand>
         | X86Insn::Setge(op)
         | X86Insn::Setl(op)
         | X86Insn::Setle(op)
-        | X86Insn::Setne(op) => {
+        | X86Insn::Setne(op) 
+        | X86Insn::Pop(op) => {
             add_def(&mut def_set, &op);
         }
         _ => {} // don't involve X86Operands
@@ -108,6 +108,13 @@ fn get_basic_operand(operand: &X86Operand) -> Option<X86Operand> {
     }
 }
 
+fn get_basic_type(typ: Type) -> Type {
+    match typ {
+        Type::Long | Type::String => Type::Long,
+        _ => Type::Int
+    }
+}
+
 fn compute_def_use_sets(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn>>) -> HashMap<i32, DefUse> {
     let mut block_def_use = HashMap::new();
 
@@ -152,16 +159,6 @@ fn compute_maps(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, d
     while let Some(block_id) = worklist.pop_front() {
         let defs = &def_use_sets.get(&block_id).unwrap().defs;
         let uses = &def_use_sets.get(&block_id).unwrap().uses;
-
-        // print!("{}:  defs: ", block_id);
-        // for def in defs {
-        //     print!("{} ", def);
-        // }
-        // print!("   uses: ");
-        // for use_ in uses {
-        //     print!("{} ", use_);
-        // }
-        // println!();
 
         // compute OUT
         let mut out = HashSet::new();
@@ -208,18 +205,10 @@ fn liveness_analysis(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn
     let (_, out_map) = compute_maps(method_cfg, x86_blocks, debug);
     let mut output_map = HashMap::new();
 
-    // println!();
-
     for (block_id, _) in method_cfg.blocks.iter() {
         let mut instruction_liveness = Vec::new();
         let mut live_out: HashSet<X86Operand> = out_map[block_id].clone(); // OUT set of this basic block
 
-        print!("{}:   ", block_id);
-        for live in &live_out {
-            print!("{} ", live);
-        }
-        println!();
-        
         if let Some(insns) = x86_blocks.get(block_id) {
             // process instructions backwards
             for insn in insns.iter().rev() {
@@ -251,64 +240,93 @@ fn liveness_analysis(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn
 /// move a, b
 /// move b, c
 /// move c, d
-/// use liveness analysis to only compress instructions when valid
+/// use liveness analysis to only compress instructions when the intermediate operand isn't needed after
 fn optimize_mov_chains(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
     let liveness_info = liveness_analysis(method_cfg, x86_blocks, debug);
 
-    for (id, block) in method_cfg.get_blocks() {
+    for (id, _) in method_cfg.get_blocks() {
         let insns = x86_blocks.get_mut(id).unwrap();
         let block_liveness = &liveness_info[id];
 
         let mut i = 0; // index into insns
         let mut j = 0; // index into insn_liveness
-        while i < insns.len()-1 {
-            let insn_liveness = &block_liveness[j+1]; // liveness after the second instruction
-            j += 1;
-            i += 1;
+        while i < insns.len() - 1 {
+            let insn1 = &insns[i];
+            let insn2 = &insns[i + 1];
 
             // only collapse consecutive mov instructions
-            if let (
+            let (
                 X86Insn::Mov(src1, dst1, ty1),
                 X86Insn::Mov(src2, dst2, ty2),
-            ) = (&insns[i-1], &insns[i])
-            {
-                // can't move from memory to memory
-                if !matches!((src1, dst2), 
-                            (
-                                X86Operand::Constant(_) | X86Operand::Reg(_),
-                                X86Operand::Reg(_)
-                            )) {
-                    continue;
-                }
+            ) = (insn1, insn2) else {
+                i += 1;
+                j += 1;
+                continue;
+            };
 
-                // make sure intermediate operand and types match
-                if dst1 != src2 || ty1 != ty2 {
-                    continue;
-                }
-
-                // intermediate operand must be dead after the second instruction
-                let basic_intermediate = get_basic_operand(dst1);
-                if basic_intermediate.is_none() || insn_liveness.contains(&basic_intermediate.unwrap()) {
-                    continue;
-                }
-
-                let new_insn = X86Insn::Mov(src1.clone(), dst2.clone(), ty1.clone());
-                if debug {
-                    println!("replacing {}; {} with {}", &insns[i-1], &insns[i], new_insn);
-                }
-
-                // replace the two instructions with one
-                insns.splice(i-1 .. i+1, [new_insn]);
-                // continue from same index to allow longer chains
-                i -= 1;
+            // can't move from memory to memory
+            let is_mem = |op: &X86Operand| matches!(
+                op,
+                X86Operand::Address(..) | X86Operand::Global(..) | X86Operand::RegInt(..) | X86Operand::RegLabel(..)
+            );
+            if is_mem(&src1) && is_mem(&dst2) {
+                i += 1;
+                j += 1;
                 continue;
             }
+
+            // make sure intermediate operand and types match
+            if dst1 != src2 || get_basic_type(ty1.clone()) != get_basic_type(ty2.clone()) {
+                i += 1;
+                j += 1;
+                continue;
+            }
+
+            // intermediate operand must be dead after the second instruction
+            let insn_liveness = &block_liveness[j+1]; // liveness after the second instruction
+            let intermediate = match get_basic_operand(dst1) {
+                Some(op) => op,
+                None => {
+                    i += 1;
+                    j += 1;
+                    continue;
+                }
+            };
+            if insn_liveness.contains(&intermediate) {
+                if debug {
+                    println!(
+                        "not replacing {}; {}",
+                        insn1, insn2
+                    );
+                }
+                i += 1;
+                j += 1;
+                continue;
+            }
+
+            // skip move x, x
+            if src1 == dst2 {
+                if debug {
+                    println!("deleting redundant move: {}", src1);
+                }
+                insns.splice(i..=i + 1, []);
+                j += 2;
+                continue;
+            }
+
+            // do the replacement
+            let new_insn = X86Insn::Mov(src1.clone(), dst2.clone(), ty1.clone());
+            if debug {
+                println!("replacing {}; {} with {}", insn1, insn2, new_insn);
+            }
+            insns.splice(i..=i + 1, [new_insn]);
+            j += 1;
+            // don't update i; continue from same index to allow longer chains
         }
     }
 }
 
 /// perform peephole optimizations on the x86 basic blocks within a method
 pub fn peephole(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
-    // liveness_analysis(method_cfg, x86_blocks, debug);
     optimize_mov_chains(method_cfg, x86_blocks, debug);
 }
