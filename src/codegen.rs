@@ -86,7 +86,12 @@ fn map_operand(
         Operand::Const { value, .. } => X86Operand::Constant(*value),
 
         Operand::LocalVar { name, .. } => {
-            let typ = method_cfg.locals.get(name).expect("missing temp in scope").typ.clone();
+            let typ = method_cfg
+                .locals
+                .get(name)
+                .expect("missing temp in scope")
+                .typ
+                .clone();
             X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(name), typ)
             // X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), Type::Long)
         }
@@ -94,7 +99,12 @@ fn map_operand(
         Operand::GlobalVar { name, .. } => X86Operand::Global(name.to_string()),
 
         Operand::LocalArrElement { name, index, .. } => {
-            let array_typ: Type = method_cfg.locals.get(name).expect("expected array entry").typ.clone();
+            let array_typ: Type = method_cfg
+                .locals
+                .get(name)
+                .expect("expected array entry")
+                .typ
+                .clone();
             // println!("Matching operand for {:?}", index);
             let idx_op = map_operand(method_cfg, index, x86_instructions, globals);
             // println!("index operand is  {:?}", idx_op);
@@ -137,8 +147,14 @@ fn map_operand(
             )
         }
 
-        Operand::GlobalArrElement { name, index, typ, .. } => {
-            let array_typ: Type = globals.get(name).expect("Global array not defined!").typ.clone();
+        Operand::GlobalArrElement {
+            name, index, typ, ..
+        } => {
+            let array_typ: Type = globals
+                .get(name)
+                .expect("Global array not defined!")
+                .typ
+                .clone();
             let idx_op = map_operand(method_cfg, index, x86_instructions, globals);
 
             let index_reg: Register = reg_for_type(Register::R10, &Type::Int);
@@ -222,61 +238,25 @@ fn map_operand(
     }
 }
 
-fn magic_number_signed(divisor: i64, is_64: bool) -> (i64, u8) {
-    let w: u32 = if is_64 { 64 } else { 32 };
-    // 2^(w-1)
-    let two_w_1: u128 = 1u128 << (w - 1);
-    let ad: u128 = divisor.abs() as u128;
-    // sign_bit = 1 if divisor < 0, else 0
-    let sign_bit: u128 = ((divisor as u128) >> (w - 1)) & 1;
-    // t = 2^(w-1) + sign_bit
-    let t: u128 = two_w_1 + sign_bit;
-    // anc = t - 1 - (t mod ad)
-    let anc: u128 = t - 1 - (t % ad);
+fn compute_magic_u64(divisor: u64) -> (u64, u32) {
+    assert!(divisor > 1, "Divisor must be > 1");
 
-    // initialize p, q1/r1 for |nc|, and q2/r2 for |d|
-    let mut p: u32 = w - 1;
-    let mut q1: u128 = two_w_1 / anc;
-    let mut r1: u128 = two_w_1 - q1 * anc;
-    let mut q2: u128 = two_w_1 / ad;
-    let mut r2: u128 = two_w_1 - q2 * ad;
+    let bits = 64;
 
-    // loop until q1 ≥ (ad - r2), with the extra check for equality/r1==0
-    loop {
-        p += 1;
-        // update quotient/remainder for |nc|
-        q1 <<= 1;
-        r1 <<= 1;
-        if r1 >= anc {
-            q1 += 1;
-            r1 -= anc;
-        }
-        // update quotient/remainder for |d|
-        q2 <<= 1;
-        r2 <<= 1;
-        if r2 >= ad {
-            q2 += 1;
-            r2 -= ad;
-        }
+    // Compute magic = floor( (2^bits + divisor - 1) / divisor )
+    let magic = (1u128 << bits).wrapping_add(divisor as u128 - 1) / (divisor as u128);
 
-        let delta = ad - r2;
-        // break when q1 > delta or (q1==delta && r1!=0)
-        if q1 > delta || (q1 == delta && r1 != 0) {
-            break;
-        }
-    }
+    // Magic must fit into 64 bits
+    assert!(magic <= u64::MAX as u128, "Magic number too large");
 
-    // magic = q2 + 1, with sign adjustment
-    let mut m = (q2 + 1) as i128;
-    if divisor < 0 {
-        m = -m;
-    }
-    // s = p - w
-    let s = (p - w) as u8;
-    (m as i64, s)
+    let magic_u64 = magic as u64;
+
+    // Usually the shift is just the bit width
+    let shift = bits;
+
+    // println!("magic: {}, shift: {}", magic, shift);
+    (magic_u64, shift)
 }
-
-
 
 // Adds the x86 instructions corresponding to insn to x86_instructions
 fn add_instruction(
@@ -304,8 +284,13 @@ fn add_instruction(
                     if dest.get_reg().is_some() {
                         x86_instructions.push(X86Insn::Loadlong(*src, dest_location));
                     } else {
-                        x86_instructions.push(X86Insn::Loadlong(*src, X86Operand::Reg(Register::Rax)));
-                        x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rax), dest_location, Type::Long));
+                        x86_instructions
+                            .push(X86Insn::Loadlong(*src, X86Operand::Reg(Register::Rax)));
+                        x86_instructions.push(X86Insn::Mov(
+                            X86Operand::Reg(Register::Rax),
+                            dest_location,
+                            Type::Long,
+                        ));
                     }
                 }
                 _ => panic!("Load const only defined for numeric types"),
@@ -557,7 +542,7 @@ fn add_instruction(
             x86_instructions.push(X86Insn::Xor(
                 X86Operand::Reg(Register::Rax),
                 X86Operand::Reg(Register::Rax),
-                Type::Long
+                Type::Long,
             ));
 
             // -- 5) Call! --
@@ -674,35 +659,82 @@ fn add_instruction(
 
                 if divisor == 0 {
                     panic!("Division by zero");
-                } else if abs_divisor.is_power_of_two() {  //SUS
+                } else if abs_divisor.is_power_of_two() {
+                    //SUS
                     // Division by power of 2
                     // Use arithmetic shift for signed divide by power of two
-                    let shift = abs_divisor.trailing_zeros();                // always positive
-                    x86_instructions.push(X86Insn::Mov(left_op.clone(), dest_op.clone(), typ.clone()));
+                    let shift = abs_divisor.trailing_zeros(); // always positive
+                    x86_instructions.push(X86Insn::Mov(
+                        left_op.clone(),
+                        dest_op.clone(),
+                        typ.clone(),
+                    ));
                     x86_instructions.push(X86Insn::SarImm(shift, dest_op.clone()));
                     if divisor < 0 {
                         x86_instructions.push(X86Insn::Neg(dest_op.clone()));
                     }
                     return;
                 } else {
+                    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
                     // Use magic number division (signed)
                     let (magic, shift) = match typ {
-                        Type::Int => magic_number_signed(divisor, false),
-                        Type::Long => magic_number_signed(divisor, true),
+                        Type::Int => compute_magic_u64(abs_divisor),
+                        Type::Long => compute_magic_u64(abs_divisor),
                         _ => panic!("Divide only supported for int or long"),
                     };
-        
-                    let reg = match typ {
-                        Type::Int => Register::Eax,
-                        Type::Long => Register::Rax,
-                        _ => unreachable!(),
-                    };
-                    
+
+                    // let reg = match typ {
+                    //     Type::Int => Register::Rax,
+                    //     Type::Long => Register::Rax,
+                    //     _ => unreachable!(),
+                    // };
+
                     // left / right = (left * magic) >> shift
-                    x86_instructions.push(X86Insn::Mov(left_op.clone(), X86Operand::Reg(reg.clone()),typ.clone()));
-                    x86_instructions.push(X86Insn::Mul(X86Operand::Constant(magic), X86Operand::Reg(reg.clone())));
-                    x86_instructions.push(X86Insn::SarImm(shift as u32, X86Operand::Reg(reg.clone())));
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), dest_op.clone(), typ.clone()));
+                    x86_instructions.push(X86Insn::Mov(
+                        left_op.clone(),
+                        X86Operand::Reg(reg_for_type(Register::R11, typ)),
+                        typ.clone(),
+                    ));
+                    x86_instructions.push(X86Insn::Loadlong(
+                        magic as i64,
+                        X86Operand::Reg(Register::Rax),
+                    )); // todo: magic signed
+                    x86_instructions.push(X86Insn::UMul(X86Operand::Reg(Register::R11)));
+
+                    if shift == 64 {
+                        // rdx into res
+                        x86_instructions.push(X86Insn::Mov(
+                            X86Operand::Reg(reg_for_type(Register::Rdx, typ)),
+                            dest_op.clone(),
+                            typ.clone(),
+                        ));
+                    } else {
+                        // shrd
+                        x86_instructions.push(X86Insn::Mov(
+                            X86Operand::Constant(shift.into()),
+                            X86Operand::Reg(Register::R11),
+                            Type::Long,
+                        ));
+
+                        x86_instructions.push(X86Insn::Shrd(
+                            X86Operand::Reg(Register::R11),
+                            X86Operand::Reg(Register::Rdx),
+                            X86Operand::Reg(Register::Rax),
+                        ));
+
+                        x86_instructions.push(X86Insn::Mov(
+                            X86Operand::Reg(reg_for_type(Register::Rax, typ)),
+                            dest_op.clone(),
+                            typ.clone(),
+                        ));
+
+                    }
+                    
+                    if divisor < 0 {
+                        x86_instructions.push(X86Insn::Neg(dest_op.clone()));
+                    }
+
+                    x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
                     return;
                 }
             }
@@ -756,106 +788,54 @@ fn add_instruction(
             dest,
             typ,
         } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions, globals);
-            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
-        
-            if let Operand::Const { value, .. } = right {
-                let divisor: i64 = *value;
-                if divisor == 0 {
-                    panic!("Modulo by zero");
-                } else if (divisor as u64).is_power_of_two() {
-                    // x % 2^n = x & (2^n - 1) for unsigned
-                    // For signed, we can do: x - ((x >> n) << n)
-                    let shift = divisor.trailing_zeros();
-        
-                    // temp = left >> shift
-                    let tmp_reg = match typ {
-                        Type::Int => Register::Eax,
-                        Type::Long => Register::Rax,
-                        _ => panic!("Modulo only supported for int or long"),
-                    };
-        
-                    let mul_reg = match typ {
-                        Type::Int => Register::Ecx,
-                        Type::Long => Register::Rcx,
-                        _ => unreachable!(),
-                    };
-        
-                    // tmp = x >> shift
-                    x86_instructions.push(X86Insn::Mov(left_op.clone(), X86Operand::Reg(tmp_reg.clone()), typ.clone()));
-                    x86_instructions.push(X86Insn::SarImm(shift, X86Operand::Reg(tmp_reg.clone())));
-        
-                    // tmp = tmp << shift  → now tmp = x rounded down to nearest multiple of 2^shift
-                    x86_instructions.push(X86Insn::Shl(X86Operand::Constant(shift as i64), X86Operand::Reg(tmp_reg.clone()), typ.clone()));
-        
-                    // remainder = x - tmp
-                    x86_instructions.push(X86Insn::Mov(left_op.clone(), X86Operand::Reg(mul_reg.clone()), typ.clone()));
-                    x86_instructions.push(X86Insn::Sub(X86Operand::Reg(tmp_reg.clone()), X86Operand::Reg(mul_reg.clone()), typ.clone()));
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(mul_reg.clone()), dest_op.clone(), typ.clone()));
-                    return;
-                } else {
-                    // Magic number trick for mod: a - (a / d) * d
-                    let (magic, shift) = match typ {
-                        Type::Int => magic_number_signed(divisor, false),
-                        Type::Long => magic_number_signed(divisor, true),
-                        _ => panic!("Modulo only supported for int or long"),
-                    };
-        
-                    let reg = match typ {
-                        Type::Int => Register::Eax,
-                        Type::Long => Register::Rax,
-                        _ => unreachable!(),
-                    };
-        
-                    let tmp = match typ {
-                        Type::Int => Register::Ecx,
-                        Type::Long => Register::Rcx,
-                        _ => unreachable!(),
-                    };
-        
-                    // eax = a
-                    x86_instructions.push(X86Insn::Mov(left_op.clone(), X86Operand::Reg(reg.clone()), typ.clone()));
-        
-                    // eax = (a * magic) >> shift
-                    x86_instructions.push(X86Insn::Mul(X86Operand::Constant(magic), X86Operand::Reg(reg.clone())));
-                    x86_instructions.push(X86Insn::SarImm(shift as u32, X86Operand::Reg(reg.clone())));
-        
-                    // tmp = eax * divisor  (quotient * d)
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), X86Operand::Reg(tmp.clone()), typ.clone()));
-                    x86_instructions.push(X86Insn::Mul(X86Operand::Constant(divisor), X86Operand::Reg(tmp.clone())));
-        
-                    // result = a - tmp
-                    x86_instructions.push(X86Insn::Mov(left_op.clone(), X86Operand::Reg(reg.clone()), typ.clone()));
-                    x86_instructions.push(X86Insn::Sub(X86Operand::Reg(tmp.clone()), X86Operand::Reg(reg.clone()), typ.clone()));
-        
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(reg.clone()), dest_op.clone(), typ.clone()));
-                    return;
-                }
-            }
-        
+            let left_op: X86Operand = map_operand(method_cfg, left, x86_instructions, globals);
             let right_op = map_operand(method_cfg, right, x86_instructions, globals);
-        
+            let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
             match typ {
                 Type::Int => {
-                    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
-                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Eax), Type::Int));
-                    x86_instructions.push(X86Insn::Cdq);
-                    x86_instructions.push(X86Insn::Div(right_op, Type::Int));
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Edx), dest_op, Type::Int));
-                    x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
+                    // Signed modulo in x86 (32-bit): dividend in EAX, sign-extended into EDX using CDQ
+                    x86_instructions.push(X86Insn::Mov(
+                        left_op,
+                        X86Operand::Reg(Register::Eax),
+                        Type::Int,
+                    ));
+                    x86_instructions.push(X86Insn::Cdq); // Sign-extend EAX into EDX
+                    x86_instructions.push(X86Insn::Mov(
+                        right_op,
+                        X86Operand::Reg(Register::R11d),
+                        Type::Int,
+                    ));
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::R11d), Type::Int));
+                    x86_instructions.push(X86Insn::Mov(
+                        X86Operand::Reg(Register::Edx),
+                        dest_op,
+                        Type::Int,
+                    ));
                 }
                 Type::Long => {
-                    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
-                    x86_instructions.push(X86Insn::Mov(left_op, X86Operand::Reg(Register::Rax), Type::Long));
-                    x86_instructions.push(X86Insn::Cqto);
-                    x86_instructions.push(X86Insn::Div(right_op, Type::Long));
-                    x86_instructions.push(X86Insn::Mov(X86Operand::Reg(Register::Rdx), dest_op, Type::Long));
-                    x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
+                    // Signed modulo in x86 (64-bit): dividend in RAX, sign-extended into RDX using CQO
+                    x86_instructions.push(X86Insn::Mov(
+                        left_op,
+                        X86Operand::Reg(Register::Rax),
+                        Type::Long,
+                    ));
+                    x86_instructions.push(X86Insn::Cqto); // Sign-extend RAX into RDX
+                    x86_instructions.push(X86Insn::Mov(
+                        right_op,
+                        X86Operand::Reg(Register::R11),
+                        Type::Long,
+                    ));
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::R11), Type::Long));
+                    x86_instructions.push(X86Insn::Mov(
+                        X86Operand::Reg(Register::Rdx),
+                        dest_op,
+                        Type::Long,
+                    ));
                 }
                 _ => panic!("Modulo only supported for int or long types"),
             }
         }
-
         Instruction::Not { expr, dest } => {
             let expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
@@ -870,7 +850,7 @@ fn add_instruction(
             x86_instructions.push(X86Insn::Xor(
                 X86Operand::Constant(1),
                 X86Operand::Reg(reg.clone()),
-                Type::Bool
+                Type::Bool,
             ));
             x86_instructions.push(X86Insn::Mov(
                 X86Operand::Reg(reg.clone()),
@@ -1124,7 +1104,11 @@ fn add_instruction(
             };
 
             // cmp condition; jump if condition is true
-            x86_instructions.push(X86Insn::Mov(cond_op, X86Operand::Reg(Register::Eax), Type::Int));
+            x86_instructions.push(X86Insn::Mov(
+                cond_op,
+                X86Operand::Reg(Register::Eax),
+                Type::Int,
+            ));
             x86_instructions.push(X86Insn::Cmp(
                 X86Operand::Constant(0),
                 X86Operand::Reg(Register::Eax),
@@ -1136,7 +1120,7 @@ fn add_instruction(
             x86_instructions.push(X86Insn::Mov(
                 X86Operand::Constant(*exit_code),
                 X86Operand::Reg(Register::Rdi), // exit code goes in RDI
-                Type::Long
+                Type::Long,
             ));
             x86_instructions.push(X86Insn::Exit);
         }
@@ -1238,9 +1222,10 @@ fn generate_method_x86(
             // skip unnecessary unconditional jumps
             let is_last_insn = j == block_instructions.len() - 1;
             if is_last_insn {
-                if let Instruction::UJmp { id, ..} = insn {
+                if let Instruction::UJmp { id, .. } = insn {
                     if let Some(next) = next_id {
-                        if id == next  { // jump to the label right after this insn
+                        if id == next {
+                            // jump to the label right after this insn
                             continue;
                         }
                     }
@@ -1271,8 +1256,6 @@ fn generate_method_x86(
 
             continue;
         }
-
-
     }
 
     x86_instructions
