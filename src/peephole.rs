@@ -472,6 +472,44 @@ fn zero_with_xor(x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
     }
 }
 
+/// peephole optimization; replace multiplication by power of 2 with left shift
+/// division by powers of 2 should be covered by magic number division?
+fn strength_reduction(x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
+    for (_, insns) in x86_blocks {
+        let mut i = 0;
+        while i < insns.len() {
+            let insn = &insns[i];
+
+            // pattern match for multiplication
+            if let X86Insn::Mul(X86Operand::Constant(val), dst) = insn {
+                if *val > 0 {
+                    let unsigned = *val as u32;
+
+                    if unsigned.is_power_of_two() {
+                        let shift_amt = unsigned.trailing_zeros();
+
+                        let new_insn = X86Insn::Shl(
+                            X86Operand::Constant(shift_amt as i64),
+                            dst.clone()
+                        );
+
+                        if debug {
+                            println!(
+                                "replacing {} with {} (strength reduction)",
+                                insn, new_insn
+                            );
+                        }
+
+                        insns[i] = new_insn;
+                    }
+                }
+            }
+
+            i += 1;
+        }
+    }
+}
+
 /// perform peephole optimizations on the x86 basic blocks within a method
 pub fn peephole(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
     optimize_mov_chains(method_cfg, x86_blocks, debug);
@@ -479,4 +517,5 @@ pub fn peephole(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, d
     delete_self_moves(x86_blocks, debug);
     consecutive_movs_to_dst(x86_blocks, debug);
     zero_with_xor(x86_blocks, debug);
+    strength_reduction(x86_blocks, debug);
 }
