@@ -98,7 +98,6 @@ impl Args {
             opts.remove(&NoDce);
         }
 
-
         if opts.contains(&NoRegalloc) {
             opts.remove(&Regalloc);
             opts.remove(&NoRegalloc);

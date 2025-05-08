@@ -95,9 +95,7 @@ fn map_operand(
 
         Operand::LocalArrElement { name, index, .. } => {
             let array_typ: Type = method_cfg.locals.get(name).expect("expected array entry").typ.clone();
-            // println!("Matching operand for {:?}", index);
             let idx_op = map_operand(method_cfg, index, x86_instructions, globals);
-            // println!("index operand is  {:?}", idx_op);
 
             let index_reg: Register = reg_for_type(Register::R10, &Type::Int);
 
@@ -230,12 +228,10 @@ fn add_instruction(
     globals: &BTreeMap<String, Global>,
     reg_alloc: bool,
 ) {
-    // println!("Adding instruction: {:?}", insn);
     match insn {
         Instruction::LoadConst { src, dest, typ } => {
             match typ {
                 Type::Int => {
-                    // println!("Loading Const to {:?}", dest);
                     let dest_location = map_operand(method_cfg, dest, x86_instructions, globals);
                     x86_instructions.push(X86Insn::Mov(
                         X86Operand::Constant(src.clone()),
@@ -388,8 +384,6 @@ fn add_instruction(
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let src_op = map_operand(method_cfg, src, x86_instructions, globals);
 
-            // println!("Assigning {:?} to {:?}", dest, dest_op);
-
             // // Reason that this matters is because we might have src as an array and we are using full
             // // 64 bits for the length if its long array, so we must move using src typ then only take
             // // The necessary dest bits for the final move
@@ -401,7 +395,6 @@ fn add_instruction(
 
             // If either src or dest is a register, just do the move
             if src.get_reg().is_some() || dest.get_reg().is_some() {
-                println!("did smart assign");
                 x86_instructions.push(X86Insn::Mov(
                     src_op.clone(),
                     dest_op.clone(),
@@ -1149,7 +1142,6 @@ pub fn generate_assembly(
 ) {
     // Generate the method CFGS
     let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
-    // println!("globals are {:#?}", globals);
 
     // if debug {
     //     html_cfgs(&method_cfgs, "no-opt.html".to_string());

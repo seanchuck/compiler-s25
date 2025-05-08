@@ -1,0 +1,8 @@
+import printf;
+void main ( ) {
+  int a, b, c;
+  a = 2600;
+  b = a / -50;
+  c = a / 19;
+  printf("b: %d, c: %d\n", b, c); // -52, 136
+}
