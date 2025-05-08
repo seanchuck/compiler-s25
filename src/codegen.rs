@@ -815,6 +815,10 @@ pub fn generate_assembly(file: &str, filename: &str, optimizations: BTreeSet<Opt
 
     writeln!(writer).expect("Failed to write newline after globals!");
 
+    if debug {
+        println!("\n========== Peephole Optimizations ==========\n");
+    }
+
     // Generate a vector of x86 for each method
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, method_cfg) in &method_cfgs {
