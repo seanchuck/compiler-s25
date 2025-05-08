@@ -102,6 +102,10 @@ impl Args {
             opts.remove(&NoDce);
         }
 
+        if opts.contains(&NoConstprop) {
+            opts.remove(&Constprop);
+            opts.remove(&NoConstprop);
+        }
 
         if opts.contains(&NoRegalloc) {
             opts.remove(&Regalloc);
