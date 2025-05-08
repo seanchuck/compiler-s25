@@ -400,6 +400,9 @@ fn delete_self_moves(x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
 
             if let X86Insn::Mov(src, dst, _) = insn {
                 if src == dst {
+                    if debug {
+                        println!("deleting redundant move: {}", src);
+                    }
                     insns.remove(i);
                     continue
                 }
@@ -446,10 +449,34 @@ fn consecutive_movs_to_dst(x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: b
     }
 }
 
+/// peephole optimization; replace 
+///     move 0, %reg
+/// with
+///     xor %reg, %reg
+fn zero_with_xor(x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
+    for (_, insns) in x86_blocks {
+        let mut i = 0;
+        while i < insns.len() {
+            let insn = &insns[i];
+
+            // pattern match for move 0, %reg
+            if let X86Insn::Mov(X86Operand::Constant(0), X86Operand::Reg(reg), typ) = insn {
+                if debug {
+                    println!("zeroing {} with xor", reg);
+                }
+                insns[i] = X86Insn::Xor(X86Operand::Reg(reg.clone()), X86Operand::Reg(reg.clone()), typ.clone());
+            }
+
+            i += 1;
+        }
+    }
+}
+
 /// perform peephole optimizations on the x86 basic blocks within a method
 pub fn peephole(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
     optimize_mov_chains(method_cfg, x86_blocks, debug);
     push_pop(x86_blocks, debug);
     delete_self_moves(x86_blocks, debug);
     consecutive_movs_to_dst(x86_blocks, debug);
+    zero_with_xor(x86_blocks, debug);
 }
