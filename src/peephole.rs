@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::{ast::Type, cfg::CFG, state::{compute_predecessors, compute_successors}, x86::{DefUse, Register, X86Insn, X86Operand}};
+use crate::{ast::Type, cfg::CFG, state::{compute_predecessors, compute_successors}, x86::{self, DefUse, Register, X86Insn, X86Operand}};
 
 fn add_use(use_set: &mut HashSet<X86Operand>, def_set: Option<&HashSet<X86Operand>>, operand: &X86Operand) {
     let basic_op = get_basic_operand(operand);
@@ -237,9 +237,9 @@ fn liveness_analysis(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn
 }
 
 /// peephole optimization; eliminate chains of moves such as:
-/// move a, b
-/// move b, c
-/// move c, d
+///      move a, b
+///      move b, c
+///      move c, d
 /// use liveness analysis to only compress instructions when the intermediate operand isn't needed after
 fn optimize_mov_chains(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
     let liveness_info = liveness_analysis(method_cfg, x86_blocks, debug);
@@ -346,7 +346,52 @@ fn optimize_mov_chains(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86In
     }
 }
 
+/// peephole optimization; eliminate sequences of 
+///     push x
+///     pop x
+/// until no more changes
+fn push_pop(x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
+    for (_, insns) in x86_blocks {
+        loop {
+            let mut changed = false;
+            let mut i = 0;
+            while i < insns.len() - 1 {
+                let insn1 = &insns[i];
+                let insn2 = &insns[i + 1];
+
+                // only collapse consecutive push-pop instructions
+                let (
+                    X86Insn::Push(op1),
+                    X86Insn::Pop(op2),
+                ) = (insn1, insn2) else {
+                    i += 1;
+                    continue;
+                };
+
+                // check if operands match
+                if op1 != op2 {
+                    i += 2;
+                    continue;
+                }
+
+                // delete both instructions
+                if debug {
+                    println!("deleting {}; {}", insn1, insn2);
+                }
+                insns.splice(i..=i + 1, []);
+                changed = true;
+                // don't change i
+            }
+
+            if !changed {
+                break;
+            }
+        }
+    }
+}
+
 /// perform peephole optimizations on the x86 basic blocks within a method
 pub fn peephole(method_cfg: &CFG, x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) {
     optimize_mov_chains(method_cfg, x86_blocks, debug);
+    push_pop(x86_blocks, debug);
 }
