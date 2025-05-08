@@ -303,9 +303,21 @@ fn add_instruction(
             dest,
             typ,
         } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions, globals);
-            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let mut left_op = map_operand(method_cfg, left, x86_instructions, globals);
+            let mut right_op = map_operand(method_cfg, right, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
+            // Long constants must be loaded first using movabs
+            if *typ == Type::Long {
+                if let Operand::Const { value, .. } = right {
+                    x86_instructions.push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R11)));
+                    right_op = X86Operand::Reg(Register::R11);
+                }
+                if let Operand::Const { value, .. } = left {
+                    x86_instructions.push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R10)));
+                    left_op = X86Operand::Reg(Register::R10);
+                }
+            }
 
             if let Some(_) = dest.get_reg() {
                 if dest_op != right_op {
@@ -359,9 +371,21 @@ fn add_instruction(
             dest,
             typ,
         } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions, globals);
-            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let mut left_op = map_operand(method_cfg, left, x86_instructions, globals);
+            let mut right_op = map_operand(method_cfg, right, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
+            // Long constants must be loaded first using movabs
+            if *typ == Type::Long {
+                if let Operand::Const { value, .. } = right {
+                    x86_instructions.push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R11)));
+                    right_op = X86Operand::Reg(Register::R11);
+                }
+                if let Operand::Const { value, .. } = left {
+                    x86_instructions.push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R10)));
+                    left_op = X86Operand::Reg(Register::R10);
+                }
+            }
 
             if let Some(_) = dest.get_reg() {
                 if dest_op != right_op {
@@ -606,9 +630,22 @@ fn add_instruction(
             dest,
             typ,
         } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions, globals);
-            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let mut left_op = map_operand(method_cfg, left, x86_instructions, globals);
+            let mut right_op = map_operand(method_cfg, right, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
+
+            // Long constants must be loaded first using movabs
+            if *typ == Type::Long {
+                if let Operand::Const { value, .. } = right {
+                    x86_instructions.push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R11)));
+                    right_op = X86Operand::Reg(Register::R11);
+                }
+                if let Operand::Const { value, .. } = left {
+                    x86_instructions.push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R10)));
+                    left_op = X86Operand::Reg(Register::R10);
+                }
+            }
 
             if let Some(_) = dest.get_reg() {
                 if dest_op != right_op {

@@ -101,6 +101,13 @@ impl Operand {
             }
         }
     }
+
+    pub fn is_const(&self) -> bool {
+        match self {
+            Operand::Const {..} => true,
+            _=> false
+        }
+    }
 }
     
 
