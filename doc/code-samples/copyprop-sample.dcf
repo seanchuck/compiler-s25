@@ -1,0 +1,42 @@
+// Our sample test case to demonstrate copy propagation
+
+import printf;
+
+void main() {
+    int a;
+    int b;
+    int c;
+    int d;
+    int e;
+    int f;
+    int z;
+    int k;
+    bool cond1;
+    bool cond2;
+    bool notcond;
+
+
+    a = 5;
+    k = 999;
+    b = a;          // copy: b = a
+    c = b + 2;      // propagation: b -> a
+    d = c % 3;
+
+    cond1 = true;
+    cond2 = cond1;
+    
+    if (cond1) {
+        // should be e = (7 % 3 = 1)
+        e = d;      // copy across branch
+        z = k;
+        
+    } else {
+        e = 0;
+        z = k;
+    }
+
+    a = z + 3; // propagation: z -> k
+
+    notcond = !cond2;      // propagation: cond2 -> cond1
+    printf("%d\n", e); // no propagation: should be 1
+}
