@@ -11,17 +11,6 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
 };
-use crate::{
-    cfg::{Global, CFG},
-    tac::{Instruction, Operand},
-    utils::print::html_web_graphs,
-    web::*,
-    x86::{Register, X86Operand},
-};
-use std::{
-    cell::RefCell,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
-};
 
 // Initialize a counter for naming webs
 thread_local! {

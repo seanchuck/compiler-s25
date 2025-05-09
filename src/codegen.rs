@@ -1253,7 +1253,8 @@ fn generate_method_x86(
     method_cfg: &CFG,
     x86_blocks: &HashMap<i32, Vec<X86Insn>>,
     globals: &BTreeMap<String, Global>,
-    pushed_callee_saved: &Vec<Register>
+    pushed_callee_saved: &Vec<Register>,
+    regalloc: bool
 ) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
@@ -1323,7 +1324,7 @@ fn generate_method_x86(
 
     for i in 0..block_order.len() {
         let id = &block_order[i];
-        let block = &blocks[id];
+        let block = &method_cfg.blocks[id];
         x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
 
         let next_id = block_order.get(i + 1);
@@ -1343,7 +1344,7 @@ fn generate_method_x86(
                 }
             }
 
-            add_instruction(method_cfg, &insn, &mut x86_instructions, globals, reg_alloc);
+            add_instruction(method_cfg, &insn, &mut x86_instructions, globals, regalloc);
         }
 
         if *id == method_cfg.exit {
@@ -1450,7 +1451,8 @@ pub fn generate_assembly(
             method_cfg, 
             &x86_blocks, 
             &globals, 
-            &pushed_callee_saved
+            &pushed_callee_saved,
+            optimizations.contains(&Optimization::Regalloc)
         );
         code.insert(method_name.clone(), method_code);
     }
