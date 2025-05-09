@@ -1,0 +1,41 @@
+import atoi;
+import exit;
+import getenv;
+import printf;
+import strcmp;
+
+int base_cases[2];
+int memoization[100];
+bool is_memoized[100];
+
+int fib_memoized(int n) {
+  if (is_memoized[n]) {
+    return memoization[n];
+  } else {
+    int res;
+    if (n == 0 || n == 1) {
+      res = n;
+    } else {
+      int l, r;
+      l = fib_memoized(n - 1);
+      r = fib_memoized(n - 2);
+      res = l + r;
+    }
+    memoization[n] = res;
+    is_memoized[n] = true;
+    return res;
+  }
+}
+
+void main() {
+  int n, res;
+
+  n = 8;
+  res = 0;
+
+  base_cases[0] = 0;
+  base_cases[1] = 1;
+
+  res = fib_memoized(n);
+  printf("memoized: %d\n", res);
+}

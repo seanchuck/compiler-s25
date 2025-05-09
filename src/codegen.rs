@@ -1,8 +1,9 @@
-use crate::ast::Type;
 /**
-Generate x86 code from the Control flow graph.
+ Generate x86 code from the Control flow graph.
 **/
-use crate::cfg::{Global, Local};
+use crate::ast::Type;
+use crate::cfg::BasicBlock;
+use crate::cfg::Global;
 use crate::cfg::{INT_SIZE, LONG_SIZE};
 use crate::dataflow::optimize_dataflow;
 use crate::tac::*;
@@ -12,6 +13,7 @@ use crate::x86::*;
 use crate::{buildcfg::build_cfg, cfg::CFG};
 use core::panic;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use crate::peephole::peephole;
 
 pub const CALLEE_SAVED_REGISTERS: [Register; 5] = [
     Register::Rbx,
@@ -997,13 +999,77 @@ fn add_instruction(
     }
 }
 
+/// returns x86 instructions corresponding to the instructions in the basic block
+fn generate_x86_block(method_cfg: &CFG, id: &i32, block: &BasicBlock, next_id: Option<&i32>, globals: &BTreeMap<String, Global>, reg_alloc: bool, pushed_callee_saved: &Vec<Register>) -> Vec<X86Insn> {
+    let mut x86_instructions: Vec<X86Insn> = Vec::new();
+    let method_name = &method_cfg.name;
+
+    x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
+
+    let block_instructions = block.get_instructions();
+
+    for (j, insn) in block_instructions.iter().enumerate() {
+        // skip unnecessary unconditional jumps
+        let is_last_insn = j == block_instructions.len() - 1;
+        if is_last_insn {
+            if let Instruction::UJmp { id: jump_to, ..} = insn {
+                if let Some(next) = next_id {
+                    if jump_to == next  { // jump to the label right after this insn
+                        continue;
+                    }
+                }
+            }
+        }
+
+        add_instruction(method_cfg, &insn, &mut x86_instructions, globals, reg_alloc);
+    }
+
+    if *id == method_cfg.exit {
+        // method epilogue
+        x86_instructions.push(X86Insn::Mov(
+            X86Operand::Reg(Register::Rbp),
+            X86Operand::Reg(Register::Rsp),
+            Type::Long
+        )); // move base pointer to stack pointer
+
+        x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp))); // pop base pointer off stack
+
+        // Pop callee-saved in reverse
+        for reg in pushed_callee_saved.iter().rev() {
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(reg.clone())));
+        }
+
+        x86_instructions.push(X86Insn::Ret); // return to where function was called
+    }
+
+    x86_instructions
+}
+
+/// returns a map from ID of basic block to a vector of x86 instructions representing it
+fn generate_x86_blocks(method_cfg: &CFG, globals: &BTreeMap<String, Global>, reg_alloc: bool, pushed_callee_saved: &Vec<Register>) -> HashMap<i32, Vec<X86Insn>> {
+    let mut output_map = HashMap::new();
+
+    let blocks = method_cfg.get_blocks();
+    let block_order = method_cfg.get_block_order();
+
+    for i in 0..block_order.len() {
+        let id = &block_order[i];
+        let block = &blocks[id];
+        let next_id = block_order.get(i + 1);
+        output_map.insert(*id, generate_x86_block(method_cfg, id, block, next_id, globals, reg_alloc, pushed_callee_saved));
+    }
+
+    output_map
+}
+
 /// Emit x86 code corresponding to the given CFG
 /// Returns a vector of x86 instructions.
 fn generate_method_x86(
     method_name: &String,
-    method_cfg: &mut CFG,
+    method_cfg: &CFG,
+    x86_blocks: &HashMap<i32, Vec<X86Insn>>,
     globals: &BTreeMap<String, Global>,
-    reg_alloc: bool,
+    pushed_callee_saved: &Vec<Register>
 ) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
@@ -1015,17 +1081,9 @@ fn generate_method_x86(
 
     // === Method Prologue ===
 
-    // Track pushed callee-saved registers
-    let mut pushed_callee_saved: Vec<Register> = vec![];
-
-    for reg in CALLEE_SAVED_REGISTERS {
-        if method_cfg
-            .get_reg_allocs()
-            .contains(&X86Operand::Reg(reg.clone()))
-        {
-            x86_instructions.push(X86Insn::Push(X86Operand::Reg(reg.clone())));
-            pushed_callee_saved.push(reg);
-        }
+    // callee saved registers
+    for reg in pushed_callee_saved {
+        x86_instructions.push(X86Insn::Push(X86Operand::Reg(reg.clone())));
     }
 
     // Set up new frame and push RBP
@@ -1077,56 +1135,11 @@ fn generate_method_x86(
         }
     }
 
-    let blocks = method_cfg.get_blocks();
     let block_order = method_cfg.get_block_order();
 
     for i in 0..block_order.len() {
         let id = &block_order[i];
-        let block = &blocks[id];
-        x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
-
-        let next_id = block_order.get(i + 1);
-        let block_instructions = block.get_instructions();
-
-        for (j, insn) in block_instructions.iter().enumerate() {
-            // skip unnecessary unconditional jumps
-            let is_last_insn = j == block_instructions.len() - 1;
-            if is_last_insn {
-                if let Instruction::UJmp { id, ..} = insn {
-                    if let Some(next) = next_id {
-                        if id == next  { // jump to the label right after this insn
-                            continue;
-                        }
-                    }
-                }
-            }
-
-            add_instruction(method_cfg, &insn, &mut x86_instructions, globals, reg_alloc);
-        }
-
-        if *id == method_cfg.exit {
-            // === Method Epilogue ===
-
-            // Restore RSP from RBP
-            x86_instructions.push(X86Insn::Mov(
-                X86Operand::Reg(Register::Rbp),
-                X86Operand::Reg(Register::Rsp),
-                Type::Long,
-            ));
-
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp)));
-
-            // Pop callee-saved in reverse
-            for reg in pushed_callee_saved.iter().rev() {
-                x86_instructions.push(X86Insn::Pop(X86Operand::Reg(reg.clone())));
-            }
-
-            x86_instructions.push(X86Insn::Ret); // return to where function was called
-
-            continue;
-        }
-
-
+        x86_instructions.extend(x86_blocks[id].clone());
     }
 
     x86_instructions
@@ -1142,11 +1155,6 @@ pub fn generate_assembly(
 ) {
     // Generate the method CFGS
     let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
-
-    // if debug {
-    //     html_cfgs(&method_cfgs, "no-opt.html".to_string());
-    //     println!("\n========== X86 Code ==========\n");
-    // }
 
     // Perform dataflow optimizations (includes register allocation)
     optimize_dataflow(&mut method_cfgs, &optimizations, &globals, debug);
@@ -1188,17 +1196,42 @@ pub fn generate_assembly(
 
     writeln!(writer).expect("Failed to write newline after globals!");
 
+    if debug {
+        println!("\n========== Peephole Optimizations ==========\n");
+    }
+
     // Generate a vector of x86 for each method
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, method_cfg) in &method_cfgs {
-        let mut method_cfg = method_cfg.clone();
+        // Track pushed callee-saved registers
+        let mut pushed_callee_saved: Vec<Register> = vec![];
+
+        for reg in CALLEE_SAVED_REGISTERS {
+            if method_cfg
+                .get_reg_allocs()
+                .contains(&X86Operand::Reg(reg.clone()))
+            {
+                pushed_callee_saved.push(reg);
+            }
+        }
+
+        let reg_alloc = optimizations.contains(&Optimization::Regalloc);
+        let mut x86_blocks = generate_x86_blocks(method_cfg, &globals, reg_alloc, &pushed_callee_saved);
+        peephole(method_cfg, &mut x86_blocks, debug);
         let method_code = generate_method_x86(
-            method_name,
-            &mut method_cfg,
-            &globals,
-            optimizations.contains(&Optimization::Regalloc),
+            method_name, 
+            method_cfg, 
+            &x86_blocks, 
+            &globals, 
+            &pushed_callee_saved
         );
         code.insert(method_name.clone(), method_code);
+    }
+
+    if debug {
+        print_cfg(&method_cfgs);
+        html_cfgs(&method_cfgs, "opt.html".to_string());
+        println!("\n========== X86 Code ==========\n");
     }
 
     // Emit the final code

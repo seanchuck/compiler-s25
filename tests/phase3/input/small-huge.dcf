@@ -1,0 +1,28 @@
+import printf;
+
+void main ( ) {
+  int i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, a1, a2, a3, a4, f, e;
+  bool g;
+  i = -15;
+  j = -12;
+  l = -17;
+  m = -44;
+  o = -7;
+  j = -61;
+  f = 14;
+  q = 10;
+  e = 5;
+  g = true;
+
+  t = e + l - i;
+  a1 = t + j + o;
+  r = t - a1 + m - j;
+  v = l + a1 + ( t - ( q + f ) );
+  if ( g ) {
+    w = 3;
+  }
+  else {
+    w = -1;
+  }
+  printf ( "%d, %d, %d, %d, %d\n", t, a1, r, v, w );
+}
