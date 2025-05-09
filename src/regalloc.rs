@@ -1,7 +1,16 @@
-use crate::{cfg::{Global, CFG}, tac::{Instruction, Operand}, utils::print::html_web_graphs, web::*, x86::{Register, X86Operand}};
-use std::{cell::RefCell, collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque}};
+use crate::codegen::ARGUMENT_REGISTERS;
 use crate::state::*;
-
+use crate::{
+    cfg::{Global, CFG},
+    tac::{Instruction, Operand},
+    utils::print::html_web_graphs,
+    web::*,
+    x86::{Register, X86Operand},
+};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
+};
 
 // Initialize a counter for naming webs
 thread_local! {
@@ -22,7 +31,13 @@ fn compute_instr_map(method_cfg: &CFG) -> InstructionMap {
 
     for (block_id, block) in &method_cfg.blocks {
         for (instr_idx, instr) in block.instructions.iter().enumerate() {
-            map.insert(InstructionIndex {block_id: *block_id, instr_index: instr_idx as i32}, instr.clone());
+            map.insert(
+                InstructionIndex {
+                    block_id: *block_id,
+                    instr_index: instr_idx as i32,
+                },
+                instr.clone(),
+            );
         }
     }
     InstructionMap(map)
@@ -36,7 +51,6 @@ fn instr_defs_var(inst: &Instruction, var: &str) -> bool {
     }
     false
 }
-
 
 fn uses_from_def(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet<InstructionIndex> {
     let mut uses = BTreeSet::new();
@@ -65,7 +79,10 @@ fn uses_from_def(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet
         // Start scanning from inst_idx
         for i in inst_idx..instructions.len() as i32 {
             let inst = &instructions[i as usize];
-            let inst_index = InstructionIndex { block_id, instr_index: i };
+            let inst_index = InstructionIndex {
+                block_id,
+                instr_index: i,
+            };
 
             if inst.get_used_vars().contains(var) {
                 uses.insert(inst_index);
@@ -77,8 +94,8 @@ fn uses_from_def(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet
         }
 
         // If scanned to end of block without redefinition:
-        if (inst_idx as usize) < instructions.len() &&
-            instructions[inst_idx as usize..]
+        if (inst_idx as usize) < instructions.len()
+            && instructions[inst_idx as usize..]
                 .iter()
                 .all(|inst| !instr_defs_var(inst, var))
         {
@@ -116,7 +133,7 @@ fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet
             continue;
         }
 
-         // Search backward within the block
+        // Search backward within the block
         for i in (0..=inst_idx).rev() {
             let inst = &instructions[i as usize];
 
@@ -130,8 +147,8 @@ fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet
         }
 
         // If no def found in this block before the start_idx, move to predecessors
-        let def_found_in_block = (0..=inst_idx)
-            .any(|i| instr_defs_var(&instructions[i as usize], var));
+        let def_found_in_block =
+            (0..=inst_idx).any(|i| instr_defs_var(&instructions[i as usize], var));
 
         if !def_found_in_block {
             for pred_id in cfg.predecessors(block_id) {
@@ -148,7 +165,6 @@ fn defs_from_use(cfg: &CFG, start_inst: InstructionIndex, var: &str) -> BTreeSet
 
     defs
 }
-
 
 // #################################################
 // COMPUTE WEBS
@@ -191,9 +207,9 @@ fn compute_webs(method_cfg: &CFG, globals: &BTreeMap<String, Global>) -> BTreeMa
 
                     for use_idx in reachable_uses {
                         uses.insert(use_idx);
-                    
+
                         let reaching_defs = defs_from_use(method_cfg, use_idx, &var);
-                    
+
                         for reaching_def_idx in reaching_defs {
                             if visited_defs.insert(reaching_def_idx) {
                                 defs.insert(reaching_def_idx);
@@ -201,7 +217,6 @@ fn compute_webs(method_cfg: &CFG, globals: &BTreeMap<String, Global>) -> BTreeMa
                             }
                         }
                     }
-                    
                 }
 
                 let web_id = next_web_id();
@@ -221,18 +236,11 @@ fn compute_webs(method_cfg: &CFG, globals: &BTreeMap<String, Global>) -> BTreeMa
     webs
 }
 
-
-
-
-
 // #################################################
 // COMPUTE INTERFERENCE
 // #################################################
 
-fn block_is_part_of_loop(
-    block_id: i32,
-    preds: &HashMap<i32, HashSet<i32>>,
-) -> bool {
+fn block_is_part_of_loop(block_id: i32, preds: &HashMap<i32, HashSet<i32>>) -> bool {
     let mut visited = BTreeSet::new();
     let mut stack = vec![block_id];
 
@@ -255,7 +263,6 @@ fn block_is_part_of_loop(
     false // no backedge found
 }
 
-
 /// Compute use-liveness spans for all uses in all webs.
 /// Requires instruction map and full CFG (with block predecessors).
 /// Returns {(web_id : a_use_id_in_web) : {live region from that use to all defs}}
@@ -266,7 +273,6 @@ pub fn compute_use_liveness_spans(
 ) -> BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>> {
     let mut result = BTreeMap::new();
     let preds = compute_predecessors(method_cfg);
-    
 
     for (web_id, web) in webs {
         let var = &web.variable;
@@ -290,7 +296,7 @@ pub fn compute_use_liveness_spans(
                 if let Some(def) = instr.get_def_var() {
                     // TODO: visited set for instructions; remove use from worklist
                     if def == *var && !web.uses.contains(&idx) {
-                            continue;
+                        continue;
                     }
                 }
 
@@ -303,7 +309,6 @@ pub fn compute_use_liveness_spans(
                         instr_index: idx.instr_index - 1,
                     };
                     worklist.push_back(prev_idx);
-
                 } else if let Some(pred_blocks) = preds.get(&idx.block_id) {
                     for &pred_block in pred_blocks {
                         let pred_instrs = &method_cfg.blocks[&pred_block].instructions;
@@ -325,9 +330,8 @@ pub fn compute_use_liveness_spans(
     result
 }
 
-
 pub fn combine_spans_per_web(
-    use_liveness_spans: &BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>>
+    use_liveness_spans: &BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>>,
 ) -> BTreeMap<i32, BTreeSet<InstructionIndex>> {
     let mut out: BTreeMap<i32, BTreeSet<InstructionIndex>> = BTreeMap::new();
 
@@ -339,7 +343,6 @@ pub fn combine_spans_per_web(
     }
     out
 }
-
 
 pub fn build_interference_graph_from_spans(
     use_liveness_spans: &BTreeMap<(i32, InstructionIndex), BTreeSet<InstructionIndex>>,
@@ -362,12 +365,10 @@ pub fn build_interference_graph_from_spans(
     graph
 }
 
-
 /// Spill webs onto the stack or split their live ranges
 fn compute_spill_costs() {
     todo!()
 }
-
 
 /// Performs graph-coloring algorithm, assigning every web
 /// either a register or a stack space.
@@ -375,6 +376,7 @@ pub fn assign_registers(
     interference: &InterferenceGraph,
     registers: &BTreeSet<X86Operand>,
     method_webs: &BTreeMap<i32, Web>,
+    precolored: &HashMap<i32, X86Operand>,
 ) -> BTreeMap<Web, Option<X86Operand>> {
     let mut stack: Vec<i32> = Vec::new();
     let mut removed: BTreeSet<i32> = BTreeSet::new();
@@ -413,15 +415,30 @@ pub fn assign_registers(
         }
     }
 
-    // Step 3: Assign colors
+    // Step 2.5, insert the precoloring
     let mut coloring: BTreeMap<Web, Option<X86Operand>> = BTreeMap::new();
+    // Step 2.5: Record all precolored webs in coloring
+    for (&node, reg) in precolored {
+        if let Some(web) = method_webs.get(&node) {
+            coloring.insert(web.clone(), Some(reg.clone()));
+        }
+    }
+
+    // Step 3: Assign colors
 
     while let Some(node) = stack.pop() {
+        // skip if already precolored
+        if precolored.contains_key(&node) {
+            continue;
+        }
+
         let mut used_colors = BTreeSet::new();
 
         if let Some(neighbors) = interference.neighbors(&node) {
             for neighbor in neighbors {
-                let neighbor_web = method_webs.get(neighbor).expect("Should have found neighbor web");
+                let neighbor_web = method_webs
+                    .get(neighbor)
+                    .expect("Should have found neighbor web");
                 if let Some(Some(color)) = coloring.get(neighbor_web) {
                     used_colors.insert(color.clone());
                 }
@@ -429,8 +446,13 @@ pub fn assign_registers(
         }
 
         // Assign the first available register not used by neighbors
-        let reg = registers.iter().find(|r| !used_colors.contains(*r)).cloned();
-        let key = method_webs.get(&node).expect("Shoudl have found vertex node");
+        let reg = registers
+            .iter()
+            .find(|r| !used_colors.contains(*r))
+            .cloned();
+        let key = method_webs
+            .get(&node)
+            .expect("Shoudl have found vertex node");
         coloring.insert(key.clone(), reg); // If no register available, reg = None (spill)
     }
 
@@ -446,8 +468,8 @@ fn add_def_reg(instruction: &mut Instruction, register: &Option<X86Operand>) {
         | Instruction::Divide { dest, .. }
         | Instruction::Modulo { dest, .. }
         | Instruction::Not { dest, .. }
-        | Instruction::Cast { dest, ..}
-        | Instruction::Len { dest, ..}
+        | Instruction::Cast { dest, .. }
+        | Instruction::Len { dest, .. }
         | Instruction::Greater { dest, .. }
         | Instruction::Less { dest, .. }
         | Instruction::LessEqual { dest, .. }
@@ -460,7 +482,7 @@ fn add_def_reg(instruction: &mut Instruction, register: &Option<X86Operand>) {
             dest.set_reg(register);
         }
         Instruction::MethodCall { dest, .. } => {
-            if let Some(dest_op) = dest{
+            if let Some(dest_op) = dest {
                 dest_op.set_reg(register);
             }
         }
@@ -473,8 +495,7 @@ fn add_def_reg(instruction: &mut Instruction, register: &Option<X86Operand>) {
     }
 }
 
-
-// Taking a reference to an instruction, add in the info of which register to use in the use of a variable with 
+// Taking a reference to an instruction, add in the info of which register to use in the use of a variable with
 // name: variable
 fn add_use_reg(instruction: &mut Instruction, register: &Option<X86Operand>, variable: &String) {
     // Recursively attempts to set the register on an operand (including nested uses in array indices)
@@ -484,8 +505,7 @@ fn add_use_reg(instruction: &mut Instruction, register: &Option<X86Operand>, var
         }
 
         match op {
-            Operand::LocalArrElement { index, .. }
-            | Operand::GlobalArrElement { index, .. } => {
+            Operand::LocalArrElement { index, .. } | Operand::GlobalArrElement { index, .. } => {
                 try_set(index, reg, var); // Recurse into index
             }
             _ => {}
@@ -539,15 +559,11 @@ fn add_use_reg(instruction: &mut Instruction, register: &Option<X86Operand>, var
             }
         }
 
-        Instruction::Exit { .. }
-        | Instruction::UJmp { .. }
-        | Instruction::LoadConst { .. } => {
+        Instruction::Exit { .. } | Instruction::UJmp { .. } | Instruction::LoadConst { .. } => {
             panic!("add_use_reg called on instruction with no register-assignable uses");
         }
     }
 }
-
-
 
 /// Modify the CFG based on the register assignments
 fn apply_reg_assignments(method_cfg: &mut CFG, assignments: BTreeMap<Web, Option<X86Operand>>) {
@@ -574,12 +590,14 @@ fn apply_reg_assignments(method_cfg: &mut CFG, assignments: BTreeMap<Web, Option
             add_use_reg(instruction, reg_opt, &web.variable);
         }
     }
-
 }
 
-
 /// Mutates CFG based on register assignments
-pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<String, Global>, debug: bool) {
+pub fn reg_alloc(
+    method_cfgs: &mut BTreeMap<String, CFG>,
+    globals: &BTreeMap<String, Global>,
+    debug: bool,
+) {
     // for (name, cfg) in method_cfgs.clone() {
     //     println!("{}", name);
     // }
@@ -590,30 +608,33 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<Str
     let usable_registers: BTreeSet<X86Operand> = vec![
         // Caller saved (volatile) — can be freely used, but caller must save if needed across calls
         // X86Operand::Reg(Register::Rax),  // Return value
-        // X86Operand::Reg(Register::Rcx),  // 4th argument, also shift count, loop counter
+        X86Operand::Reg(Register::Rdi), // 1st argument
+        X86Operand::Reg(Register::Rsi), // 2nd argument
         // X86Operand::Reg(Register::Rdx),  // 3rd argument, also used in division
-        // X86Operand::Reg(Register::Rsi),  // 2nd argument
-        // X86Operand::Reg(Register::Rdi),  // 1st argument
-        // X86Operand::Reg(Register::R8),   // 5th argument
-        // X86Operand::Reg(Register::R9),   // 6th argument
+        X86Operand::Reg(Register::Rcx), // 4th argument, also shift count, loop counter
+        X86Operand::Reg(Register::R8),  // 5th argument
+        X86Operand::Reg(Register::R9),  // 6th argument
         // X86Operand::Reg(Register::R10),  // Scratch (caller-saved temp), rarely reserved by ABI
         // X86Operand::Reg(Register::R11),  // Scratch (caller-saved temp), rarely reserved by ABI
 
         // // Callee saved (non-volatile) — must be preserved by callee across calls
-        // X86Operand::Reg(Register::Rbx),  // Callee saved (general-purpose)
+        X86Operand::Reg(Register::Rbx), // Callee saved (general-purpose)
         // X86Operand::Reg(Register::Rbp),  // Frame/base pointer
         // X86Operand::Reg(Register::Rsp),  // Stack pointer (NEVER allocate)
-        X86Operand::Reg(Register::R12),  // Callee saved (you’re using this for allocation)
-        X86Operand::Reg(Register::R13),  // Callee saved
-        X86Operand::Reg(Register::R14),  // Callee saved
-        X86Operand::Reg(Register::R15),  // Callee saved
+        X86Operand::Reg(Register::R12), // Callee saved (you’re using this for allocation)
+        X86Operand::Reg(Register::R13), // Callee saved
+        X86Operand::Reg(Register::R14), // Callee saved
+        X86Operand::Reg(Register::R15), // Callee saved
 
-        // Special
-        // X86Operand::Reg(Register::Rip),  // Instruction pointer (NEVER allocate)
-    ].into_iter().collect();
+                                        // Special
+                                        // X86Operand::Reg(Register::Rip),  // Instruction pointer (NEVER allocate)
+    ]
+    .into_iter()
+    .collect();
 
     // For building HTML visualizer
-    let mut web_data: BTreeMap<String, (BTreeMap<i32, Web>, InterferenceGraph, InstructionMap)> = BTreeMap::new();
+    let mut web_data: BTreeMap<String, (BTreeMap<i32, Web>, InterferenceGraph, InstructionMap)> =
+        BTreeMap::new();
     let mut register_data: BTreeMap<String, BTreeMap<i32, Option<X86Operand>>> = BTreeMap::new();
 
     for (method_name, method_cfg) in method_cfgs {
@@ -627,34 +648,56 @@ pub fn reg_alloc(method_cfgs: &mut BTreeMap<String, CFG>, globals: &BTreeMap<Str
         let interference = build_interference_graph_from_spans(&live_spans);
 
         if debug {
-            println!("webs for {method_name} is {:#?}", method_webs);
-            println!("interference graph for {method_name} is {:#?}", interference);
+            // println!("webs for {method_name} is {:#?}", method_webs);
+            // println!("interference graph for {method_name} is {:#?}", interference);
         }
 
         // Save data for visualization
-        web_data.insert(method_name.clone(), (method_webs.clone(), interference.clone(), instr_map.clone()));
+        web_data.insert(
+            method_name.clone(),
+            (method_webs.clone(), interference.clone(), instr_map.clone()),
+        );
 
-
-        // Assign registers
-        let register_assignments = assign_registers(&interference, &usable_registers, &method_webs);
-        if debug {
-            for (web, reg) in &register_assignments {
-                println!("assigning web {:#?} to register {:#?}", web, reg);
+        // Precolor all of the arguments to stay in their registers so they dont clobber eachother
+        // TODO what if the arguments arent that important to be in register for later
+        let mut precolored: HashMap<i32, X86Operand> = HashMap::new();
+        for (&pos, temp) in &method_cfg.param_to_temp {
+            if pos < 6 {
+                let var = &temp.name;
+                // find the web whose `variable == var`
+                if let Some((&web_id, _)) = method_webs.iter().find(|(_, w)| &w.variable == var) {
+                    precolored.insert(web_id, ARGUMENT_REGISTERS[pos as usize].clone());
+                }
             }
         }
 
+        // Assign registers
+        // println!("Assigning Regs");
+        let register_assignments =
+            assign_registers(&interference, &usable_registers, &method_webs, &precolored);
+        if debug {
+            // for (web, reg) in &register_assignments {
+            //     println!("assigning web {:#?} to register {:#?}", web, reg);
+            // }
+        }
+        // println!("Finish Assigning");
+
         // register information for visualization
-        register_data.insert(method_name.clone(), register_assignments
-            .iter()
-            .map(|(web, reg)| (web.id, reg.clone()))
-            .collect());
+        register_data.insert(
+            method_name.clone(),
+            register_assignments
+                .iter()
+                .map(|(web, reg)| (web.id, reg.clone()))
+                .collect(),
+        );
 
         apply_reg_assignments(method_cfg, register_assignments);
     }
 
     // Generate visual HTML for all methods
-    // html_web_graphs(&web_data, &register_data, "reg_alloc.html".to_string());
-
+    //html_web_graphs(&web_data, &register_data, "reg_alloc.html".to_string());
 }
+
+
 
 

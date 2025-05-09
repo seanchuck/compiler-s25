@@ -6,7 +6,7 @@ between those basic blocks.
 **/
 
 use crate::{ast::Type, scope::{Scope, TableEntry}, tac::*, x86::X86Operand};
-use std::{cell::RefCell, collections::{BTreeMap, HashMap, HashSet}, rc::Rc};
+use std::{cell::RefCell, collections::{BTreeMap, BTreeSet, HashMap, HashSet}, rc::Rc};
 
 // #################################################
 // CONSTANTS
@@ -79,6 +79,10 @@ impl CFG {
     pub fn get_block_order(&self) -> &Vec<i32> {
         &self.block_order
     }
+
+    pub fn get_mut_blocks(&mut self) -> &mut BTreeMap<i32, BasicBlock> {
+        &mut self.blocks
+    }  
 
     /// Get basic block with ID
     fn get_block_with_id(&mut self, id: i32) -> &mut BasicBlock {
@@ -193,6 +197,18 @@ impl CFG {
         } else {
             format!("{op}")
         }
+    }
+
+    // Gets the set of all registers used in the cfg
+    pub fn get_reg_allocs(&self) -> BTreeSet<X86Operand> {
+        let mut registers: BTreeSet<X86Operand> = BTreeSet::new();
+        for (_id, block) in self.get_blocks(){
+            for instr in block.get_instructions() {
+                let instr_regs: Vec<X86Operand> = instr.get_reg_allocs();
+                registers.extend(instr_regs);
+            }
+        }
+        registers
     }
     
 
@@ -385,6 +401,10 @@ impl BasicBlock {
 
     pub fn get_instructions(&self) -> &Vec<Instruction> {
         &self.instructions
+    }
+
+    pub fn get_mut_instructions(&mut self) -> &mut Vec<Instruction> {
+        &mut self.instructions
     }
     
     fn add_instruction(&mut self, instruction: Instruction) {
