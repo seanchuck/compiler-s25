@@ -1,0 +1,13 @@
+int x, y, z;
+
+void main() {
+    int a, b, c;
+
+    a = 10;
+    b = 20;
+    c = a + b; 
+
+    x = c * 2;
+    y = x - 10
+    z = y / 2;
+}
