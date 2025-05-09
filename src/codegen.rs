@@ -3,7 +3,7 @@
 **/
 use crate::ast::Type;
 use crate::cfg::BasicBlock;
-use crate::cfg::{Global, Local};
+use crate::cfg::Global;
 use crate::cfg::{INT_SIZE, LONG_SIZE};
 use crate::dataflow::optimize_dataflow;
 use crate::tac::*;
@@ -1000,7 +1000,7 @@ fn add_instruction(
 }
 
 /// returns x86 instructions corresponding to the instructions in the basic block
-fn generate_x86_block(method_cfg: &CFG, id: &i32, block: &BasicBlock, next_id: Option<&i32>, globals: &BTreeMap<String, Global>) -> Vec<X86Insn> {
+fn generate_x86_block(method_cfg: &CFG, id: &i32, block: &BasicBlock, next_id: Option<&i32>, globals: &BTreeMap<String, Global>, reg_alloc: bool, pushed_callee_saved: &Vec<Register>) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
     let method_name = &method_cfg.name;
 
@@ -1021,7 +1021,7 @@ fn generate_x86_block(method_cfg: &CFG, id: &i32, block: &BasicBlock, next_id: O
             }
         }
 
-        add_instruction(method_cfg, &insn, &mut x86_instructions, globals);
+        add_instruction(method_cfg, &insn, &mut x86_instructions, globals, reg_alloc);
     }
 
     if *id == method_cfg.exit {
@@ -1046,7 +1046,7 @@ fn generate_x86_block(method_cfg: &CFG, id: &i32, block: &BasicBlock, next_id: O
 }
 
 /// returns a map from ID of basic block to a vector of x86 instructions representing it
-fn generate_x86_blocks(method_cfg: &CFG, globals: &BTreeMap<String, Global>) -> HashMap<i32, Vec<X86Insn>> {
+fn generate_x86_blocks(method_cfg: &CFG, globals: &BTreeMap<String, Global>, reg_alloc: bool, pushed_callee_saved: &Vec<Register>) -> HashMap<i32, Vec<X86Insn>> {
     let mut output_map = HashMap::new();
 
     let blocks = method_cfg.get_blocks();
@@ -1056,7 +1056,7 @@ fn generate_x86_blocks(method_cfg: &CFG, globals: &BTreeMap<String, Global>) -> 
         let id = &block_order[i];
         let block = &blocks[id];
         let next_id = block_order.get(i + 1);
-        output_map.insert(*id, generate_x86_block(method_cfg, id, block, next_id, globals));
+        output_map.insert(*id, generate_x86_block(method_cfg, id, block, next_id, globals, reg_alloc, pushed_callee_saved));
     }
 
     output_map
@@ -1068,8 +1068,8 @@ fn generate_method_x86(
     method_name: &String,
     method_cfg: &CFG,
     x86_blocks: &HashMap<i32, Vec<X86Insn>>,
-    globals: &BTreeMap<String, Global>
-    reg_alloc: bool,
+    globals: &BTreeMap<String, Global>,
+    pushed_callee_saved: &Vec<Register>
 ) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
@@ -1081,17 +1081,9 @@ fn generate_method_x86(
 
     // === Method Prologue ===
 
-    // Track pushed callee-saved registers
-    let mut pushed_callee_saved: Vec<Register> = vec![];
-
-    for reg in CALLEE_SAVED_REGISTERS {
-        if method_cfg
-            .get_reg_allocs()
-            .contains(&X86Operand::Reg(reg.clone()))
-        {
-            x86_instructions.push(X86Insn::Push(X86Operand::Reg(reg.clone())));
-            pushed_callee_saved.push(reg);
-        }
+    // callee saved registers
+    for reg in pushed_callee_saved {
+        x86_instructions.push(X86Insn::Push(X86Operand::Reg(reg.clone())));
     }
 
     // Set up new frame and push RBP
@@ -1164,11 +1156,6 @@ pub fn generate_assembly(
     // Generate the method CFGS
     let (mut method_cfgs, globals, strings) = build_cfg(file, filename, writer, debug);
 
-    // if debug {
-    //     html_cfgs(&method_cfgs, "no-opt.html".to_string());
-    //     println!("\n========== X86 Code ==========\n");
-    // }
-
     // Perform dataflow optimizations (includes register allocation)
     optimize_dataflow(&mut method_cfgs, &optimizations, &globals, debug);
 
@@ -1216,14 +1203,27 @@ pub fn generate_assembly(
     // Generate a vector of x86 for each method
     let mut code: HashMap<String, Vec<X86Insn>> = HashMap::new();
     for (method_name, method_cfg) in &method_cfgs {
-        let mut x86_blocks = generate_x86_blocks(method_cfg, &globals);
+        // Track pushed callee-saved registers
+        let mut pushed_callee_saved: Vec<Register> = vec![];
+
+        for reg in CALLEE_SAVED_REGISTERS {
+            if method_cfg
+                .get_reg_allocs()
+                .contains(&X86Operand::Reg(reg.clone()))
+            {
+                pushed_callee_saved.push(reg);
+            }
+        }
+
+        let reg_alloc = optimizations.contains(&Optimization::Regalloc);
+        let mut x86_blocks = generate_x86_blocks(method_cfg, &globals, reg_alloc, &pushed_callee_saved);
         peephole(method_cfg, &mut x86_blocks, debug);
         let method_code = generate_method_x86(
             method_name, 
             method_cfg, 
             &x86_blocks, 
             &globals, 
-            optimizations.contains(&Optimization::Regalloc)
+            &pushed_callee_saved
         );
         code.insert(method_name.clone(), method_code);
     }

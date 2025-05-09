@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::{ast::Type, cfg::CFG, state::{compute_predecessors, compute_successors}, x86::{self, DefUse, Register, X86Insn, X86Operand}};
+use crate::{ast::Type, cfg::CFG, state::{compute_predecessors, compute_successors}, x86::{DefUse, Register, X86Insn, X86Operand}};
 
 fn add_use(use_set: &mut HashSet<X86Operand>, def_set: Option<&HashSet<X86Operand>>, operand: &X86Operand) {
     let basic_op = get_basic_operand(operand);
