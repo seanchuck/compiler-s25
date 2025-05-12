@@ -685,136 +685,99 @@ fn add_instruction(
             let left_op = map_operand(method_cfg, left, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
 
-            // if let Operand::Const { value, .. } = right {
-            //     // Optimization only applies to constants ≠ 0 and ≠ 1
-            //     let divisor: i64 = *value;
-            //     let abs_divisor = divisor.abs() as u64;
+            if let Operand::Const { value, .. } = right {
+                // Optimization only applies to constants ≠ 0 and ≠ 1
+                let divisor: i64 = *value;
+                let abs_divisor = divisor.abs() as u64;
 
-            //     if divisor == 0 {
-            //         panic!("Division by zero");
-            //     } else if abs_divisor.is_power_of_two() {
-            //         //SUS
-            //         // Division by power of 2
-            //         // Use arithmetic shift for signed divide by power of two
-            //         let shift = abs_divisor.trailing_zeros(); // always positive
-            //         x86_instructions.push(X86Insn::Mov(
-            //             left_op.clone(),
-            //             dest_op.clone(),
-            //             typ.clone(),
-            //         ));
-            //         x86_instructions.push(X86Insn::SarImm(shift, dest_op.clone()));
-            //         if divisor < 0 {
-            //             x86_instructions.push(X86Insn::Neg(dest_op.clone()));
-            //         }
-            //         return;
-            //     } else {
-            //         x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
-            //         // Use magic number division (signed)
-            //         let (magic, shift) = match typ {
-            //             Type::Int => compute_magic_u64(abs_divisor),
-            //             Type::Long => compute_magic_u64(abs_divisor),
-            //             _ => panic!("Divide only supported for int or long"),
-            //         };
+                if divisor == 0 {
+                    // keep original behavior so we get a division-by-zero runtime error
+                    add_division(x86_instructions, &left_op, &X86Operand::Constant(0), &dest_op, typ);
+                } else if abs_divisor.is_power_of_two() {
+                    //SUS
+                    // Division by power of 2
+                    // Use arithmetic shift for signed divide by power of two
+                    let shift = abs_divisor.trailing_zeros(); // always positive
+                    x86_instructions.push(X86Insn::Mov(
+                        left_op.clone(),
+                        dest_op.clone(),
+                        typ.clone(),
+                    ));
+                    x86_instructions.push(X86Insn::SarImm(shift, dest_op.clone()));
+                    if divisor < 0 {
+                        x86_instructions.push(X86Insn::Neg(dest_op.clone()));
+                    }
+                    return;
+                } else {
+                    // no magic number division for now
+                    add_division(x86_instructions, &left_op, &X86Operand::Constant(divisor), &dest_op, typ);
 
-            //         // let reg = match typ {
-            //         //     Type::Int => Register::Rax,
-            //         //     Type::Long => Register::Rax,
-            //         //     _ => unreachable!(),
-            //         // };
+                    // x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
+                    // // Use magic number division (signed)
+                    // let (magic, shift) = match typ {
+                    //     Type::Int => compute_magic_u64(abs_divisor),
+                    //     Type::Long => compute_magic_u64(abs_divisor),
+                    //     _ => panic!("Divide only supported for int or long"),
+                    // };
 
-            //         // left / right = (left * magic) >> shift
-            //         x86_instructions.push(X86Insn::Mov(
-            //             left_op.clone(),
-            //             X86Operand::Reg(reg_for_type(Register::R11, typ)),
-            //             typ.clone(),
-            //         ));
-            //         x86_instructions.push(X86Insn::Loadlong(
-            //             magic as i64,
-            //             X86Operand::Reg(Register::Rax),
-            //         )); // todo: magic signed
-            //         x86_instructions.push(X86Insn::UMul(X86Operand::Reg(Register::R11)));
+                    // // let reg = match typ {
+                    // //     Type::Int => Register::Rax,
+                    // //     Type::Long => Register::Rax,
+                    // //     _ => unreachable!(),
+                    // // };
 
-            //         if shift == 64 {
-            //             // rdx into res
-            //             x86_instructions.push(X86Insn::Mov(
-            //                 X86Operand::Reg(reg_for_type(Register::Rdx, typ)),
-            //                 dest_op.clone(),
-            //                 typ.clone(),
-            //             ));
-            //         } else {
-            //             // shrd
-            //             x86_instructions.push(X86Insn::Mov(
-            //                 X86Operand::Constant(shift.into()),
-            //                 X86Operand::Reg(Register::R11),
-            //                 Type::Long,
-            //             ));
+                    // // left / right = (left * magic) >> shift
+                    // x86_instructions.push(X86Insn::Mov(
+                    //     left_op.clone(),
+                    //     X86Operand::Reg(reg_for_type(Register::R11, typ)),
+                    //     typ.clone(),
+                    // ));
+                    // x86_instructions.push(X86Insn::Loadlong(
+                    //     magic as i64,
+                    //     X86Operand::Reg(Register::Rax),
+                    // )); // todo: magic signed
+                    // x86_instructions.push(X86Insn::UMul(X86Operand::Reg(Register::R11)));
 
-            //             x86_instructions.push(X86Insn::Shrd(
-            //                 X86Operand::Reg(Register::R11),
-            //                 X86Operand::Reg(Register::Rdx),
-            //                 X86Operand::Reg(Register::Rax),
-            //             ));
+                    // if shift == 64 {
+                    //     // rdx into res
+                    //     x86_instructions.push(X86Insn::Mov(
+                    //         X86Operand::Reg(reg_for_type(Register::Rdx, typ)),
+                    //         dest_op.clone(),
+                    //         typ.clone(),
+                    //     ));
+                    // } else {
+                    //     // shrd
+                    //     x86_instructions.push(X86Insn::Mov(
+                    //         X86Operand::Constant(shift.into()),
+                    //         X86Operand::Reg(Register::R11),
+                    //         Type::Long,
+                    //     ));
 
-            //             x86_instructions.push(X86Insn::Mov(
-            //                 X86Operand::Reg(reg_for_type(Register::Rax, typ)),
-            //                 dest_op.clone(),
-            //                 typ.clone(),
-            //             ));
-            //         }
+                    //     x86_instructions.push(X86Insn::Shrd(
+                    //         X86Operand::Reg(Register::R11),
+                    //         X86Operand::Reg(Register::Rdx),
+                    //         X86Operand::Reg(Register::Rax),
+                    //     ));
 
-            //         if divisor < 0 {
-            //             x86_instructions.push(X86Insn::Neg(dest_op.clone()));
-            //         }
+                    //     x86_instructions.push(X86Insn::Mov(
+                    //         X86Operand::Reg(reg_for_type(Register::Rax, typ)),
+                    //         dest_op.clone(),
+                    //         typ.clone(),
+                    //     ));
+                    // }
 
-            //         x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
-            //         return;
-            //     }
-            // }
+                    // if divisor < 0 {
+                    //     x86_instructions.push(X86Insn::Neg(dest_op.clone()));
+                    // }
+
+                    // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
+                    // return;
+                }
+            }
 
             let right_op = map_operand(method_cfg, right, x86_instructions, globals);
 
-            // Signed division in x86:
-            match typ {
-                Type::Int => {
-                    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
-                    // 32-bit signed division:
-                    // Dividend in EAX, sign-extended into EDX using CDQ
-                    x86_instructions.push(X86Insn::Mov(
-                        left_op,
-                        X86Operand::Reg(Register::Eax),
-                        Type::Int,
-                    ));
-                    x86_instructions.push(X86Insn::Cdq); // Sign-extend EAX into EDX
-                    x86_instructions.push(X86Insn::Mov(right_op.clone(), X86Operand::Reg(reg_for_type(Register::R11, typ)), typ.clone()));      // ONLY FOR CONST PROP NEEDED
-                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(reg_for_type(Register::R11, typ)), Type::Int)); // Divide EDX:EAX by right
-                    x86_instructions.push(X86Insn::Mov(
-                        X86Operand::Reg(Register::Eax),
-                        dest_op,
-                        Type::Int,
-                    ));
-                    x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
-                }
-                Type::Long => {
-                    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
-                    // 64-bit signed division:
-                    // Dividend in RAX, sign-extended into RDX using CQO
-                    x86_instructions.push(X86Insn::Mov(
-                        left_op,
-                        X86Operand::Reg(Register::Rax),
-                        Type::Long,
-                    ));
-                    x86_instructions.push(X86Insn::Cqto); // Sign-extend RAX into RDX
-                    x86_instructions.push(X86Insn::Mov(right_op.clone(), X86Operand::Reg(reg_for_type(Register::R11, typ)), typ.clone()));      // ONLY FOR CONST PROP NEEDED
-                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::R11), Type::Long)); // Divide RDX:RAX by RCX
-                    x86_instructions.push(X86Insn::Mov(
-                        X86Operand::Reg(Register::Rax),
-                        dest_op,
-                        Type::Long,
-                    ));
-                    x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
-                }
-                _ => panic!("Divide only supported for int or long types"),
-            }
+            add_division(x86_instructions, &left_op, &right_op, &dest_op, typ);
         }
         Instruction::Modulo {
             left,
@@ -1180,6 +1143,51 @@ fn add_instruction(
             ));
             x86_instructions.push(X86Insn::Exit);
         }
+    }
+}
+
+fn add_division(x86_instructions: &mut Vec<X86Insn>, left_op: &X86Operand, right_op: &X86Operand, dest_op: &X86Operand, typ: &Type) {
+    // Signed division in x86:
+    match typ {
+        Type::Int => {
+            x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
+            // 32-bit signed division:
+            // Dividend in EAX, sign-extended into EDX using CDQ
+            x86_instructions.push(X86Insn::Mov(
+                left_op.clone(),
+                X86Operand::Reg(Register::Eax),
+                Type::Int,
+            ));
+            x86_instructions.push(X86Insn::Cdq); // Sign-extend EAX into EDX
+            x86_instructions.push(X86Insn::Mov(right_op.clone(), X86Operand::Reg(reg_for_type(Register::R11, typ)), typ.clone()));      // ONLY FOR CONST PROP NEEDED
+            x86_instructions.push(X86Insn::Div(X86Operand::Reg(reg_for_type(Register::R11, typ)), Type::Int)); // Divide EDX:EAX by right
+            x86_instructions.push(X86Insn::Mov(
+                X86Operand::Reg(Register::Eax),
+                dest_op.clone(),
+                Type::Int,
+            ));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
+        }
+        Type::Long => {
+            x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
+            // 64-bit signed division:
+            // Dividend in RAX, sign-extended into RDX using CQO
+            x86_instructions.push(X86Insn::Mov(
+                left_op.clone(),
+                X86Operand::Reg(Register::Rax),
+                Type::Long,
+            ));
+            x86_instructions.push(X86Insn::Cqto); // Sign-extend RAX into RDX
+            x86_instructions.push(X86Insn::Mov(right_op.clone(), X86Operand::Reg(reg_for_type(Register::R11, typ)), typ.clone()));      // ONLY FOR CONST PROP NEEDED
+            x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::R11), Type::Long)); // Divide RDX:RAX by RCX
+            x86_instructions.push(X86Insn::Mov(
+                X86Operand::Reg(Register::Rax),
+                dest_op.clone(),
+                Type::Long,
+            ));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
+        }
+        _ => panic!("Divide only supported for int or long types"),
     }
 }
 
