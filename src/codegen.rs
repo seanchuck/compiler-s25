@@ -247,8 +247,19 @@ fn compute_magic_u64(divisor: u64) -> (bool, u64) {
     if magic > u64::MAX as u128 {
         return (false, 0)
     }
-    
-    (true, magic as u64)
+
+    let magic_u64 = magic as u64;
+
+    // Test if the approximation is valid for x = u64::MAX
+    let x = u64::MAX as u128;
+    let quotient_expected = x / divisor as u128;
+    let quotient_approx = ((x * magic) >> 64) as u128;
+
+    if quotient_approx != quotient_expected {
+        return (false, 0);
+    }
+
+    (true, magic_u64)
 }
 
 /// return the number of bits necessary to hold this unsigned integer
