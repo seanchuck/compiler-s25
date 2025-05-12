@@ -711,10 +711,6 @@ fn add_instruction(
                 if divisor == 0 {
                     // keep original behavior so we get a division-by-zero runtime error
                     add_division(x86_instructions, &left_op, &X86Operand::Constant(0), &dest_op, typ);
-                } else if get_basic_type(typ.clone()) == Type::Long {
-                    // only do magic num division for ints
-                    let right_op = map_operand(method_cfg, right, x86_instructions, globals);
-                    add_division(x86_instructions, &left_op, &right_op, &dest_op, typ);
                 } else if abs_divisor.is_power_of_two() {
                     //SUS
                     // Division by power of 2
@@ -731,38 +727,8 @@ fn add_instruction(
                     }
                     return;
                 } else {
-                    if divisor > 0 {
-                        // magic number division                    
-                        let (success, magic) = compute_magic_u64(abs_divisor);
-
-                        if success {
-                            // left / right = (left * magic) >> 64
-                            x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
-                            x86_instructions.push(X86Insn::Mov(
-                                left_op.clone(),
-                                X86Operand::Reg(reg_for_type(Register::R11, typ)),
-                                typ.clone(),
-                            ));
-                            x86_instructions.push(X86Insn::Loadlong(
-                                magic as i64,
-                                X86Operand::Reg(Register::Rax),
-                            ));
-                            x86_instructions.push(X86Insn::UMul(X86Operand::Reg(Register::R11)));
-                            // rdx into res
-                            x86_instructions.push(X86Insn::Mov(
-                                X86Operand::Reg(reg_for_type(Register::Rdx, typ)),
-                                dest_op.clone(),
-                                typ.clone(),
-                            ));
-                            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
-                        } else {
-                            // no magic number division
-                            add_division(x86_instructions, &left_op, &X86Operand::Constant(divisor), &dest_op, typ);
-                        }
-                    } else {
-                        // no magic number division for now
-                        add_division(x86_instructions, &left_op, &X86Operand::Constant(divisor), &dest_op, typ);
-                    }
+                    // no magic number division for now
+                    add_division(x86_instructions, &left_op, &X86Operand::Constant(divisor), &dest_op, typ);
                 }
             } else {
                 let right_op = map_operand(method_cfg, right, x86_instructions, globals);
