@@ -6,6 +6,7 @@ use crate::cfg::BasicBlock;
 use crate::cfg::Global;
 use crate::cfg::{INT_SIZE, LONG_SIZE};
 use crate::dataflow::optimize_dataflow;
+use crate::peephole::get_basic_type;
 use crate::tac::*;
 use crate::utils::cli::Optimization;
 use crate::utils::print::{html_cfgs, print_cfg};
@@ -88,7 +89,12 @@ fn map_operand(
         Operand::Const { value, .. } => X86Operand::Constant(*value),
 
         Operand::LocalVar { name, .. } => {
-            let typ = method_cfg.locals.get(name).expect("missing temp in scope").typ.clone();
+            let typ = method_cfg
+                .locals
+                .get(name)
+                .expect("missing temp in scope")
+                .typ
+                .clone();
             X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(name), typ)
             // X86Operand::RegInt(Register::Rbp, method_cfg.get_stack_offset(temp), Type::Long)
         }
@@ -137,8 +143,14 @@ fn map_operand(
             )
         }
 
-        Operand::GlobalArrElement { name, index, typ, .. } => {
-            let array_typ: Type = globals.get(name).expect("Global array not defined!").typ.clone();
+        Operand::GlobalArrElement {
+            name, index, typ, ..
+        } => {
+            let array_typ: Type = globals
+                .get(name)
+                .expect("Global array not defined!")
+                .typ
+                .clone();
             let idx_op = map_operand(method_cfg, index, x86_instructions, globals);
 
             let index_reg: Register = reg_for_type(Register::R10, &Type::Int);
@@ -222,6 +234,43 @@ fn map_operand(
     }
 }
 
+/// if successful, return true and magic number; otherwise return false
+fn compute_magic_u64(divisor: u64) -> (bool, u64) {
+    assert!(divisor > 1, "Divisor must be > 1");
+
+    let bits = 64;
+
+    // Compute magic = floor( (2^bits + divisor - 1) / divisor )
+    let magic = (1u128 << bits).wrapping_add(divisor as u128 - 1) / (divisor as u128);
+
+    // Magic must fit into 64 bits
+    if magic > u64::MAX as u128 {
+        return (false, 0)
+    }
+
+    let magic_u64 = magic as u64;
+
+    // Test if the approximation is valid for x = u64::MAX
+    let x = u64::MAX as u128;
+    let quotient_expected = x / divisor as u128;
+    let quotient_approx = ((x * magic) >> 64) as u128;
+
+    if quotient_approx != quotient_expected {
+        return (false, 0);
+    }
+
+    (true, magic_u64)
+}
+
+/// return the number of bits necessary to hold this unsigned integer
+fn bit_width(num: u64) -> u32 {
+    if num == 0 {
+        1 // Special case for 0, which requires at least 1 bit
+    } else {
+        (64 - num.leading_zeros()) as u32
+    }
+}
+
 // Adds the x86 instructions corresponding to insn to x86_instructions
 fn add_instruction(
     method_cfg: &CFG,
@@ -242,32 +291,18 @@ fn add_instruction(
                     ));
                 }
                 Type::Long => {
-                    // Must load uppper and lower 32 bits separately since assembler doesn't
-                    // support loading a 64-bit constant directly
-                    x86_instructions.push(X86Insn::Mov(
-                        X86Operand::Constant(((src.clone() as u64) & 0xFFFFFFFF) as i64),
-                        X86Operand::Reg(Register::R10),
-                        Type::Long,
-                    )); // lower 32 bits
-                    x86_instructions.push(X86Insn::Mov(
-                        X86Operand::Constant(((src.clone() as u64) >> 32) as i64),
-                        X86Operand::Reg(Register::Rax),
-                        Type::Long,
-                    )); // upper 32 bits
-                    x86_instructions.push(X86Insn::Shl(
-                        X86Operand::Constant(32),
-                        X86Operand::Reg(Register::Rax),
-                    ));
-                    x86_instructions.push(X86Insn::Or(
-                        X86Operand::Reg(Register::Rax),
-                        X86Operand::Reg(Register::R10),
-                    ));
                     let dest_location = map_operand(method_cfg, dest, x86_instructions, globals);
-                    x86_instructions.push(X86Insn::Mov(
-                        X86Operand::Reg(Register::R10),
-                        dest_location,
-                        Type::Long,
-                    ));
+                    if dest.get_reg().is_some() {
+                        x86_instructions.push(X86Insn::Loadlong(*src, dest_location));
+                    } else {
+                        x86_instructions
+                            .push(X86Insn::Loadlong(*src, X86Operand::Reg(Register::Rax)));
+                        x86_instructions.push(X86Insn::Mov(
+                            X86Operand::Reg(Register::Rax),
+                            dest_location,
+                            Type::Long,
+                        ));
+                    }
                 }
                 _ => panic!("Load const only defined for numeric types"),
             }
@@ -279,9 +314,23 @@ fn add_instruction(
             dest,
             typ,
         } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions, globals);
-            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let mut left_op = map_operand(method_cfg, left, x86_instructions, globals);
+            let mut right_op = map_operand(method_cfg, right, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
+            // Long constants must be loaded first using movabs
+            if *typ == Type::Long {
+                if let Operand::Const { value, .. } = right {
+                    x86_instructions
+                        .push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R11)));
+                    right_op = X86Operand::Reg(Register::R11);
+                }
+                if let Operand::Const { value, .. } = left {
+                    x86_instructions
+                        .push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R10)));
+                    left_op = X86Operand::Reg(Register::R10);
+                }
+            }
 
             if let Some(_) = dest.get_reg() {
                 if dest_op != right_op {
@@ -335,9 +384,23 @@ fn add_instruction(
             dest,
             typ,
         } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions, globals);
-            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let mut left_op = map_operand(method_cfg, left, x86_instructions, globals);
+            let mut right_op = map_operand(method_cfg, right, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
+            // Long constants must be loaded first using movabs
+            if *typ == Type::Long {
+                if let Operand::Const { value, .. } = right {
+                    x86_instructions
+                        .push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R11)));
+                    right_op = X86Operand::Reg(Register::R11);
+                }
+                if let Operand::Const { value, .. } = left {
+                    x86_instructions
+                        .push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R10)));
+                    left_op = X86Operand::Reg(Register::R10);
+                }
+            }
 
             if let Some(_) = dest.get_reg() {
                 if dest_op != right_op {
@@ -516,7 +579,7 @@ fn add_instruction(
             x86_instructions.push(X86Insn::Xor(
                 X86Operand::Reg(Register::Rax),
                 X86Operand::Reg(Register::Rax),
-                Type::Long
+                Type::Long,
             ));
 
             // -- 5) Call! --
@@ -580,9 +643,23 @@ fn add_instruction(
             dest,
             typ,
         } => {
-            let left_op = map_operand(method_cfg, left, x86_instructions, globals);
-            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+            let mut left_op = map_operand(method_cfg, left, x86_instructions, globals);
+            let mut right_op = map_operand(method_cfg, right, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
+
+            // Long constants must be loaded first using movabs
+            if *typ == Type::Long {
+                if let Operand::Const { value, .. } = right {
+                    x86_instructions
+                        .push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R11)));
+                    right_op = X86Operand::Reg(Register::R11);
+                }
+                if let Operand::Const { value, .. } = left {
+                    x86_instructions
+                        .push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R10)));
+                    left_op = X86Operand::Reg(Register::R10);
+                }
+            }
 
             if let Some(_) = dest.get_reg() {
                 if dest_op != right_op {
@@ -624,48 +701,38 @@ fn add_instruction(
             typ,
         } => {
             let left_op = map_operand(method_cfg, left, x86_instructions, globals);
-            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
             let dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
 
-            // Signed division in x86:
-            match typ {
-                Type::Int => {
-                    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
-                    // 32-bit signed division:
-                    // Dividend in EAX, sign-extended into EDX using CDQ
+            if let Operand::Const { value, .. } = right {
+                // Optimization only applies to constants ≠ 0 and ≠ 1
+                let divisor: i64 = *value;
+                let abs_divisor = divisor.abs() as u64;
+
+                if divisor == 0 {
+                    // keep original behavior so we get a division-by-zero runtime error
+                    add_division(x86_instructions, &left_op, &X86Operand::Constant(0), &dest_op, typ);
+                } else if abs_divisor.is_power_of_two() {
+                    //SUS
+                    // Division by power of 2
+                    // Use arithmetic shift for signed divide by power of two
+                    let shift = abs_divisor.trailing_zeros(); // always positive
                     x86_instructions.push(X86Insn::Mov(
-                        left_op,
-                        X86Operand::Reg(Register::Eax),
-                        Type::Int,
+                        left_op.clone(),
+                        dest_op.clone(),
+                        typ.clone(),
                     ));
-                    x86_instructions.push(X86Insn::Cdq); // Sign-extend EAX into EDX
-                    x86_instructions.push(X86Insn::Div(right_op, Type::Int)); // Divide EDX:EAX by right
-                    x86_instructions.push(X86Insn::Mov(
-                        X86Operand::Reg(Register::Eax),
-                        dest_op,
-                        Type::Int,
-                    ));
-                    x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
+                    x86_instructions.push(X86Insn::SarImm(shift, dest_op.clone()));
+                    if divisor < 0 {
+                        x86_instructions.push(X86Insn::Neg(dest_op.clone()));
+                    }
+                    return;
+                } else {
+                    // no magic number division for now
+                    add_division(x86_instructions, &left_op, &X86Operand::Constant(divisor), &dest_op, typ);
                 }
-                Type::Long => {
-                    x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
-                    // 64-bit signed division:
-                    // Dividend in RAX, sign-extended into RDX using CQO
-                    x86_instructions.push(X86Insn::Mov(
-                        left_op,
-                        X86Operand::Reg(Register::Rax),
-                        Type::Long,
-                    ));
-                    x86_instructions.push(X86Insn::Cqto); // Sign-extend RAX into RDX
-                    x86_instructions.push(X86Insn::Div(right_op, Type::Long)); // Divide RDX:RAX by RCX
-                    x86_instructions.push(X86Insn::Mov(
-                        X86Operand::Reg(Register::Rax),
-                        dest_op,
-                        Type::Long,
-                    ));
-                    x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
-                }
-                _ => panic!("Divide only supported for int or long types"),
+            } else {
+                let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+                add_division(x86_instructions, &left_op, &right_op, &dest_op, typ);
             }
         }
         Instruction::Modulo {
@@ -687,7 +754,12 @@ fn add_instruction(
                         Type::Int,
                     ));
                     x86_instructions.push(X86Insn::Cdq); // Sign-extend EAX into EDX
-                    x86_instructions.push(X86Insn::Div(right_op, Type::Int));
+                    x86_instructions.push(X86Insn::Mov(
+                        right_op,
+                        X86Operand::Reg(Register::R11d),
+                        Type::Int,
+                    ));
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::R11d), Type::Int));
                     x86_instructions.push(X86Insn::Mov(
                         X86Operand::Reg(Register::Edx),
                         dest_op,
@@ -702,7 +774,12 @@ fn add_instruction(
                         Type::Long,
                     ));
                     x86_instructions.push(X86Insn::Cqto); // Sign-extend RAX into RDX
-                    x86_instructions.push(X86Insn::Div(right_op, Type::Long));
+                    x86_instructions.push(X86Insn::Mov(
+                        right_op,
+                        X86Operand::Reg(Register::R11),
+                        Type::Long,
+                    ));
+                    x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::R11), Type::Long));
                     x86_instructions.push(X86Insn::Mov(
                         X86Operand::Reg(Register::Rdx),
                         dest_op,
@@ -726,7 +803,7 @@ fn add_instruction(
             x86_instructions.push(X86Insn::Xor(
                 X86Operand::Constant(1),
                 X86Operand::Reg(reg.clone()),
-                Type::Bool
+                Type::Bool,
             ));
             x86_instructions.push(X86Insn::Mov(
                 X86Operand::Reg(reg.clone()),
@@ -740,8 +817,16 @@ fn add_instruction(
             target_type,
         } => {
             let dest_op: X86Operand = map_operand(method_cfg, dest, x86_instructions, globals);
+            let mut expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
 
-            let expr_op = map_operand(method_cfg, expr, x86_instructions, globals);
+            // Long constants must be loaded first using movabs
+            if expr.get_type() == Type::Long {
+                if let Operand::Const { value, .. } = expr {
+                    x86_instructions
+                        .push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R11)));
+                    expr_op = X86Operand::Reg(reg_for_type(Register::R11, target_type));
+                }
+            }
 
             let expr_typ = expr.get_type();
             let expr_reg = reg_for_type(Register::Rax, &expr_typ);
@@ -876,6 +961,20 @@ fn add_instruction(
             let mut dest_op = map_operand(method_cfg, dest, x86_instructions, globals);
             let mut swapped = false;
 
+            // Long constants must be loaded first using movabs
+            if left.get_type() == Type::Long {
+                if let Operand::Const { value, .. } = right {
+                    x86_instructions
+                        .push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R11)));
+                    right_op = X86Operand::Reg(Register::R11);
+                }
+                if let Operand::Const { value, .. } = left {
+                    x86_instructions
+                        .push(X86Insn::Loadlong(*value, X86Operand::Reg(Register::R10)));
+                    left_op = X86Operand::Reg(Register::R10);
+                }
+            }
+
             let left_typ = left.get_type();
             let left_reg = reg_for_type(Register::Rax, &left_typ);
 
@@ -980,7 +1079,11 @@ fn add_instruction(
             };
 
             // cmp condition; jump if condition is true
-            x86_instructions.push(X86Insn::Mov(cond_op, X86Operand::Reg(Register::Eax), Type::Int));
+            x86_instructions.push(X86Insn::Mov(
+                cond_op,
+                X86Operand::Reg(Register::Eax),
+                Type::Int,
+            ));
             x86_instructions.push(X86Insn::Cmp(
                 X86Operand::Constant(0),
                 X86Operand::Reg(Register::Eax),
@@ -992,10 +1095,55 @@ fn add_instruction(
             x86_instructions.push(X86Insn::Mov(
                 X86Operand::Constant(*exit_code),
                 X86Operand::Reg(Register::Rdi), // exit code goes in RDI
-                Type::Long
+                Type::Long,
             ));
             x86_instructions.push(X86Insn::Exit);
         }
+    }
+}
+
+fn add_division(x86_instructions: &mut Vec<X86Insn>, left_op: &X86Operand, right_op: &X86Operand, dest_op: &X86Operand, typ: &Type) {
+    // Signed division in x86:
+    match typ {
+        Type::Int => {
+            x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
+            // 32-bit signed division:
+            // Dividend in EAX, sign-extended into EDX using CDQ
+            x86_instructions.push(X86Insn::Mov(
+                left_op.clone(),
+                X86Operand::Reg(Register::Eax),
+                Type::Int,
+            ));
+            x86_instructions.push(X86Insn::Cdq); // Sign-extend EAX into EDX
+            x86_instructions.push(X86Insn::Mov(right_op.clone(), X86Operand::Reg(reg_for_type(Register::R11, typ)), typ.clone()));      // ONLY FOR CONST PROP NEEDED
+            x86_instructions.push(X86Insn::Div(X86Operand::Reg(reg_for_type(Register::R11, typ)), Type::Int)); // Divide EDX:EAX by right
+            x86_instructions.push(X86Insn::Mov(
+                X86Operand::Reg(Register::Eax),
+                dest_op.clone(),
+                Type::Int,
+            ));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
+        }
+        Type::Long => {
+            x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
+            // 64-bit signed division:
+            // Dividend in RAX, sign-extended into RDX using CQO
+            x86_instructions.push(X86Insn::Mov(
+                left_op.clone(),
+                X86Operand::Reg(Register::Rax),
+                Type::Long,
+            ));
+            x86_instructions.push(X86Insn::Cqto); // Sign-extend RAX into RDX
+            x86_instructions.push(X86Insn::Mov(right_op.clone(), X86Operand::Reg(reg_for_type(Register::R11, typ)), typ.clone()));      // ONLY FOR CONST PROP NEEDED
+            x86_instructions.push(X86Insn::Div(X86Operand::Reg(Register::R11), Type::Long)); // Divide RDX:RAX by RCX
+            x86_instructions.push(X86Insn::Mov(
+                X86Operand::Reg(Register::Rax),
+                dest_op.clone(),
+                Type::Long,
+            ));
+            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
+        }
+        _ => panic!("Divide only supported for int or long types"),
     }
 }
 
@@ -1162,7 +1310,6 @@ pub fn generate_assembly(
     if debug {
         print_cfg(&method_cfgs);
         html_cfgs(&method_cfgs, "opt.html".to_string());
-        println!("\n========== X86 Code ==========\n");
     }
 
     let mut global_code: Vec<X86Insn> = Vec::new();
@@ -1223,7 +1370,7 @@ pub fn generate_assembly(
             method_cfg, 
             &x86_blocks, 
             &globals, 
-            &pushed_callee_saved
+            &pushed_callee_saved,
         );
         code.insert(method_name.clone(), method_code);
     }

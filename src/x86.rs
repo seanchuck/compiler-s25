@@ -20,12 +20,15 @@ pub enum X86Insn {
     Add(X86Operand, X86Operand, Type),
     Sub(X86Operand, X86Operand, Type),
     Mul(X86Operand, X86Operand),
+    UMul(X86Operand),
     Div(X86Operand, Type),
+    Neg(X86Operand),
     Cdq,
     Cqto,
     Xor(X86Operand, X86Operand, Type),
     Or(X86Operand, X86Operand),
     Shl(X86Operand, X86Operand),
+    Shrd(X86Operand, X86Operand, X86Operand),
     Call(String),
     Label(String),
     Jmp(String),
@@ -44,6 +47,8 @@ pub enum X86Insn {
     Comm(String, i64, i64), // name, size, alignment
     String(String),
     Global(String),
+    Loadlong(i64, X86Operand),
+    SarImm(u32, X86Operand),
     Exit
 }
 
@@ -234,10 +239,12 @@ impl fmt::Display for X86Insn {
             X86Insn::Movsxd(src, dst) => write!(f, "    movsxd {}, {}", src, dst),
             X86Insn::Add(src, dst, typ) => {write!(f, "    add{} {}, {}", suffix(typ), src, dst) }
             X86Insn::Sub(src, dst, typ) => {write!(f, "    sub{} {}, {}", suffix(typ), src, dst) }
-            X86Insn::Mul(src, dst, ..) => {write!(f, "    imul {}, {}", src, dst) } // `imul` has same mnemonic for int/long 
+            X86Insn::Mul(src, dst, ..) => {write!(f, "    imul {}, {}", src, dst) }
+            X86Insn::UMul(op) => {write!(f, "    mul {}", op) }
             X86Insn::Div(divisor, typ) => {write!(f, "    idiv{} {}", suffix(typ), divisor)}
             X86Insn::Cdq => write!(f, "    cdq"),
             X86Insn::Cqto => write!(f, "    cqto"),
+            X86Insn::Shrd(shift, left, right) => write!(f, "    shrd {}, {}, {}", shift, left, right),
             X86Insn::Xor(src, dst, typ) => write!(f, "    xor{} {}, {}", suffix(typ), src, dst),
             X86Insn::Call(label) => write!(f, "    call {}", label),
             X86Insn::Label(name) => write!(f, "{}:", name),
@@ -259,7 +266,10 @@ impl fmt::Display for X86Insn {
             X86Insn::String(val) => write!(f, "    .string \"{val}\""),
             X86Insn::Global(val) => write!(f, ".globl {val}"),
             X86Insn::Or(src, dst) => write!(f, "    orq {src}, {dst}"),
-            X86Insn::Shl(src, dst) => write!(f, "    shlq {src}, {dst}"),
+            X86Insn::Shl(src, dst) => write!(f, "    shl {}, {}", src, dst),
+            X86Insn::Loadlong(constant, dst) => write!(f, "    movabs ${constant}, {dst}"),
+            X86Insn::SarImm(shift, dst) => write!(f, "    sar ${}, {}", shift, dst),
+            X86Insn::Neg(op) => write!(f, "    neg {}", op),
         }
     }
 }

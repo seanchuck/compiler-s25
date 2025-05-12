@@ -108,7 +108,7 @@ fn get_basic_operand(operand: &X86Operand) -> Option<X86Operand> {
     }
 }
 
-fn get_basic_type(typ: Type) -> Type {
+pub fn get_basic_type(typ: Type) -> Type {
     match typ {
         Type::Long | Type::String => Type::Long,
         _ => Type::Int
@@ -482,25 +482,34 @@ fn strength_reduction(x86_blocks: &mut HashMap<i32, Vec<X86Insn>>, debug: bool) 
 
             // pattern match for multiplication
             if let X86Insn::Mul(X86Operand::Constant(val), dst) = insn {
-                if *val > 0 {
-                    let unsigned = *val as u32;
+                let abs_val = val.abs() as u32;
 
-                    if unsigned.is_power_of_two() {
-                        let shift_amt = unsigned.trailing_zeros();
+                if abs_val.is_power_of_two() {
+                    let shift_amt = abs_val.trailing_zeros();
 
-                        let new_insn = X86Insn::Shl(
-                            X86Operand::Constant(shift_amt as i64),
-                            dst.clone()
-                        );
+                    let shl_insn = X86Insn::Shl(
+                        X86Operand::Constant(shift_amt as i64),
+                        dst.clone(),
+                    );
+
+                    if *val < 0 {
+                        let neg_insn = X86Insn::Neg(dst.clone());
 
                         if debug {
-                            println!(
-                                "replacing {} with {} (strength reduction)",
-                                insn, new_insn
-                            );
+                            println!("replacing {} with {}, {} (strength reduction)", insn, shl_insn, neg_insn);
                         }
 
-                        insns[i] = new_insn;
+                        // Replace current instruction with shl and insert neg after it
+                        insns[i] = shl_insn;
+                        insns.insert(i + 1, neg_insn);
+                        i += 2;
+                        continue;
+                    } else {
+                        if debug {
+                            println!("replacing {} with {} (strength reduction)", insn, shl_insn);
+                        }
+
+                        insns[i] = shl_insn;
                     }
                 }
             }

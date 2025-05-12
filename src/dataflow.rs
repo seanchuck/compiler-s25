@@ -3,7 +3,7 @@ Dataflow code generation optimizations.
 */
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use crate::{
-    cfg::{Global, CFG}, regalloc::reg_alloc, state::*, tac::*, utils::cli::Optimization
+    cfg::{Global, CFG}, regalloc::reg_alloc, state::*, tac::*, utils::cli::Optimization, x86::{Register, X86Operand}
 };
 
 // #################################################
@@ -499,6 +499,167 @@ fn copy_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
 }
 
 
+// #################################################
+// CONSTANT PROPAGATION
+// #################################################
+
+type ConstMap = BTreeMap<String, Operand>; // maps variable name → constant operand
+
+
+fn intersect_constants(
+    a: &ConstMap,
+    b: &ConstMap
+) -> ConstMap {
+    let mut result = ConstMap::new();
+    for (k, v1) in a {
+        if let Some(v2) = b.get(k) {
+            if v1 == v2 {
+                result.insert(k.clone(), v1.clone());
+            }
+        }
+    }
+    result
+}
+
+
+fn compute_const_maps(method_cfg: &CFG, debug: bool) -> (BTreeMap<i32, ConstMap>, BTreeMap<i32, ConstMap>) {
+    let preds = compute_predecessors(method_cfg);
+    let succs = compute_successors(method_cfg);
+
+    let mut in_map = BTreeMap::new();
+    let mut out_map = BTreeMap::new();
+    let mut worklist: VecDeque<i32> = method_cfg.blocks.keys().copied().collect();
+
+    while let Some(block_id) = worklist.pop_front() {
+        let in_consts = if let Some(preds) = preds.get(&block_id) {
+            preds.iter()
+                .filter_map(|p| out_map.get(p).cloned())
+                .reduce(|a, b| intersect_constants(&a, &b))
+                .unwrap_or_default()
+        } else {
+            BTreeMap::new()
+        };
+
+        let mut consts = in_consts.clone();
+
+        for instr in &method_cfg.blocks[&block_id].instructions {
+            match instr {
+                Instruction::Assign { src, dest, .. } => {
+                    if let Operand::Const { .. } = src {
+                        consts.insert(dest.to_string(), src.clone());
+                    } else {
+                        consts.remove(&dest.to_string());
+                    }
+                }
+                Instruction::LoadConst { dest, src , ..} => {
+                    consts.insert(dest.to_string(), Operand::Const { value: *src, typ: dest.get_type(), reg: None });
+                }
+                Instruction::Not { dest, .. }
+                | Instruction::Cast { dest, .. }
+                | Instruction::Add { dest, .. }
+                | Instruction::Multiply { dest, .. }
+                | Instruction::Divide { dest, .. }
+                | Instruction::Modulo { dest, .. }
+                | Instruction::Subtract { dest, .. }
+                | Instruction::Equal { dest, .. }
+                | Instruction::NotEqual { dest, .. }
+                | Instruction::Less { dest, .. }
+                | Instruction::LessEqual { dest, .. }
+                | Instruction::Greater { dest, .. }
+                | Instruction::GreaterEqual { dest, .. }
+                | Instruction::Len { dest, .. }
+                | Instruction::MethodCall { dest: Some(dest), .. }
+                | Instruction::LoadString { dest, .. } => {
+                    consts.remove(&dest.to_string());
+                }
+                _ => {}
+            }
+        }
+
+        if in_map.get(&block_id) != Some(&in_consts) || out_map.get(&block_id) != Some(&consts) {
+            in_map.insert(block_id, in_consts);
+            out_map.insert(block_id, consts);
+
+            if let Some(succs) = succs.get(&block_id) {
+                for s in succs {
+                    worklist.push_back(*s);
+                }
+            }
+        }
+    }
+    (in_map, out_map)
+}
+
+
+fn constant_propagation(method_cfg: &mut CFG, debug: bool) -> bool {
+    let (in_maps, _) = compute_const_maps(method_cfg, debug);
+    let mut changed = false;
+
+    for (block_id, block) in method_cfg.blocks.iter_mut() {
+        let mut consts = in_maps.get(&block_id).cloned().unwrap_or_default();
+        let mut block_isn_ct = 0;
+        for instr in block.get_mut_instructions() {
+            // println!("Looking at instruction: {:?}", instr);
+            block_isn_ct += 1;
+            let mut update = |op: &mut Operand| {
+                if let Operand::LocalVar { name, typ, reg } = op {
+                    if let Some(Operand::Const { value, .. }) = consts.get(name) {
+                        if debug {
+                            println!("CPROP: Replacing {} with const {}", name, value);
+                        }
+                        *op = Operand::Const {
+                            value: *value,
+                            typ: typ.clone(),
+                            reg: reg.clone(),
+                        };
+                        changed = true;
+                    }
+                }
+            };
+            // println!("Consts before instruction: {:?}", consts);
+
+            match instr {
+                Instruction::Assign { src, .. } => {
+                    update(src);
+                }
+                Instruction::Add { left, right, .. }
+                | Instruction::Subtract { left, right, .. }
+                | Instruction::Multiply { left, right, .. }
+                | Instruction::Divide { left, right, .. }
+                | Instruction::Modulo { left, right, .. }
+                | Instruction::Equal { left, right, .. }
+                | Instruction::NotEqual { left, right, .. }
+                | Instruction::Less { left, right, .. }
+                | Instruction::LessEqual { left, right, .. }
+                | Instruction::Greater { left, right, .. }
+                | Instruction::GreaterEqual { left, right, .. } => {
+                    update(left);
+                    update(right);
+                }
+                Instruction::Not { expr, .. }
+                | Instruction::Cast { expr, .. }
+                | Instruction::Len { expr, .. } => {
+                    update(expr);
+                }
+                Instruction::MethodCall { args, .. } => {
+                    for arg in args.iter_mut() {
+                        update(arg);
+                    }
+                }
+                Instruction::LoadConst { src, dest, typ } => {
+                    consts.insert(dest.to_string(), Operand::Const { value: *src, typ: typ.clone(), reg: None });
+                },
+                _ => {}
+            }
+        }
+        // println!("BLOCK INSTR COUNT: {:?}", block_isn_ct);
+    }
+
+    changed
+}
+
+
+
 
 // #################################################
 // COMMON SUBEXPRESSION ELIMINATION
@@ -818,6 +979,20 @@ pub fn optimize_dataflow(method_cfgs: &mut BTreeMap<String, CFG>, optimizations:
                 }
             }
         }
+
+        if optimizations.contains(&Optimization::Constprop) {
+            // println!("Trying const prop");
+            for (method, cfg) in method_cfgs.iter_mut() {
+                if constant_propagation(cfg, debug) {
+                    // println!("Yippeee");
+                    fixed_point = false;
+                    if debug {
+                        println!("Constant propagation changed {}", method);
+                    }
+                }
+            }
+        }
+        
     }
 
     // Register allocation optimization (NOT fixed point)

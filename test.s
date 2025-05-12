@@ -1,530 +1,542 @@
 
-.comm ARR_SIZE, 4, 4
-.comm SAMPLED_INTS, 1004, 4
 str0:
-    .string "tests/phase5/output/mergesort.txt"
-merge_sort:
-    pushq %rbx
-    pushq %rbp
-    movq %rsp, %rbp
-    subq $104, %rsp
-merge_sort0:
-    cmpl %edx, %esi
-    setl %al
-    movzbq %al, %rax
-    movl %eax, %ebx
-    movl %ebx, %eax
-    cmpl $0, %eax
-    jne merge_sort1
-
-    jmp merge_sort2
-merge_sort1:
-    movl %edx, %ecx
-    subl %esi, %ecx
-    movl $2, %ebx
-    pushq %rdx
-    movl %ecx, %eax
-    cdq
-    idivl %ebx
-    movl %eax, %ebx
-    popq %rdx
-    movl %esi, %ecx
-    addl %ebx, %ecx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq 0(%rsp), %rdi
-    movl 8(%rsp), %esi
-    movl 24(%rsp), %edx
-    xorq %rax, %rax
-    call merge_sort
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movl $1, %ebx
-    movl %ebx, %ebx
-    addl %ecx, %ebx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq 0(%rsp), %rdi
-    movl %ebx, %esi
-    movl 16(%rsp), %edx
-    xorq %rax, %rax
-    call merge_sort
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq 0(%rsp), %rdi
-    movl 8(%rsp), %esi
-    movl 24(%rsp), %edx
-    movl 16(%rsp), %ecx
-    xorq %rax, %rax
-    call merge
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-merge_sort2:
-    movq %rbp, %rsp
-    popq %rbp
-    popq %rbx
-    ret
-
-sample_output:
-    pushq %rbx
-    pushq %rbp
-    movq %rsp, %rbp
-    subq $136, %rsp
-sample_output0:
-    movl $0, %ebx
-    movl %ebx, %ebx
-sample_output1:
-    cmpl ARR_SIZE, %ebx
-    setl %al
-    movzbq %al, %rax
-    movl %eax, %ecx
-    movl %ecx, %eax
-    cmpl $0, %eax
-    jne sample_output2
-
-    jmp sample_output4
-sample_output2:
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rsi
-    movsxd %ebx, %rax
-    movq %rax, %rcx
-    movq %rcx, %rcx
-    imul %rsi, %rcx
-    movq %rcx, %rcx
-    addq %rdi, %rcx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movq 24(%rsp), %rdi
-    xorq %rax, %rax
-    call ptr_read_int
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movl %eax, %esi
-    movl $10000, %ecx
-    pushq %rdx
-    movl %ebx, %eax
-    cdq
-    idivl %ecx
-    movl %eax, %ecx
-    popq %rdx
-    movl %ecx, %r10d
-    addl $1, %r10d
-    movl %esi, SAMPLED_INTS(, %r10, 4)
-sample_output3:
-    movl $10000, %ecx
-    movl %ebx, %ebx
-    addl %ecx, %ebx
-    jmp sample_output1
-sample_output4:
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movq 0(%rsp), %rdi
-    xorq %rax, %rax
-    call ptr_free
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movq %rbp, %rsp
-    popq %rbp
-    popq %rbx
-    ret
-
-fix_neg:
-    pushq %rbx
-    pushq %rbp
-    movq %rsp, %rbp
-    subq $120, %rsp
-fix_neg0:
-    movl $0, %ebx
-    cmpl %ebx, %edi
-    setl %al
-    movzbq %al, %rax
-    movl %eax, %ebx
-    movl %ebx, %eax
-    cmpl $0, %eax
-    jne fix_neg1
-
-    jmp fix_neg2
-fix_neg1:
-    movsxd %edi, %rax
-    movq %rax, %rdi
-    movsxd %esi, %rax
-    movq %rax, %rcx
-    movsxd %esi, %rax
-    movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %rdi, %rax
-    addq %rbx, %rax
-    movq %rax, -56(%rbp)
-    movq -56(%rbp), %rax
-    movq %rbp, %rsp
-    popq %rbp
-    popq %rbx
-    ret
-fix_neg2:
-    movsxd %edi, %rax
-    movq %rax, -64(%rbp)
-    movq -64(%rbp), %rax
-    movq %rbp, %rsp
-    popq %rbp
-    popq %rbx
-    ret
-fix_neg3:
-    movq $-1, %rdi
-    call exit
-    movq %rbp, %rsp
-    popq %rbp
-    popq %rbx
-    ret
-
-write_array:
-    pushq %rbx
-    pushq %rbp
-    movq %rsp, %rbp
-    subq $88, %rsp
-write_array0:
-    leaq str0(%rip), %rax
-    movq %rax, -12(%rbp)
-    movq %rcx, 24(%rsp)
-    movq -12(%rbp), %rdi
-    xorq %rax, %rax
-    call num_open_file_write
-    movq 24(%rsp), %rcx
-    movl $0, -16(%rbp)
-    movl -16(%rbp), %ecx
-write_array1:
-    movl $250, %ebx
-    cmpl %ebx, %ecx
-    setl %al
-    movzbq %al, %rax
-    movl %eax, %ebx
-    movl %ebx, %eax
-    cmpl $0, %eax
-    jne write_array2
-
-    jmp write_array4
-write_array2:
-    movl %ecx, %r10d
-    addl $1, %r10d
-    movl SAMPLED_INTS(, %r10, 4), %ebx
-    movq %rcx, 24(%rsp)
-    movl %ebx, %edi
-    xorq %rax, %rax
-    call num_write_num_int
-    movq 24(%rsp), %rcx
-write_array3:
-    movl $1, %ebx
-    movl %ecx, %ecx
-    addl %ebx, %ecx
-    jmp write_array1
-write_array4:
-    movq %rcx, 24(%rsp)
-    xorq %rax, %rax
-    call num_close_file
-    movq 24(%rsp), %rcx
-    movq %rbp, %rsp
-    popq %rbp
-    popq %rbx
-    ret
-
-allocate:
+    .string "top of gurp\n"
+str1:
+    .string "done j\n"
+str2:
+    .string "done i\n"
+str3:
+    .string "done j\n"
+str4:
+    .string "done k\n"
+str5:
+    .string "done k\n"
+str6:
+    .string "done m\n%d %d\n"
+str7:
+    .string "after n\n"
+str8:
+    .string "after first if\n"
+str9:
+    .string "after second if\n"
+str10:
+    .string "after third if\n"
+str11:
+    .string "%d"
+str12:
+    .string " "
+str13:
+    .string "%d"
+str14:
+    .string " "
+str15:
+    .string "%d"
+str16:
+    .string " "
+str17:
+    .string "%d"
+str18:
+    .string "%d"
+str19:
+    .string "%d"
+str20:
+    .string "after fourth if\n"
+str21:
+    .string "Top of loop\n"
+str22:
+    .string "done z gurp\n"
+str23:
+    .string "%d"
+str24:
+    .string "\n"
+str25:
+    .string "done 0z gurp\n"
+str26:
+    .string "done y gurp\n"
+str27:
+    .string "done a gurp\n"
+str28:
+    .string "done b gurp\n"
+str29:
+    .string "After gurps\n"
+str30:
+    .string "%d"
+str31:
+    .string " "
+str32:
+    .string "%d"
+str33:
+    .string " "
+str34:
+    .string "%d"
+str35:
+    .string " "
+str36:
+    .string "%d"
+str37:
+    .string "\n"
+.globl main
+main:
     pushq %rbx
     pushq %r12
+    pushq %r13
     pushq %rbp
     movq %rsp, %rbp
-    subq $288, %rsp
-allocate0:
-    movl $65536, %ebx
-    movl ARR_SIZE, %eax
-    movsxd %eax, %rax
-    movq %rax, %rsi
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rcx
-    movq %rcx, %rcx
-    imul %rsi, %rcx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movq 24(%rsp), %rdi
-    xorq %rax, %rax
-    call ptr_alloc
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    xorq %rax, %rax
-    call ptr_get_lower
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ecx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movl 24(%rsp), %edi
-    movl %ebx, %esi
-    xorq %rax, %rax
-    call fix_neg
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movq %rax, %rcx
-    movq %rcx, %rdi
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    xorq %rax, %rax
-    call ptr_get_upper
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ecx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movl 24(%rsp), %edi
-    xorq %rax, %rax
-    call abs
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ecx
-    movsxd %ecx, %rax
-    movq %rax, %rsi
-    movsxd %ebx, %rax
-    movq %rax, %rcx
-    movsxd %ebx, %rax
-    movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %rbx, %rbx
-    imul %rsi, %rbx
-    movq %rdi, %rdi
-    addq %rbx, %rdi
-    movq %rdi, %rsi
-    movl $0, %ebx
-    movl %ebx, %ecx
-allocate1:
-    cmpl ARR_SIZE, %ecx
+    subq $504, %rsp
+main0:
+    movl $3, %r8d
+main1:
+    cmpl $5, %r8d
     setl %al
     movzbq %al, %rax
     movl %eax, %ebx
     movl %ebx, %eax
     cmpl $0, %eax
-    jne allocate2
+    jne main2
 
-    jmp allocate4
-allocate2:
-    movl $3559, %ebx
-    movl %ecx, %eax
-    cdq
-    idivl %ebx
-    movl %edx, %r8d
-    movl $5581, %ebx
-    movl %ebx, %ebx
-    imul %r8d, %ebx
-    movl $1777, %r8d
-    movl %ecx, %eax
-    cdq
-    idivl %r8d
-    movl %edx, %r12d
-    movl $8693, %r9d
-    movl $9151, %r8d
-    movl %ecx, %eax
-    cdq
-    idivl %r8d
-    movl %edx, %r8d
-    movl %r9d, %eax
-    subl %r8d, %eax
-    movl %eax, %r8d
-    movl %r8d, %r8d
-    imul %r12d, %r8d
-    movl %ebx, %r9d
-    subl %r8d, %r9d
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %r8
-    movl ARR_SIZE, %ebx
-    subl %ecx, %ebx
-    movsxd %ebx, %rax
+    jmp main4
+main2:
+    leaq str21(%rip), %rax
     movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %r8, %rbx
-    movq %rbx, %rbx
-    addq %rdi, %rbx
     movq %rdi, 0(%rsp)
     movq %rsi, 8(%rsp)
     movq %rcx, 24(%rsp)
     movq %r8, 32(%rsp)
     movq %r9, 40(%rsp)
     movq %rbx, %rdi
-    movl 40(%rsp), %esi
     xorq %rax, %rax
-    call ptr_write_int
+    call printf
     movq 0(%rsp), %rdi
     movq 8(%rsp), %rsi
     movq 24(%rsp), %rcx
     movq 32(%rsp), %r8
     movq 40(%rsp), %r9
-allocate3:
-    movl $1, %ebx
-    movl %ecx, %ecx
-    addl %ebx, %ecx
-    jmp allocate1
-allocate4:
-    movq %rsi, %rax
+    movl $1, %r9d
+    addl %r8d, %r9d
+    movl $0, %edi
+    subl %r8d, %edi
+    movl $2, %esi
+    addl %r8d, %esi
+    movl $1, %ecx
+    subl %r8d, %ecx
+    movl $4, %ebx
+    subl %r8d, %ebx
+    movl $1, %eax
+    movq %rax, 0(%rsp)
+    movl %ebx, %eax
+    movq %rax, 8(%rsp)
+    movq %rdi, 16(%rsp)
+    movq %rsi, 24(%rsp)
+    movq %rcx, 40(%rsp)
+    movq %r8, 48(%rsp)
+    movq %r9, 56(%rsp)
+    movl 56(%rsp), %edi
+    movl 16(%rsp), %esi
+    movl $1, %edx
+    movl $3, %ecx
+    movl 24(%rsp), %r8d
+    movl 40(%rsp), %r9d
+    xorq %rax, %rax
+    call gurp
+    movq 16(%rsp), %rdi
+    movq 24(%rsp), %rsi
+    movq 40(%rsp), %rcx
+    movq 48(%rsp), %r8
+    movq 56(%rsp), %r9
+    movl %eax, -88(%rbp)
+    leaq str22(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str23(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    movl 32(%rsp), %esi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str24(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl $1, %edi
+    addl %r8d, %edi
+    movl $0, %esi
+    subl %r8d, %esi
+    movl $2, %ecx
+    addl %r8d, %ecx
+    movl %r8d, %ebx
+    addl $1, %ebx
+    movl $1, %eax
+    movq %rax, 0(%rsp)
+    movl $0, %eax
+    movq %rax, 8(%rsp)
+    movq %rdi, 16(%rsp)
+    movq %rsi, 24(%rsp)
+    movq %rcx, 40(%rsp)
+    movq %r8, 48(%rsp)
+    movq %r9, 56(%rsp)
+    movl 16(%rsp), %edi
+    movl 24(%rsp), %esi
+    movl $1, %edx
+    movl $3, %ecx
+    movl 40(%rsp), %r8d
+    movl %ebx, %r9d
+    xorq %rax, %rax
+    call gurp
+    movq 16(%rsp), %rdi
+    movq 24(%rsp), %rsi
+    movq 40(%rsp), %rcx
+    movq 48(%rsp), %r8
+    movq 56(%rsp), %r9
+    movl %eax, %edi
+    leaq str25(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl $3, %r12d
+    subl %r8d, %r12d
+    movl $-8, %r9d
+    addl %r8d, %r9d
+    movl $3, %ebx
+    imul %r8d, %ebx
+    movl $12, %esi
+    subl %ebx, %esi
+    movl $16, %ecx
+    addl %r8d, %ecx
+    movl $8, %ebx
+    subl %r8d, %ebx
+    movl $1, %eax
+    movq %rax, 0(%rsp)
+    movl %ebx, %eax
+    movq %rax, 8(%rsp)
+    movq %rdi, 16(%rsp)
+    movq %rsi, 24(%rsp)
+    movq %rcx, 40(%rsp)
+    movq %r8, 48(%rsp)
+    movq %r9, 56(%rsp)
+    movl %r12d, %edi
+    movl 56(%rsp), %esi
+    movl $0, %edx
+    movl 24(%rsp), %ecx
+    movl 40(%rsp), %r8d
+    movl $1, %r9d
+    xorq %rax, %rax
+    call gurp
+    movq 16(%rsp), %rdi
+    movq 24(%rsp), %rsi
+    movq 40(%rsp), %rcx
+    movq 48(%rsp), %r8
+    movq 56(%rsp), %r9
+    movl %eax, %esi
+    leaq str26(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl $2, %r13d
+    subl %r8d, %r13d
+    movl $6, %r12d
+    addl %r8d, %r12d
+    movl %r8d, %r9d
+    imul $-3, %r9d
+    movl %r8d, %ebx
+    imul $2, %ebx
+    movl $3, %ecx
+    subl %ebx, %ecx
+    movl $5, %ebx
+    subl %r8d, %ebx
+    movl $0, %eax
+    movq %rax, 0(%rsp)
+    movl %ebx, %eax
+    movq %rax, 8(%rsp)
+    movq %rdi, 16(%rsp)
+    movq %rsi, 24(%rsp)
+    movq %rcx, 40(%rsp)
+    movq %r8, 48(%rsp)
+    movq %r9, 56(%rsp)
+    movl %r13d, %edi
+    movl %r12d, %esi
+    movl $0, %edx
+    movl 56(%rsp), %ecx
+    movl $1, %r8d
+    movl 40(%rsp), %r9d
+    xorq %rax, %rax
+    call gurp
+    movq 16(%rsp), %rdi
+    movq 24(%rsp), %rsi
+    movq 40(%rsp), %rcx
+    movq 48(%rsp), %r8
+    movq 56(%rsp), %r9
+    movl %eax, %ecx
+    leaq str27(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl $7, %r12d
+    subl %r8d, %r12d
+    movl %r8d, %r9d
+    subl $4, %r9d
+    movl %r8d, %ebx
+    imul $9, %ebx
+    movl $6, %eax
+    subl %ebx, %eax
+    movl %eax, %ebx
+    movl $0, %eax
+    movq %rax, 0(%rsp)
+    movl %ebx, %eax
+    movq %rax, 8(%rsp)
+    movq %rdi, 16(%rsp)
+    movq %rsi, 24(%rsp)
+    movq %rcx, 40(%rsp)
+    movq %r8, 48(%rsp)
+    movq %r9, 56(%rsp)
+    movl $-3, %edi
+    movl $8, %esi
+    movl $1, %edx
+    movl %r12d, %ecx
+    movl 56(%rsp), %r8d
+    movl $2, %r9d
+    xorq %rax, %rax
+    call gurp
+    movq 16(%rsp), %rdi
+    movq 24(%rsp), %rsi
+    movq 40(%rsp), %rcx
+    movq 48(%rsp), %r8
+    movq 56(%rsp), %r9
+    movl %eax, %ebx
+    leaq str28(%rip), %rax
+    movq %rax, %r9
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq 40(%rsp), %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str29(%rip), %rax
+    movq %rax, %r9
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq 40(%rsp), %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str30(%rip), %rax
+    movq %rax, %r9
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq 40(%rsp), %rdi
+    movl 8(%rsp), %esi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str31(%rip), %rax
+    movq %rax, %rsi
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq 8(%rsp), %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str32(%rip), %rax
+    movq %rax, %rsi
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq 8(%rsp), %rdi
+    movl 0(%rsp), %esi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str33(%rip), %rax
+    movq %rax, %rsi
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq 8(%rsp), %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str34(%rip), %rax
+    movq %rax, %rsi
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq 8(%rsp), %rdi
+    movl 24(%rsp), %esi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str35(%rip), %rax
+    movq %rax, %rcx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq 24(%rsp), %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str36(%rip), %rax
+    movq %rax, %rcx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq 24(%rsp), %rdi
+    movl %ebx, %esi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str37(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+main3:
+    movl %r8d, %r8d
+    addl $1, %r8d
+    jmp main1
+main4:
+    movl $0, -428(%rbp)
+    movl -428(%rbp), %eax
     movq %rbp, %rsp
     popq %rbp
+    popq %r13
     popq %r12
     popq %rbx
     ret
 
-.globl main
-main:
-    pushq %rbp
-    movq %rsp, %rbp
-    subq $80, %rsp
-    movq $250, %rax
-    movq %rax, SAMPLED_INTS
-main0:
-    movl $2500000, -12(%rbp)
-    movl -12(%rbp), %eax
-    movl %eax, ARR_SIZE
-    xorq %rax, %rax
-    call allocate
-    movq %rax, -20(%rbp)
-    xorq %rax, %rax
-    call start_timer
-    movq -20(%rbp), %rdi
-    movl ARR_SIZE, %esi
-    xorq %rax, %rax
-    call perform_sort_and_print
-    xorq %rax, %rax
-    call end_timer
-    xorq %rax, %rax
-    call timer_print
-    movq -20(%rbp), %rdi
-    xorq %rax, %rax
-    call sample_output
-    xorq %rax, %rax
-    call write_array
-    xorq %rax, %rax
-    call timer_write
-    movl $0, -24(%rbp)
-    movl -24(%rbp), %eax
-    movq %rbp, %rsp
-    popq %rbp
-    ret
-
-perform_sort_and_print:
-    pushq %rbx
-    pushq %rbp
-    movq %rsp, %rbp
-    subq $72, %rsp
-perform_sort_and_print0:
-    movl $0, %ecx
-    movl $1, %ebx
-    movl %esi, %eax
-    subl %ebx, %eax
-    movl %eax, %ebx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rcx, 24(%rsp)
-    movq 0(%rsp), %rdi
-    movl 24(%rsp), %esi
-    movl %ebx, %edx
-    xorq %rax, %rax
-    call merge_sort
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 24(%rsp), %rcx
-    movq %rbp, %rsp
-    popq %rbp
-    popq %rbx
-    ret
-
-abs:
-    pushq %rbx
-    pushq %rbp
-    movq %rsp, %rbp
-    subq $72, %rsp
-abs0:
-    movl $0, %ebx
-    cmpl %ebx, %edi
-    setl %al
-    movzbq %al, %rax
-    movl %eax, %ebx
-    movl %ebx, %eax
-    cmpl $0, %eax
-    jne abs1
-
-    jmp abs2
-abs1:
-    movl $-1, %ebx
-    movl %edi, %eax
-    imul %ebx, %eax
-    movl %eax, -20(%rbp)
-    movl -20(%rbp), %eax
-    movq %rbp, %rsp
-    popq %rbp
-    popq %rbx
-    ret
-abs2:
-    movl %edi, %eax
-    movq %rbp, %rsp
-    popq %rbp
-    popq %rbx
-    ret
-
-merge:
+gurp:
     pushq %rbx
     pushq %r12
     pushq %r13
@@ -533,31 +545,13 @@ merge:
     pushq %rbp
     movq %rsp, %rbp
     subq $920, %rsp
-merge0:
-    movl $65536, %r9d
-    movl %edx, %r8d
-    subl %esi, %r8d
-    movl $1, %ebx
-    movl %r8d, %eax
-    addl %ebx, %eax
-    movl %eax, -84(%rbp)
-    movl -84(%rbp), %eax
-    movl %eax, -36(%rbp)
-    movl %ecx, %eax
-    subl %edx, %eax
-    movl %eax, -88(%rbp)
-    movl -88(%rbp), %eax
-    movl %eax, -40(%rbp)
-    movl -84(%rbp), %eax
-    movsxd %eax, %rax
-    movq %rax, %rcx
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
+gurp0:
+    movl 56(%rbp), %eax
+    movl %eax, -28(%rbp)
+    movl 64(%rbp), %eax
+    movl %eax, -32(%rbp)
+    leaq str0(%rip), %rax
+    movq %rax, %rbx
     movq %rdi, 0(%rsp)
     movq %rsi, 8(%rsp)
     movq %rdx, 16(%rsp)
@@ -566,420 +560,21 @@ merge0:
     movq %r9, 40(%rsp)
     movq %rbx, %rdi
     xorq %rax, %rax
-    call ptr_alloc
+    call printf
     movq 0(%rsp), %rdi
     movq 8(%rsp), %rsi
     movq 16(%rsp), %rdx
     movq 24(%rsp), %rcx
     movq 32(%rsp), %r8
     movq 40(%rsp), %r9
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    xorq %rax, %rax
-    call ptr_get_lower
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ebx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movl %ebx, %edi
-    movl 40(%rsp), %esi
-    xorq %rax, %rax
-    call fix_neg
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movq %rax, %rbx
-    movq %rbx, %r8
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    xorq %rax, %rax
-    call ptr_get_upper
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ebx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movl %ebx, %edi
-    xorq %rax, %rax
-    call abs
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ebx
-    movsxd %ebx, %rax
-    movq %rax, %rcx
-    movsxd %r9d, %rax
-    movq %rax, %rbx
-    movq %rcx, %rcx
-    imul %rbx, %rcx
-    movsxd %r9d, %rax
-    movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %r8, %r13
-    addq %rbx, %r13
-    movq %r13, %r15
-    movl -88(%rbp), %eax
-    movsxd %eax, %rax
-    movq %rax, %rcx
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movq %rbx, %rdi
-    xorq %rax, %rax
-    call ptr_alloc
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    xorq %rax, %rax
-    call ptr_get_lower
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ebx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movl %ebx, %edi
-    movl 40(%rsp), %esi
-    xorq %rax, %rax
-    call fix_neg
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movq %rax, %rbx
-    movq %rbx, %r8
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    xorq %rax, %rax
-    call ptr_get_upper
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ebx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movl %ebx, %edi
-    xorq %rax, %rax
-    call abs
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ebx
-    movsxd %ebx, %rax
-    movq %rax, %rcx
-    movsxd %r9d, %rax
-    movq %rax, %rbx
-    movq %rcx, %rcx
-    imul %rbx, %rcx
-    movsxd %r9d, %rax
-    movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %r8, %r12
-    addq %rbx, %r12
-    movq %r12, %r14
-    movl $0, %ebx
-    movl %ebx, %r9d
-merge1:
-    cmpl -84(%rbp), %r9d
-    setl %al
-    movzbq %al, %rax
-    movl %eax, %ebx
-    movl %ebx, %eax
-    cmpl $0, %eax
-    jne merge2
-
-    jmp merge4
-merge2:
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rcx
-    movl %esi, %ebx
-    addl %r9d, %ebx
-    movsxd %ebx, %rax
-    movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %rdi, %r8
-    addq %rbx, %r8
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rcx
-    movsxd %r9d, %rax
-    movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %r13, %rcx
-    addq %rbx, %rcx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movq 32(%rsp), %rdi
-    xorq %rax, %rax
-    call ptr_read_int
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ebx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movq 24(%rsp), %rdi
-    movl %ebx, %esi
-    xorq %rax, %rax
-    call ptr_write_int
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-merge3:
-    movl $1, %ebx
-    movl %r9d, %r9d
-    addl %ebx, %r9d
-    jmp merge1
-merge4:
-    movl $0, %ebx
-    movl %ebx, %r9d
-merge5:
-    cmpl -88(%rbp), %r9d
-    setl %al
-    movzbq %al, %rax
-    movl %eax, %ebx
-    movl %ebx, %eax
-    cmpl $0, %eax
-    jne merge6
-
-    jmp merge8
-merge6:
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rcx
-    movl $1, %ebx
+    movl %edi, %ebx
+    imul %esi, %ebx
     movl %ebx, %ebx
-    addl %edx, %ebx
-    movl %ebx, %ebx
-    addl %r9d, %ebx
-    movsxd %ebx, %rax
-    movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %rdi, %r8
-    addq %rbx, %r8
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rcx
-    movsxd %r9d, %rax
-    movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %r12, %rcx
-    addq %rbx, %rcx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movq 32(%rsp), %rdi
-    xorq %rax, %rax
-    call ptr_read_int
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ebx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movq 24(%rsp), %rdi
-    movl %ebx, %esi
-    xorq %rax, %rax
-    call ptr_write_int
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-merge7:
-    movl $1, %ebx
-    movl %r9d, %r9d
-    addl %ebx, %r9d
-    jmp merge5
-merge8:
-    movl $0, %ebx
-    movl %ebx, %r13d
-    movl $0, %ebx
+    subl %r8d, %ebx
     movl %ebx, %r12d
-    movl %esi, %r9d
-merge9:
-    cmpl -36(%rbp), %r13d
-    setl %al
-    movzbq %al, %rax
-    movl %eax, %ebx
-    movl %ebx, %eax
-    cmpl $0, %eax
-    jne merge12
-
-    jmp merge11
-merge12:
-    cmpl -40(%rbp), %r12d
-    setl %al
-    movzbq %al, %rax
-    movl %eax, %ebx
-    movl %ebx, %eax
-    cmpl $0, %eax
-    jne merge10
-
-    jmp merge11
-merge10:
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rcx
-    movsxd %r9d, %rax
+    addl %ecx, %r12d
+    leaq str1(%rip), %rax
     movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %rdi, %r8
-    addq %rbx, %r8
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rcx
-    movsxd %r13d, %rax
-    movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %r15, %rsi
-    addq %rbx, %rsi
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rcx
-    movsxd %r12d, %rax
-    movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %rbx, %rbx
-    addq %r14, %rbx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movq 8(%rsp), %rdi
-    xorq %rax, %rax
-    call ptr_read_int
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %esi
     movq %rdi, 0(%rsp)
     movq %rsi, 8(%rsp)
     movq %rdx, 16(%rsp)
@@ -988,103 +583,250 @@ merge10:
     movq %r9, 40(%rsp)
     movq %rbx, %rdi
     xorq %rax, %rax
-    call ptr_read_int
+    call printf
     movq 0(%rsp), %rdi
     movq 8(%rsp), %rsi
     movq 16(%rsp), %rdx
     movq 24(%rsp), %rcx
     movq 32(%rsp), %r8
     movq 40(%rsp), %r9
-    movl %eax, %ecx
-    cmpl %ecx, %esi
-    setle %al
+    movl %r12d, %eax
+    subl $1, %eax
+    movl %eax, -156(%rbp)
+    leaq str2(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl $3, %r13d
+    addl -156(%rbp), %r13d
+    leaq str3(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl -156(%rbp), %ebx
+    addl %r13d, %ebx
+    movl %ebx, %eax
+    subl $2, %eax
+    movl %eax, -192(%rbp)
+    leaq str4(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl -192(%rbp), %r12d
+    subl %r13d, %r12d
+    movl %r12d, -48(%rbp)
+    leaq str5(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl -156(%rbp), %eax
+    addl -192(%rbp), %eax
+    movl %eax, -216(%rbp)
+    leaq str6(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    movl -192(%rbp), %esi
+    movl -216(%rbp), %edx
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl -192(%rbp), %ebx
+    subl -216(%rbp), %ebx
+    movl %r13d, %eax
+    subl %ebx, %eax
+    movl %eax, %ebx
+    movl -156(%rbp), %eax
+    addl %ebx, %eax
+    movl %eax, -236(%rbp)
+    leaq str7(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    cmpl $50, %edi
+    setg %al
     movzbq %al, %rax
     movl %eax, %ebx
     movl %ebx, %eax
     cmpl $0, %eax
-    jne merge13
+    jne gurp1
 
-    jmp merge14
-merge13:
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movq 32(%rsp), %rdi
-    movl 8(%rsp), %esi
-    xorq %rax, %rax
-    call ptr_write_int
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl $1, %ebx
-    movl %r13d, %r13d
-    addl %ebx, %r13d
-    jmp merge15
-merge14:
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movq 32(%rsp), %rdi
-    movl 24(%rsp), %esi
-    xorq %rax, %rax
-    call ptr_write_int
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl $1, %ebx
-    movl %r12d, %r12d
+    jmp gurp2
+gurp1:
+    movl %edi, %ebx
+    addl %esi, %ebx
+    movl %ebx, %r13d
+    addl %r12d, %r13d
+    movl %r13d, -60(%rbp)
+    movl %r12d, %ebx
+    subl -216(%rbp), %ebx
+    movl %ebx, -40(%rbp)
+    movl %edx, %eax
+    cmpl $0, %eax
+    jne gurp4
+
+    jmp gurp5
+gurp4:
+    movl %r8d, %r12d
+    addl %r9d, %r12d
+    movl -32(%rbp), %ebx
+    addl -236(%rbp), %ebx
+    movl %r12d, %eax
+    subl %ebx, %eax
+    movl %eax, %ebx
+    movl %ebx, -48(%rbp)
+    movl %r9d, %ebx
+    subl $1, %ebx
+    movl %ebx, %r9d
+    movl %r13d, %ebx
+    subl $3, %ebx
+    movl %ebx, -68(%rbp)
+    jmp gurp6
+gurp5:
+    movl %r13d, %ebx
+    addl $3, %ebx
+    movl %ebx, -68(%rbp)
+gurp6:
+    movl %edx, %eax
+    cmpl $0, %eax
+    jne gurp7
+
+gurp9:
+    movl -28(%rbp), %eax
+    cmpl $0, %eax
+    jne gurp7
+
+    jmp gurp8
+gurp7:
+    movl %r9d, %r12d
+    addl %r8d, %r12d
+    movl -32(%rbp), %ebx
+    subl %esi, %ebx
+    movl %ebx, %ebx
+    addl %r12d, %ebx
+    movl %ebx, -76(%rbp)
+gurp8:
+    jmp gurp3
+gurp2:
+    movl %esi, %r13d
+    subl %edi, %r13d
+    movl %r13d, -60(%rbp)
+    movl %r12d, %r9d
+    addl -216(%rbp), %r9d
+    movl %r9d, -40(%rbp)
+    movl -28(%rbp), %eax
+    cmpl $0, %eax
+    jne gurp10
+
+    jmp gurp11
+gurp10:
+    movl %edi, %ebx
+    subl %r13d, %ebx
+    movl $3, %r12d
     addl %ebx, %r12d
-merge15:
-    movl $1, %ebx
+    movl %r12d, %r9d
+    movl $3, %ebx
+    subl %r13d, %ebx
+    movl %ebx, -68(%rbp)
+    movl %ebx, %ebx
+    addl %r12d, %ebx
+    movl %ebx, -76(%rbp)
+    jmp gurp12
+gurp11:
+    movl %r13d, %ebx
+    subl %edi, %ebx
+    movl %ebx, %ebx
+    subl $2, %ebx
+    movl %ebx, %ebx
+    addl $3, %ebx
+    movl %ebx, -76(%rbp)
     movl %r9d, %r9d
     addl %ebx, %r9d
-    jmp merge9
-merge11:
-merge16:
-    cmpl -36(%rbp), %r13d
-    setl %al
-    movzbq %al, %rax
-    movl %eax, %ebx
-    movl %ebx, %eax
-    cmpl $0, %eax
-    jne merge17
-
-    jmp merge18
-merge17:
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rcx
-    movsxd %r9d, %rax
+    movl %r9d, -68(%rbp)
+    movl %ebx, %ebx
+    addl %r9d, %ebx
+    movl %ebx, %ebx
+    subl %r9d, %ebx
+    movl %ebx, %r9d
+gurp12:
+gurp3:
+    leaq str8(%rip), %rax
     movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %rdi, %rsi
-    addq %rbx, %rsi
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rcx
-    movsxd %r13d, %rax
-    movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %rbx, %rbx
-    addq %r15, %rbx
     movq %rdi, 0(%rsp)
     movq %rsi, 8(%rsp)
     movq %rdx, 16(%rsp)
@@ -1093,87 +835,184 @@ merge17:
     movq %r9, 40(%rsp)
     movq %rbx, %rdi
     xorq %rax, %rax
-    call ptr_read_int
+    call printf
     movq 0(%rsp), %rdi
     movq 8(%rsp), %rsi
     movq 16(%rsp), %rdx
     movq 24(%rsp), %rcx
     movq 32(%rsp), %r8
     movq 40(%rsp), %r9
+    movl %r8d, %ebx
+    addl -48(%rbp), %ebx
+    movl %ebx, %eax
+    subl -156(%rbp), %eax
+    movl %eax, -392(%rbp)
+    movl -392(%rbp), %ebx
+    addl -40(%rbp), %ebx
+    movl %ebx, %eax
+    addl -60(%rbp), %eax
+    movl %eax, -400(%rbp)
+    movl -392(%rbp), %ebx
+    subl -400(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -216(%rbp), %ebx
+    movl %ebx, %eax
+    subl -40(%rbp), %eax
+    movl %eax, -412(%rbp)
+    movl -48(%rbp), %r12d
+    addl -400(%rbp), %r12d
+    movl -68(%rbp), %ebx
+    addl %r9d, %ebx
+    movl -392(%rbp), %eax
+    subl %ebx, %eax
     movl %eax, %ebx
+    movl %r12d, %eax
+    addl %ebx, %eax
+    movl %eax, -428(%rbp)
+    movl -28(%rbp), %eax
+    cmpl $0, %eax
+    jne gurp13
+
+    jmp gurp14
+gurp13:
+    movl $3, %eax
+    movl %eax, -92(%rbp)
+    jmp gurp15
+gurp14:
+    movl $-1, %eax
+    movl %eax, -92(%rbp)
+gurp15:
+    leaq str9(%rip), %rax
+    movq %rax, %rbx
     movq %rdi, 0(%rsp)
     movq %rsi, 8(%rsp)
     movq %rdx, 16(%rsp)
     movq %rcx, 24(%rsp)
     movq %r8, 32(%rsp)
     movq %r9, 40(%rsp)
-    movq 8(%rsp), %rdi
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl $99, %ebx
+    addl -236(%rbp), %ebx
+    movl %ebx, %ebx
+    subl %r8d, %ebx
+    movl %ebx, %eax
+    addl -392(%rbp), %eax
+    movl %eax, -460(%rbp)
+    movl %r8d, %ebx
+    subl -76(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -236(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -60(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -216(%rbp), %ebx
+    movl %ebx, %ebx
+    subl %r8d, %ebx
+    movl %ebx, %ebx
+    addl %esi, %ebx
+    movl %ebx, %ebx
+    subl %esi, %ebx
+    movl %ebx, %eax
+    addl %r8d, %eax
+    movl %eax, -492(%rbp)
+    movl -400(%rbp), %ebx
+    addl -392(%rbp), %ebx
+    movl %ebx, %ebx
+    subl -236(%rbp), %ebx
+    movl %ebx, %eax
+    subl -392(%rbp), %eax
+    movl %eax, -504(%rbp)
+    movl -32(%rbp), %ebx
+    addl %r9d, %ebx
+    movl %ebx, %ebx
+    addl %ecx, %ebx
+    movl %ebx, %eax
+    subl %r8d, %eax
+    movl %eax, -516(%rbp)
+    cmpl $-1, -92(%rbp)
+    sete %al
+    movzbq %al, %rax
+    movl %eax, %ebx
+    movl %ebx, %eax
+    cmpl $0, %eax
+    jne gurp16
+
+    jmp gurp17
+gurp16:
+    movl -504(%rbp), %ebx
+    addl -516(%rbp), %ebx
+    movl %ebx, -116(%rbp)
+    jmp gurp18
+gurp17:
+    movl -516(%rbp), %ebx
+    subl -504(%rbp), %ebx
+    movl %ebx, -116(%rbp)
+gurp18:
+    movl -460(%rbp), %r15d
+    subl -428(%rbp), %r15d
+    movl %r15d, %r14d
+    addl -92(%rbp), %r14d
+    movl $42, %r13d
+    subl %r14d, %r13d
+    leaq str10(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str11(%rip), %rax
+    movq %rax, %r12
+    movl %edi, %ebx
+    subl -156(%rbp), %ebx
+    movl %ebx, %ebx
+    addl %ecx, %ebx
+    movl %ebx, %ebx
+    addl -40(%rbp), %ebx
+    movl %ebx, %ebx
+    subl %r8d, %ebx
+    movl %ebx, %ebx
+    subl %r9d, %ebx
+    movl %ebx, %ebx
+    addl -48(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -216(%rbp), %ebx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %r12, %rdi
     movl %ebx, %esi
     xorq %rax, %rax
-    call ptr_write_int
+    call printf
     movq 0(%rsp), %rdi
     movq 8(%rsp), %rsi
     movq 16(%rsp), %rdx
     movq 24(%rsp), %rcx
     movq 32(%rsp), %r8
     movq 40(%rsp), %r9
-    movl $1, %ebx
-    movl %r13d, %r13d
-    addl %ebx, %r13d
-    movl $1, %ebx
-    movl %r9d, %r9d
-    addl %ebx, %r9d
-    jmp merge16
-merge18:
-merge19:
-    cmpl -40(%rbp), %r12d
-    setl %al
-    movzbq %al, %rax
-    movl %eax, %ebx
-    movl %ebx, %eax
-    cmpl $0, %eax
-    jne merge20
-
-    jmp merge21
-merge20:
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rcx
-    movsxd %r9d, %rax
+    leaq str12(%rip), %rax
     movq %rax, %rbx
-    movq %rbx, %rbx
-    imul %rcx, %rbx
-    movq %rbx, %rbx
-    addq %rdi, %rbx
-    movq $4, %r10
-    movq $0, %rax
-    shlq $32, %rax
-    orq %rax, %r10
-    movq %r10, %rsi
-    movsxd %r12d, %rax
-    movq %rax, %rcx
-    movq %rcx, %rcx
-    imul %rsi, %rcx
-    movq %rcx, %rcx
-    addq %r14, %rcx
-    movq %rdi, 0(%rsp)
-    movq %rsi, 8(%rsp)
-    movq %rdx, 16(%rsp)
-    movq %rcx, 24(%rsp)
-    movq %r8, 32(%rsp)
-    movq %r9, 40(%rsp)
-    movq 24(%rsp), %rdi
-    xorq %rax, %rax
-    call ptr_read_int
-    movq 0(%rsp), %rdi
-    movq 8(%rsp), %rsi
-    movq 16(%rsp), %rdx
-    movq 24(%rsp), %rcx
-    movq 32(%rsp), %r8
-    movq 40(%rsp), %r9
-    movl %eax, %ecx
     movq %rdi, 0(%rsp)
     movq %rsi, 8(%rsp)
     movq %rdx, 16(%rsp)
@@ -1181,53 +1020,273 @@ merge20:
     movq %r8, 32(%rsp)
     movq %r9, 40(%rsp)
     movq %rbx, %rdi
-    movl 24(%rsp), %esi
     xorq %rax, %rax
-    call ptr_write_int
+    call printf
     movq 0(%rsp), %rdi
     movq 8(%rsp), %rsi
     movq 16(%rsp), %rdx
     movq 24(%rsp), %rcx
     movq 32(%rsp), %r8
     movq 40(%rsp), %r9
-    movl $1, %ebx
-    movl %r12d, %r12d
-    addl %ebx, %r12d
-    movl $1, %ebx
-    movl %r9d, %r9d
-    addl %ebx, %r9d
-    jmp merge19
-merge21:
+    leaq str13(%rip), %rax
+    movq %rax, %r12
+    movl %esi, %ebx
+    subl -192(%rbp), %ebx
+    movl %ebx, %ebx
+    subl -32(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -236(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -60(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -68(%rbp), %ebx
+    movl %ebx, %ebx
+    subl -412(%rbp), %ebx
+    movl %ebx, %ebx
+    subl -504(%rbp), %ebx
     movq %rdi, 0(%rsp)
     movq %rsi, 8(%rsp)
     movq %rdx, 16(%rsp)
     movq %rcx, 24(%rsp)
     movq %r8, 32(%rsp)
     movq %r9, 40(%rsp)
-    movq %r15, %rdi
+    movq %r12, %rdi
+    movl %ebx, %esi
     xorq %rax, %rax
-    call ptr_free
+    call printf
     movq 0(%rsp), %rdi
     movq 8(%rsp), %rsi
     movq 16(%rsp), %rdx
     movq 24(%rsp), %rcx
     movq 32(%rsp), %r8
     movq 40(%rsp), %r9
+    leaq str14(%rip), %rax
+    movq %rax, %rbx
     movq %rdi, 0(%rsp)
     movq %rsi, 8(%rsp)
     movq %rdx, 16(%rsp)
     movq %rcx, 24(%rsp)
     movq %r8, 32(%rsp)
     movq %r9, 40(%rsp)
-    movq %r14, %rdi
+    movq %rbx, %rdi
     xorq %rax, %rax
-    call ptr_free
+    call printf
     movq 0(%rsp), %rdi
     movq 8(%rsp), %rsi
     movq 16(%rsp), %rdx
     movq 24(%rsp), %rcx
     movq 32(%rsp), %r8
     movq 40(%rsp), %r9
+    leaq str15(%rip), %rax
+    movq %rax, %r12
+    movl -516(%rbp), %ebx
+    addl -76(%rbp), %ebx
+    movl %ebx, %ebx
+    subl -392(%rbp), %ebx
+    movl %ebx, %ebx
+    addl %r14d, %ebx
+    movl %ebx, %ebx
+    subl -492(%rbp), %ebx
+    movl %ebx, %ebx
+    addl $0, %ebx
+    movl %ebx, %ebx
+    addl -92(%rbp), %ebx
+    movl %ebx, %ebx
+    subl -116(%rbp), %ebx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %r12, %rdi
+    movl %ebx, %esi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    leaq str16(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl %edx, %eax
+    cmpl $0, %eax
+    jne gurp19
+
+    jmp gurp20
+gurp19:
+    leaq str17(%rip), %rax
+    movq %rax, %r12
+    movl %r13d, %ebx
+    addl -460(%rbp), %ebx
+    movl %ebx, %ebx
+    subl -428(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -400(%rbp), %ebx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %r12, %rdi
+    movl %ebx, %esi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    jmp gurp21
+gurp20:
+    movl -28(%rbp), %eax
+    cmpl $0, %eax
+    jne gurp22
+
+    jmp gurp23
+gurp22:
+    leaq str18(%rip), %rax
+    movq %rax, %r12
+    movl %r15d, %ebx
+    addl -400(%rbp), %ebx
+    movl %ebx, %ebx
+    subl %r13d, %ebx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %r12, %rdi
+    movl %ebx, %esi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    jmp gurp24
+gurp23:
+    leaq str19(%rip), %rax
+    movq %rax, %r12
+    movl -400(%rbp), %ebx
+    addl -428(%rbp), %ebx
+    movl %ebx, %ebx
+    addl %r13d, %ebx
+    movl %ebx, %ebx
+    subl -460(%rbp), %ebx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %r12, %rdi
+    movl %ebx, %esi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+gurp24:
+gurp21:
+    leaq str20(%rip), %rax
+    movq %rax, %rbx
+    movq %rdi, 0(%rsp)
+    movq %rsi, 8(%rsp)
+    movq %rdx, 16(%rsp)
+    movq %rcx, 24(%rsp)
+    movq %r8, 32(%rsp)
+    movq %r9, 40(%rsp)
+    movq %rbx, %rdi
+    xorq %rax, %rax
+    call printf
+    movq 0(%rsp), %rdi
+    movq 8(%rsp), %rsi
+    movq 16(%rsp), %rdx
+    movq 24(%rsp), %rcx
+    movq 32(%rsp), %r8
+    movq 40(%rsp), %r9
+    movl %edi, %ebx
+    subl %esi, %ebx
+    movl %ebx, %ebx
+    addl %ecx, %ebx
+    movl %ebx, %ebx
+    addl %r8d, %ebx
+    movl %ebx, %ebx
+    addl %r9d, %ebx
+    movl %ebx, %ebx
+    addl -32(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -156(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -40(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -192(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -48(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -216(%rbp), %ebx
+    movl %ebx, %ebx
+    subl -236(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -60(%rbp), %ebx
+    movl %ebx, %ebx
+    subl %r13d, %ebx
+    movl %ebx, %ebx
+    addl -68(%rbp), %ebx
+    movl %ebx, %ebx
+    subl -412(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -76(%rbp), %ebx
+    movl %ebx, %ebx
+    subl -392(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -460(%rbp), %ebx
+    movl %ebx, %ebx
+    subl -428(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -92(%rbp), %ebx
+    movl %ebx, %ebx
+    subl $0, %ebx
+    movl %ebx, %ebx
+    addl -492(%rbp), %ebx
+    movl %ebx, %ebx
+    subl %r14d, %ebx
+    movl %ebx, %ebx
+    addl -400(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -504(%rbp), %ebx
+    movl %ebx, %ebx
+    addl -116(%rbp), %ebx
+    movl %ebx, %eax
+    subl -516(%rbp), %eax
+    movl %eax, -868(%rbp)
+    movl -868(%rbp), %eax
     movq %rbp, %rsp
     popq %rbp
     popq %r15

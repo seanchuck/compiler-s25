@@ -38,6 +38,13 @@ fn compute_instr_map(method_cfg: &CFG) -> InstructionMap {
                 },
                 instr.clone(),
             );
+            map.insert(
+                InstructionIndex {
+                    block_id: *block_id,
+                    instr_index: instr_idx as i32,
+                },
+                instr.clone(),
+            );
         }
     }
     InstructionMap(map)
@@ -681,8 +688,16 @@ pub fn reg_alloc(
             // }
         }
         // println!("Finish Assigning");
+        // println!("Finish Assigning");
 
         // register information for visualization
+        register_data.insert(
+            method_name.clone(),
+            register_assignments
+                .iter()
+                .map(|(web, reg)| (web.id, reg.clone()))
+                .collect(),
+        );
         register_data.insert(
             method_name.clone(),
             register_assignments
@@ -697,7 +712,3 @@ pub fn reg_alloc(
     // Generate visual HTML for all methods
     //html_web_graphs(&web_data, &register_data, "reg_alloc.html".to_string());
 }
-
-
-
-

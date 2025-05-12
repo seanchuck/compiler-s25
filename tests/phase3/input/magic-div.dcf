@@ -1,0 +1,8 @@
+import printf;
+
+void main() {
+    printf("%d\n", 50871816L / 245760L);
+    printf("%d\n", 66 / 3);
+    printf("%d\n", 100 / 7);
+    printf("%d\n", 33 / 5);
+}
