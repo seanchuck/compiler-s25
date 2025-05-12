@@ -1260,8 +1260,7 @@ fn generate_method_x86(
     method_cfg: &CFG,
     x86_blocks: &HashMap<i32, Vec<X86Insn>>,
     globals: &BTreeMap<String, Global>,
-    pushed_callee_saved: &Vec<Register>,
-    regalloc: bool
+    pushed_callee_saved: &Vec<Register>
 ) -> Vec<X86Insn> {
     let mut x86_instructions: Vec<X86Insn> = Vec::new();
 
@@ -1354,7 +1353,6 @@ pub fn generate_assembly(
     if debug {
         print_cfg(&method_cfgs);
         html_cfgs(&method_cfgs, "opt.html".to_string());
-        println!("\n========== X86 Code ==========\n");
     }
 
     let mut global_code: Vec<X86Insn> = Vec::new();
@@ -1416,7 +1414,6 @@ pub fn generate_assembly(
             &x86_blocks, 
             &globals, 
             &pushed_callee_saved,
-            optimizations.contains(&Optimization::Regalloc)
         );
         code.insert(method_name.clone(), method_code);
     }
