@@ -233,8 +233,8 @@ fn map_operand(
     }
 }
 
-/// return magic number and shift amount
-fn compute_magic_u64(divisor: u64) -> (u64, u32) {
+/// if successful, return true and magic number; otherwise return false
+fn compute_magic_u64(divisor: u64) -> (bool, u64) {
     assert!(divisor > 1, "Divisor must be > 1");
 
     let bits = 64;
@@ -243,15 +243,20 @@ fn compute_magic_u64(divisor: u64) -> (u64, u32) {
     let magic = (1u128 << bits).wrapping_add(divisor as u128 - 1) / (divisor as u128);
 
     // Magic must fit into 64 bits
-    assert!(magic <= u64::MAX as u128, "Magic number too large");
+    if magic > u64::MAX as u128 {
+        return (false, 0)
+    }
+    
+    (true, magic as u64)
+}
 
-    let magic_u64 = magic as u64;
-
-    // Usually the shift is just the bit width
-    let shift = bits;
-
-    // println!("magic: {}, shift: {}", magic, shift);
-    (magic_u64, shift)
+/// return the number of bits necessary to hold this unsigned integer
+fn bit_width(num: u64) -> u32 {
+    if num == 0 {
+        1 // Special case for 0, which requires at least 1 bit
+    } else {
+        (64 - num.leading_zeros()) as u32
+    }
 }
 
 // Adds the x86 instructions corresponding to insn to x86_instructions
@@ -710,69 +715,38 @@ fn add_instruction(
                     }
                     return;
                 } else {
-                    // no magic number division for now
-                    add_division(x86_instructions, &left_op, &X86Operand::Constant(divisor), &dest_op, typ);
+                    if divisor > 0 {
+                        // magic number division                    
+                        let (success, magic) = compute_magic_u64(abs_divisor);
 
-                    // x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
-                    // // Use magic number division (signed)
-                    // let (magic, shift) = match typ {
-                    //     Type::Int => compute_magic_u64(abs_divisor),
-                    //     Type::Long => compute_magic_u64(abs_divisor),
-                    //     _ => panic!("Divide only supported for int or long"),
-                    // };
-
-                    // // let reg = match typ {
-                    // //     Type::Int => Register::Rax,
-                    // //     Type::Long => Register::Rax,
-                    // //     _ => unreachable!(),
-                    // // };
-
-                    // // left / right = (left * magic) >> shift
-                    // x86_instructions.push(X86Insn::Mov(
-                    //     left_op.clone(),
-                    //     X86Operand::Reg(reg_for_type(Register::R11, typ)),
-                    //     typ.clone(),
-                    // ));
-                    // x86_instructions.push(X86Insn::Loadlong(
-                    //     magic as i64,
-                    //     X86Operand::Reg(Register::Rax),
-                    // )); // todo: magic signed
-                    // x86_instructions.push(X86Insn::UMul(X86Operand::Reg(Register::R11)));
-
-                    // if shift == 64 {
-                    //     // rdx into res
-                    //     x86_instructions.push(X86Insn::Mov(
-                    //         X86Operand::Reg(reg_for_type(Register::Rdx, typ)),
-                    //         dest_op.clone(),
-                    //         typ.clone(),
-                    //     ));
-                    // } else {
-                    //     // shrd
-                    //     x86_instructions.push(X86Insn::Mov(
-                    //         X86Operand::Constant(shift.into()),
-                    //         X86Operand::Reg(Register::R11),
-                    //         Type::Long,
-                    //     ));
-
-                    //     x86_instructions.push(X86Insn::Shrd(
-                    //         X86Operand::Reg(Register::R11),
-                    //         X86Operand::Reg(Register::Rdx),
-                    //         X86Operand::Reg(Register::Rax),
-                    //     ));
-
-                    //     x86_instructions.push(X86Insn::Mov(
-                    //         X86Operand::Reg(reg_for_type(Register::Rax, typ)),
-                    //         dest_op.clone(),
-                    //         typ.clone(),
-                    //     ));
-                    // }
-
-                    // if divisor < 0 {
-                    //     x86_instructions.push(X86Insn::Neg(dest_op.clone()));
-                    // }
-
-                    // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
-                    // return;
+                        if success {
+                            // left / right = (left * magic) >> 64
+                            x86_instructions.push(X86Insn::Push(X86Operand::Reg(Register::Rdx)));
+                            x86_instructions.push(X86Insn::Mov(
+                                left_op.clone(),
+                                X86Operand::Reg(reg_for_type(Register::R11, typ)),
+                                typ.clone(),
+                            ));
+                            x86_instructions.push(X86Insn::Loadlong(
+                                magic as i64,
+                                X86Operand::Reg(Register::Rax),
+                            ));
+                            x86_instructions.push(X86Insn::UMul(X86Operand::Reg(Register::R11)));
+                            // rdx into res
+                            x86_instructions.push(X86Insn::Mov(
+                                X86Operand::Reg(reg_for_type(Register::Rdx, typ)),
+                                dest_op.clone(),
+                                typ.clone(),
+                            ));
+                            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
+                        } else {
+                            // no magic number division
+                            add_division(x86_instructions, &left_op, &X86Operand::Constant(divisor), &dest_op, typ);
+                        }
+                    } else {
+                        // no magic number division for now
+                        add_division(x86_instructions, &left_op, &X86Operand::Constant(divisor), &dest_op, typ);
+                    }
                 }
             } else {
                 let right_op = map_operand(method_cfg, right, x86_instructions, globals);
