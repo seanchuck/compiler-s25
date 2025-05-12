@@ -233,25 +233,26 @@ fn map_operand(
     }
 }
 
-// fn compute_magic_u64(divisor: u64) -> (u64, u32) {
-//     assert!(divisor > 1, "Divisor must be > 1");
+/// return magic number and shift amount
+fn compute_magic_u64(divisor: u64) -> (u64, u32) {
+    assert!(divisor > 1, "Divisor must be > 1");
 
-//     let bits = 64;
+    let bits = 64;
 
-//     // Compute magic = floor( (2^bits + divisor - 1) / divisor )
-//     let magic = (1u128 << bits).wrapping_add(divisor as u128 - 1) / (divisor as u128);
+    // Compute magic = floor( (2^bits + divisor - 1) / divisor )
+    let magic = (1u128 << bits).wrapping_add(divisor as u128 - 1) / (divisor as u128);
 
-//     // Magic must fit into 64 bits
-//     assert!(magic <= u64::MAX as u128, "Magic number too large");
+    // Magic must fit into 64 bits
+    assert!(magic <= u64::MAX as u128, "Magic number too large");
 
-//     let magic_u64 = magic as u64;
+    let magic_u64 = magic as u64;
 
-//     // Usually the shift is just the bit width
-//     let shift = bits;
+    // Usually the shift is just the bit width
+    let shift = bits;
 
-//     // println!("magic: {}, shift: {}", magic, shift);
-//     (magic_u64, shift)
-// }
+    // println!("magic: {}, shift: {}", magic, shift);
+    (magic_u64, shift)
+}
 
 // Adds the x86 instructions corresponding to insn to x86_instructions
 fn add_instruction(

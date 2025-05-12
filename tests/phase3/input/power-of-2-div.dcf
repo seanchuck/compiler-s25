@@ -1,0 +1,5 @@
+import printf;
+
+void main() {
+    printf("%d\n", 512 / -32);
+}
