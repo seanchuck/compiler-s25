@@ -1,0 +1,10 @@
+import printf;
+
+// do not inline
+long get(long x) {
+    return x;
+}
+
+void main() {
+    printf("%d\n", get(50871816L) / 245760L);
+}

@@ -773,11 +773,10 @@ fn add_instruction(
                     // x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rdx)));
                     // return;
                 }
+            } else {
+                let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+                add_division(x86_instructions, &left_op, &right_op, &dest_op, typ);
             }
-
-            let right_op = map_operand(method_cfg, right, x86_instructions, globals);
-
-            add_division(x86_instructions, &left_op, &right_op, &dest_op, typ);
         }
         Instruction::Modulo {
             left,
@@ -1332,50 +1331,7 @@ fn generate_method_x86(
 
     for i in 0..block_order.len() {
         let id = &block_order[i];
-        let block = &method_cfg.blocks[id];
-        x86_instructions.push(X86Insn::Label(method_name.to_string() + &id.to_string()));
-
-        let next_id = block_order.get(i + 1);
-        let block_instructions = block.get_instructions();
-
-        for (j, insn) in block_instructions.iter().enumerate() {
-            // skip unnecessary unconditional jumps
-            let is_last_insn = j == block_instructions.len() - 1;
-            if is_last_insn {
-                if let Instruction::UJmp { id, .. } = insn {
-                    if let Some(next) = next_id {
-                        if id == next {
-                            // jump to the label right after this insn
-                            continue;
-                        }
-                    }
-                }
-            }
-
-            add_instruction(method_cfg, &insn, &mut x86_instructions, globals, regalloc);
-        }
-
-        if *id == method_cfg.exit {
-            // === Method Epilogue ===
-
-            // Restore RSP from RBP
-            x86_instructions.push(X86Insn::Mov(
-                X86Operand::Reg(Register::Rbp),
-                X86Operand::Reg(Register::Rsp),
-                Type::Long,
-            ));
-
-            x86_instructions.push(X86Insn::Pop(X86Operand::Reg(Register::Rbp)));
-
-            // Pop callee-saved in reverse
-            for reg in pushed_callee_saved.iter().rev() {
-                x86_instructions.push(X86Insn::Pop(X86Operand::Reg(reg.clone())));
-            }
-
-            x86_instructions.push(X86Insn::Ret); // return to where function was called
-
-            continue;
-        }
+        x86_instructions.extend(x86_blocks[id].clone());
     }
 
     x86_instructions
