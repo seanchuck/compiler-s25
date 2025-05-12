@@ -108,7 +108,7 @@ fn get_basic_operand(operand: &X86Operand) -> Option<X86Operand> {
     }
 }
 
-fn get_basic_type(typ: Type) -> Type {
+pub fn get_basic_type(typ: Type) -> Type {
     match typ {
         Type::Long | Type::String => Type::Long,
         _ => Type::Int

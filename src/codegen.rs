@@ -6,6 +6,7 @@ use crate::cfg::BasicBlock;
 use crate::cfg::Global;
 use crate::cfg::{INT_SIZE, LONG_SIZE};
 use crate::dataflow::optimize_dataflow;
+use crate::peephole::get_basic_type;
 use crate::tac::*;
 use crate::utils::cli::Optimization;
 use crate::utils::print::{html_cfgs, print_cfg};
@@ -699,6 +700,10 @@ fn add_instruction(
                 if divisor == 0 {
                     // keep original behavior so we get a division-by-zero runtime error
                     add_division(x86_instructions, &left_op, &X86Operand::Constant(0), &dest_op, typ);
+                } else if get_basic_type(typ.clone()) == Type::Long {
+                    // only do magic num division for ints
+                    let right_op = map_operand(method_cfg, right, x86_instructions, globals);
+                    add_division(x86_instructions, &left_op, &right_op, &dest_op, typ);
                 } else if abs_divisor.is_power_of_two() {
                     //SUS
                     // Division by power of 2
