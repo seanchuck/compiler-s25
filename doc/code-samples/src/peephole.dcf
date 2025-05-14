@@ -1,0 +1,19 @@
+int example() {
+    int x, y;
+    y = 0; // should turn into xor instruction
+    x = 2; 
+    x += y; // peephole optimization should compress the move of $2 to %esi
+    y *= 8; // should be replaced with a left shift
+
+    if (y < 5) {
+        
+    } else {
+        x = 4;
+    } // should be no jump to next block
+
+    return x;
+}
+
+void main() {
+    example();
+}
