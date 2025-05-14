@@ -1,7 +1,0 @@
-import printf;
-void main ( ) {
-  int a, b, c;
-  a = 2600;
-  b = a / -50;
-  printf("b: %d\n", b);
-}
